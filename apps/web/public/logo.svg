@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="220" height="48" viewBox="0 0 220 48" role="img" aria-labelledby="title">
+  <title id="title">CyberAudit</title>
+  <g fill="none" stroke="#31F27C" stroke-width="2">
+    <path d="M24 3 41 9v12c0 11-6.9 19.2-17 24C13.9 40.2 7 32 7 21V9Z"/>
+    <path d="M30 16a9 9 0 1 0 0 16M21 19v10m0-5h9"/>
+    <circle cx="21" cy="16" r="2" fill="#31F27C"/><circle cx="32" cy="24" r="2" fill="#31F27C"/><circle cx="21" cy="32" r="2" fill="#31F27C"/>
+  </g>
+  <text x="52" y="31" fill="#F2F7F9" font-family="Inter,Arial,sans-serif" font-weight="700" font-size="20" letter-spacing="1.2">CYBER<tspan fill="#31F27C">AUDIT</tspan></text>
+</svg>

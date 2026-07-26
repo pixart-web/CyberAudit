@@ -1,0 +1,18 @@
+{
+  "dashboard": "Dashboard",
+  "search": "Search CyberAudit",
+  "clientMode": "Client mode",
+  "laboratoryMode": "Laboratory mode",
+  "securityPosture": "Security posture",
+  "assets": "Assets",
+  "findings": "Findings",
+  "activeAudits": "Active audits",
+  "retestRate": "Approved retests",
+  "topRisks": "Top risks",
+  "recentActivity": "Recent activity",
+  "severityDistribution": "Findings by severity",
+  "activeEngagements": "Active audits",
+  "upcomingJobs": "Upcoming jobs",
+  "incidentTimeline": "Incident timeline",
+  "adapterStatus": "Adapter status"
+}

@@ -1,0 +1,16 @@
+{
+  "findings": [
+    {
+      "title": "Header de demonstração importado",
+      "description": "Resultado sintético criado apenas para validar a importação CyberAudit.",
+      "category": "http_headers",
+      "severity": "low",
+      "confidence": "medium",
+      "affected_component": "http://localhost:8080/",
+      "source_identifier": "demo.import.header",
+      "observed_value": "header ausente",
+      "expected_value": "header presente",
+      "remediation": "Rever a configuração no laboratório."
+    }
+  ]
+}
