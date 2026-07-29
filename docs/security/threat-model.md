@@ -87,3 +87,31 @@ O JWT local, storage local e execução in-process são adequados apenas a desen
   classificação/residência e nenhum segredo na configuração.
 - **Autonomous action:** não existe tool calling nem endpoint que converta uma
   resposta em mutação.
+
+# Product Hardening (Fase 10)
+
+- **Configuração insegura em produção:** validação tipada rejeita defaults,
+  SQLite, HTTP/cookies inseguros, autenticação local, storage local, fixtures e
+  runner in-process.
+- **OIDC mix-up/replay:** issuer e endpoints fixos, PKCE, nonce, state Redis
+  single-use e validação de assinatura/audience/expiry.
+- **Session theft:** apenas hashes server-side, idle/absolute expiry, limite de
+  sessões, cookies SameSite/Secure e revogação remota.
+- **Escalada por mapeamento externo:** JIT pendente por defeito, mapeamentos
+  versionados por tenant e step-up para permissões administrativas.
+- **Supply-chain connector:** registry/manifesto fechado, versão mínima,
+  permissões read-only e nenhuma carga dinâmica fornecida pelo utilizador.
+- **Runner/container escape:** nenhum comando livre; produção exige workload
+  efémero não-root, read-only, sem capabilities/host mounts/socket e egress
+  allowlist. O controlador externo continua bloqueado até ser validado.
+- **Upload/archive abuse:** limites, MIME allowlist, basename, double-extension,
+  archive entry/ratio limits, zip-slip defense e quarentena.
+- **License/telemetry abuse:** assinaturas Ed25519 e preview allowlist opt-in;
+  expiração não impede acesso aos dados do cliente.
+
+## Riscos residuais da Fase 10
+
+Integrações reais de secret manager/object storage, WebAuthn, controladores
+efémeros, PostgreSQL RLS por sessão e HA/DR medido dependem de infraestrutura
+externa. As interfaces falham fechadas, mas esses controlos só podem ser
+considerados eficazes após testes nos ambientes de destino.

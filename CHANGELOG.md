@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — Product Hardening & Enterprise Readiness
+
+- Added fail-closed production configuration, secret references/redaction, OIDC PKCE, MFA and
+  server-side sessions.
+- Added central authorization decisions, closed runners, read-only connector SDK, object lifecycle,
+  offline licensing and opt-in telemetry.
+- Added migration `0010`, operations UI, structured metrics/tracing, readiness checks, hardened
+  Compose/Helm, security CI and signed release workflow.
+- Added local load/stress/Redis-chaos validation and explicit production blockers/readiness report.
+
 ## Unreleased — Enterprise Domain Expansion
 
 - Added migration 0009 for Identity, SaaS, Cloud, Kubernetes, runtime, endpoint,

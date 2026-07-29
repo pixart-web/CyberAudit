@@ -35,3 +35,8 @@ verdade para Asset Graph, SOC, GRC e Knowledge Graph.
 
 Consulte os ADRs e os documentos `soc-detection-response.md`,
 `grc-platform.md` e `knowledge-graph-ai.md`.
+
+Na baseline de Product Hardening, produção exige OIDC, secret manager, object
+storage e runner efémero. A edge termina TLS; a API propaga trace context,
+aplica limites/headers e usa sessões revogáveis. Conectores read-only e runners
+ficam atrás de contratos fechados e nunca recebem comandos livres.
