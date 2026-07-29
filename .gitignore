@@ -16,5 +16,6 @@ coverage/
 uploads/
 dist/
 *.log
+dump.rdb
 *.tsbuildinfo
 .DS_Store
