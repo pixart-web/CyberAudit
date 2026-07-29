@@ -7,6 +7,7 @@ from alembic import context
 from cyberaudit import (  # noqa: F401
     domain_expansion_models,
     enterprise_models,
+    hardening_models,
     models,
     phase4_models,
     phase5_models,
