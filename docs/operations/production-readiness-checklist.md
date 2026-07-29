@@ -23,7 +23,7 @@ means external infrastructure or an unfinished control is required.
 | Observability | partial | SRE | metrics, structured logs, trace context, alert rules | 2026-07-29 | Exporter/alert receiver external | Yes |
 | Performance | ready-local | Performance | 200/20 and 1000/50 localhost runs | 2026-07-29 | Not representative of production | No |
 | Testing | ready-local | QA | backend 153; frontend 16; build 92 routes | 2026-07-29 | Coverage is 64%, below 75% | Yes |
-| Supply Chain | partial | Release Engineering | CI/dependency/secret scan and signed-release workflow | 2026-07-29 | Workflows not yet run on GitHub | Yes |
+| Supply Chain | partial | Release Engineering | GitHub PR CI: backend/frontend/migrations/secret scan passed | 2026-07-29 | Tagged SBOM/provenance/signing release not run | Yes |
 | Licensing | ready-local | Product | Ed25519 offline license tests | 2026-07-29 | Online provider absent by design | No |
 | Updates | documented | Release Engineering | upgrade/rollback guide | 2026-07-29 | Staged production rehearsal absent | Yes |
 | Documentation | ready | Engineering | architecture/security/operations docs | 2026-07-29 | Provider-specific guides remain | No |

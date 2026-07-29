@@ -55,8 +55,10 @@ NetworkPolicy and migration hook; it was not tested on a Kubernetes cluster.
 
 Security CI covers lint, types, tests, clean PostgreSQL migration, dependency audits and bounded
 secret signatures. Tagged releases request SBOM/provenance attestations and keyless image signing.
-These workflows are prepared but have not yet run on GitHub. Dockerfiles use fixed runtime versions
-and non-root users. Production Compose uses Docker secrets and external dependencies; Helm requires
+The pull-request security workflow passed on GitHub for backend, frontend, migrations and secret
+scan, including `pip-audit` and the high/critical npm advisory gate. The tagged release workflow
+remains unexecuted because no release tag was created. Dockerfiles use fixed runtime versions and
+non-root users. Production Compose uses Docker secrets and external dependencies; Helm requires
 immutable image digests.
 
 ## Executed validation
@@ -76,6 +78,8 @@ immutable image digests.
 - Redis chaos smoke: API liveness remained healthy, development login returned 200 under its
   explicit fallback, Redis restarted and returned PONG; worker logged retry and remained running.
 - YAML parsing and shell syntax for deployment/CI/backup artefacts: passed.
+- GitHub pull-request security CI: backend, frontend, PostgreSQL migrations and secret scan passed;
+  Python had no known auditable dependency vulnerabilities and npm had no high/critical findings.
 
 These timings are from a local machine and `/health`; they are not production capacity claims.
 
@@ -90,7 +94,7 @@ These timings are from a local machine and `/health`; they are not production ca
 5. PostgreSQL RLS, event partitioning and a universal queue dead-letter projection remain.
 6. Backup/restore, Kubernetes, HA and disaster recovery were not executed in real infrastructure.
 7. WebAuthn, full step-up browser ceremony and comprehensive auth-route integration tests remain.
-8. GitHub CI/release, dependency audit, SBOM and signing require the pushed branch/tag to execute.
+8. The tag-only release, SBOM/provenance generation and keyless signing remain unexecuted.
 
 ## Recommendation
 
