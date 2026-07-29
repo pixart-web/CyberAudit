@@ -34,6 +34,25 @@ imports_total = Counter("cyberaudit_imports_total", "External result imports", [
 retests_total = Counter("cyberaudit_retests_total", "Finding retests", ["result"])
 evidence_redactions = Counter("cyberaudit_evidence_redactions_total", "Evidence values redacted")
 asset_suggestions = Counter("cyberaudit_asset_suggestions_total", "Asset suggestions", ["result"])
+assets_discovered = Counter(
+    "cyberaudit_assets_discovered_total", "Assets suggested by discovery", ["source"]
+)
+services_observed = Counter("cyberaudit_services_observed_total", "Services observed", ["state"])
+vulnerability_matches = Counter(
+    "cyberaudit_vulnerability_matches_total", "Vulnerability matches", ["status"]
+)
+graph_analyses = Counter(
+    "cyberaudit_graph_analyses_total", "Cyber Asset Graph analyses", ["result"]
+)
+attack_paths_analyzed = Counter(
+    "cyberaudit_attack_paths_analyzed_total", "Candidate attack paths", ["status"]
+)
+feed_syncs = Counter(
+    "cyberaudit_vulnerability_feed_syncs_total", "Vulnerability feed syncs", ["result"]
+)
+risk_calculations = Counter(
+    "cyberaudit_risk_calculations_total", "Contextual risk calculations", ["version"]
+)
 
 logger = logging.getLogger("cyberaudit.execution")
 SENSITIVE = {"token", "password", "secret", "configuration", "raw_output"}

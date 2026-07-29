@@ -56,6 +56,7 @@ from cyberaudit.observability import (
     structured_event,
 )
 from cyberaudit.orchestrator import approval_is_expired, transition_job, update_progress
+from cyberaudit.phase4_processing import process_phase4_observations
 from cyberaudit.policy import ScopePolicyEngine
 from cyberaudit.queue import broker as _configured_broker  # noqa: F401
 from cyberaudit.schemas import PolicyRequest
@@ -403,11 +404,13 @@ async def run_job(job_id: str) -> None:
                     )
                 )
             created += 1
+        phase4_inventory = await process_phase4_observations(db, job, persisted_evidence)
         job.result_summary = {
             "simulated": parsed.summary.simulated,
             "findings_created": created,
             "findings_deduplicated": deduplicated,
             "evidence_created": len(persisted_evidence),
+            "inventory_updates": phase4_inventory,
             "warnings": [warning.model_dump() for warning in parsed.warnings],
             "network": (
                 {

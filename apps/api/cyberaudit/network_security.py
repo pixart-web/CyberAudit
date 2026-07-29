@@ -520,7 +520,43 @@ def build_network_policy(
         "http_security_headers": (4, 131_072, 2),
         "web_technology_detection": (3, 262_144, 1),
         "public_configuration": (3, 131_072, 1),
+        "host_discovery": (32, 32_768, 0),
+        "port_discovery": (32, 32_768, 0),
+        "service_identification": (32, 65_536, 0),
     }
+    discovery_ports = (
+        21,
+        22,
+        25,
+        53,
+        80,
+        110,
+        143,
+        389,
+        443,
+        445,
+        465,
+        587,
+        636,
+        993,
+        995,
+        1433,
+        1521,
+        2049,
+        2375,
+        3306,
+        3389,
+        5432,
+        6379,
+        8080,
+        8443,
+        9200,
+    )
+    allowed_ports = (
+        discovery_ports
+        if category in {"host_discovery", "port_discovery", "service_identification"}
+        else (80, 443, 8080, 8443)
+    )
     requests, response_bytes, redirects = limits.get(category, (2, 65_536, 0))
     total = min(max(float(profile_timeout), 3.0), 120.0)
     return NetworkExecutionPolicy(
@@ -532,7 +568,7 @@ def build_network_policy(
         read_timeout=min(10.0, total),
         total_timeout=total,
         allowed_schemes=("https", "http"),
-        allowed_ports=(80, 443, 8080, 8443),
+        allowed_ports=allowed_ports,
         allow_private_addresses=laboratory_mode,
         allow_public_addresses=not laboratory_mode,
         resolve_once=True,
