@@ -16,6 +16,7 @@ from starlette.responses import Response
 from cyberaudit.audit import write_audit
 from cyberaudit.config import get_settings
 from cyberaudit.db import Base, engine, get_db
+from cyberaudit.domain_expansion_api import router as domain_expansion_router
 from cyberaudit.enterprise_api import router as enterprise_router
 from cyberaudit.execution_api import router as execution_router
 from cyberaudit.models import (
@@ -95,6 +96,7 @@ app.include_router(phase3_router)
 app.include_router(phase4_router)
 app.include_router(phase5_router)
 app.include_router(enterprise_router)
+app.include_router(domain_expansion_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.app_origin],
