@@ -1,4 +1,4 @@
-.PHONY: setup up down restart logs migrate seed test lint format clean worker worker-logs test-worker seed-jobs adapters-health purge-demo-jobs seed-phase3 seed-phase4 seed-phase5 test-adapters test-network-safety test-discovery test-graph test-vulnerability-intelligence test-risk test-appsec test-web-inventory test-api-security test-dependencies test-sca test-secrets test-sast test-iac test-containers test-cicd test-security-gates lab-services-up lab-services-down lab-network-up lab-network-down appsec-lab-up appsec-lab-down import-demo-results import-demo-api-spec generate-demo-sbom purge-evidence purge-appsec-demo retest-demo sync-vulnerability-feeds recalculate-risk rebuild-appsec-scores refresh-attack-paths coverage-report benchmark-appsec
+.PHONY: setup up down restart logs migrate seed test lint format clean worker worker-logs test-worker seed-jobs adapters-health purge-demo-jobs seed-phase3 seed-phase4 seed-phase5 seed-enterprise test-adapters test-network-safety test-discovery test-graph test-vulnerability-intelligence test-risk test-appsec test-soc test-grc test-ai test-enterprise test-web-inventory test-api-security test-dependencies test-sca test-secrets test-sast test-iac test-containers test-cicd test-security-gates lab-services-up lab-services-down lab-network-up lab-network-down appsec-lab-up appsec-lab-down import-demo-results import-demo-api-spec generate-demo-sbom purge-evidence purge-appsec-demo retest-demo sync-vulnerability-feeds recalculate-risk rebuild-appsec-scores refresh-attack-paths rebuild-knowledge-graph coverage-report benchmark-appsec
 
 setup:
 	cp -n .env.example .env || true
@@ -35,6 +35,9 @@ seed-phase4:
 seed-phase5:
 	docker compose exec api python -m cyberaudit.seed_phase5
 
+seed-enterprise:
+	docker compose exec api python -m cyberaudit.seed_enterprise
+
 worker:
 	docker compose up --build worker
 
@@ -68,6 +71,18 @@ test-risk:
 test-appsec:
 	.venv/bin/pytest apps/api/tests/test_appsec_services.py apps/api/tests/test_phase5_adapters.py apps/api/tests/test_phase5_routes.py
 
+test-soc:
+	.venv/bin/pytest apps/api/tests/test_enterprise_soc.py
+
+test-grc:
+	.venv/bin/pytest apps/api/tests/test_enterprise_grc.py
+
+test-ai:
+	.venv/bin/pytest apps/api/tests/test_enterprise_ai.py
+
+test-enterprise:
+	.venv/bin/pytest apps/api/tests/test_enterprise_soc.py apps/api/tests/test_enterprise_grc.py apps/api/tests/test_enterprise_ai.py apps/api/tests/test_enterprise_routes.py
+
 test-web-inventory test-api-security test-dependencies test-sca test-secrets test-sast test-iac test-containers test-cicd test-security-gates:
 	.venv/bin/pytest apps/api/tests/test_appsec_services.py apps/api/tests/test_phase5_adapters.py
 
@@ -97,6 +112,9 @@ recalculate-risk:
 
 refresh-attack-paths:
 	docker compose exec api python -m cyberaudit.phase4_tasks refresh-attack-paths
+
+rebuild-knowledge-graph:
+	@echo "Use the tenant-bound cyberaudit.enterprise_worker actor; direct cross-tenant rebuilds are disabled."
 
 rebuild-appsec-scores:
 	@echo "Use GET /api/v1/appsec/risk to inspect the versioned deterministic score."

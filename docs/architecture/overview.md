@@ -8,8 +8,18 @@ flowchart LR
   A --> P[(PostgreSQL)]
   A --> R[(Redis)]
   A --> S[Storage privado]
-  K[Worker placeholder] --> P
+  K[Workers isolados] --> P
   K --> R
+  E[Event Pipeline] --> A
+  A --> KG[Knowledge Graph]
+  G[GRC] --> KG
+  KG --> AI[Assistentes advisory-only]
 ```
 
-O worker não executa scanners na Fase 1. Adaptadores futuros terão de chamar o `ScopePolicyEngine` antes de preparar ou executar qualquer job.
+O worker de avaliações volta a executar o `ScopePolicyEngine` antes de cada
+adaptador. Workers enterprise recebem apenas IDs e processam deteções e projeções
+internas, sem rede ou execução de código submetido. PostgreSQL é a fonte de
+verdade para Asset Graph, SOC, GRC e Knowledge Graph.
+
+Consulte os ADRs e os documentos `soc-detection-response.md`,
+`grc-platform.md` e `knowledge-graph-ai.md`.

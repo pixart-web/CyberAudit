@@ -1,6 +1,6 @@
 # CyberAudit
 
-Plataforma profissional para gestão e execução segura de auditorias de cibersegurança autorizadas. Inclui o domínio da Fase 1, o motor de execução da Fase 2, avaliações de baixo risco da Fase 3, Cyber Asset Graph e exposure intelligence da Fase 4 e Application Security, API Security e software supply-chain da Fase 5.
+Plataforma profissional para gestão e execução segura de auditorias de cibersegurança autorizadas. Inclui o domínio da Fase 1, o motor de execução da Fase 2, avaliações de baixo risco da Fase 3, Cyber Asset Graph e exposure intelligence da Fase 4, Application Security da Fase 5 e os domínios Enterprise defensivos das Fases 7–9: SOC, GRC, Knowledge Graph e assistência fundamentada.
 
 ## Requisitos
 
@@ -20,6 +20,7 @@ make seed-jobs
 make seed-phase3
 make seed-phase4
 make seed-phase5
+make seed-enterprise
 ```
 
 Web: `http://localhost:3000`  
@@ -35,6 +36,9 @@ Esta password é apenas para `ENVIRONMENT=development`; ambientes diferentes dev
 ## Comandos
 
 Fase 5 acrescenta `make seed-phase5`, `make test-appsec`, `make appsec-lab-up`, `make appsec-lab-down`, os alvos de teste por domínio AppSec, `make generate-demo-sbom` e `make import-demo-api-spec`.
+
+Enterprise acrescenta `make seed-enterprise`, `make test-soc`, `make test-grc`,
+`make test-ai`, `make test-enterprise` e `make rebuild-knowledge-graph`.
 
 ## Estrutura
 
@@ -57,6 +61,11 @@ Não existem scanners agressivos, exploração, credenciais ou comandos arbitrá
 
 Na Fase 5, especificações OpenAPI e SBOM CycloneDX são analisadas offline, com limites de tamanho e sem resolver referências externas. O inventário web aceita apenas pedidos seguros através do cliente HTTP central com proteção SSRF. Repositórios não são clonados pelo processo da API, imagens não são executadas, package managers não são invocados e observações de segredos guardam apenas fingerprint e máscara.
 
+Nas Fases 7–9, eventos usam schemas allowlist, regras de deteção nunca executam
+código, playbooks são checklists não-executáveis e assistentes não efetuam
+ações. Respostas assistidas indicam fontes, factos, inferências, confiança e
+limitações. Fornecedores externos de IA começam desativados.
+
 ## Fluxo de demonstração
 
 Entre como `auditor@cyberaudit.local` com `ChangeMe123!`, abra **Jobs → Novo Job**, selecione a auditoria ativa, scope privado e perfil de demonstração. Cenários `warning`, `failure` e `timeout` exercitam os estados controlados. Intensidades de maior risco exigem aprovação por um utilizador com `approvals.review`.
@@ -74,6 +83,15 @@ O backend usa Ruff, Black, mypy, pytest e coverage. O frontend usa TypeScript st
 
 `make lab-network-up` inicia apenas serviços inertes locais em `127.0.0.1` (HTTP, TLS e banners sem protocolo real). `make appsec-lab-up` serve apenas fixtures estáticas sintéticas em `127.0.0.1:8090`. Nunca execute os testes de integração contra serviços públicos.
 
-## Próximos passos
+## Estado das fases e próximos passos
 
-Fase 6: OIDC/MFA de produção, object storage, runners efémeros reforçados, integrações SCM por aplicação instalada, validação de assinaturas/proveniência com serviços aprovados, intelligence feeds assinados e reporting executivo.
+O histórico recebido não contém uma implementação da Fase 6. Permanecem
+pendentes OIDC/MFA de produção, object storage, runners efémeros reforçados,
+integrações SCM por aplicação instalada, validação de assinaturas/proveniência,
+feeds assinados e reporting executivo. Esta lacuna deve ser encerrada antes de
+um lançamento de produção.
+
+Fase 10 recomendada: hardening operacional, políticas PostgreSQL RLS,
+particionamento/retention de eventos, conectores defensivos assinados,
+notificações aprovadas, secret manager, avaliação de fornecedor de IA e testes
+de carga multi-tenant.

@@ -46,3 +46,30 @@ Autorizações, âmbito, targets, dados de clientes, evidências futuras, tokens
 ## Risco residual
 
 O JWT local, storage local e execução in-process são adequados apenas a desenvolvimento. Produção requer OIDC, KMS/secret manager, malware scanning, object storage, runner efémero não-root e egress enforcement externo ao processo Python.
+# Extensão Enterprise (Fases 7–9)
+
+## Novos ativos
+
+- eventos, IOCs, deteções, casos e timelines;
+- controlos, evidências GRC e decisões de aceitação de risco;
+- nós/arestas do Knowledge Graph e respostas assistidas.
+
+## Novas ameaças e controlos
+
+- **Event poisoning:** schema allowlist, deduplicação, `trusted=false` por
+  defeito e proveniência.
+- **Detection-as-code injection:** operadores fechados, sem regex/SQL/eval.
+- **Cross-tenant correlation:** todas as leituras e fingerprints incluem
+  `organization_id`.
+- **Playbook abuse:** passos não-executáveis e `automatic_execution=false`.
+- **Evidence tampering:** hashes, storage privado, timeline append-only e audit
+  logs.
+- **Framework confusion:** mapeamentos versionados para um controlo único e
+  seeds explicitamente demonstrativos.
+- **Prompt injection e hallucination:** fontes internas selecionadas pelo
+  backend, saída estruturada, factos/inferências separados, confiança,
+  limitações e recusa sem fontes.
+- **AI data exfiltration:** fornecedores externos desativados, política de
+  classificação/residência e nenhum segredo na configuração.
+- **Autonomous action:** não existe tool calling nem endpoint que converta uma
+  resposta em mutação.

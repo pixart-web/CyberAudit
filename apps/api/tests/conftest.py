@@ -4,6 +4,7 @@ import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from cyberaudit import (
+    enterprise_models,  # noqa: F401
     phase4_models,  # noqa: F401
     phase5_models,  # noqa: F401
 )

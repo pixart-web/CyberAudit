@@ -20,4 +20,9 @@
 18. **Correlação conservadora.** CPE/PURL exatos podem produzir matches; similaridade é sempre heurística e exige revisão humana.
 19. **AppSec offline-first.** OpenAPI e CycloneDX são analisados em storage privado, com limites estritos e sem resolver referências externas, clonar repositórios, instalar dependências ou executar imagens.
 20. **Segredos como observações.** A persistência aceita fingerprint, tipo, localização, comprimento e máscara; não existe coluna para o valor bruto.
-19. **Attack paths são hipóteses.** A análise é limitada por profundidade/quantidade, distingue factos de inferências e nunca executa passos do caminho.
+21. **Attack paths são hipóteses.** A análise é limitada por profundidade/quantidade, distingue factos de inferências e nunca executa passos do caminho.
+22. **SOC defensivo e declarativo.** Regras e hunts usam campos e operadores allowlist; não existe `eval`, SQL livre ou resposta automática.
+23. **Controlo GRC único.** Referenciais apontam para `UnifiedControl`, evitando duplicar implementação, owners e evidências.
+24. **IA advisory-only.** Fornecedores implementam `AiProvider`; o contrato separa factos/inferências, exige fontes e mantém `action_executed=false`.
+25. **PostgreSQL continua source of truth.** Security Data Lake e Knowledge Graph são projeções privadas e reconstruíveis.
+26. **Lacuna da Fase 6 explícita.** O histórico recebido contém Fases 1–5. As Fases 7–9 não fingem fornecer OIDC/MFA/object storage/runners de produção previstos para a Fase 6.
