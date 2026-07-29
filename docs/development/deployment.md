@@ -7,3 +7,9 @@ Redis health checks must pass before the API becomes ready.
 Production requires a supported secret manager and workload identity. Do not
 use `development://demo-*`, local demo credentials or fixture adapters for
 customer collection.
+
+For hardened deployment, use `docker-compose.production.yml` or
+`infrastructure/helm/cyberaudit`, provide immutable image digests and run
+`make verify-production-config`. The Helm migration hook must complete before
+API/worker rollout. `/health` is liveness; `/ready` verifies PostgreSQL and
+Redis.

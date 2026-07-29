@@ -45,6 +45,11 @@ A expansão Enterprise acrescenta `make enterprise-domain-seed`,
 `make kubernetes-test`, `make zero-trust-test` e
 `make enterprise-domain-health`.
 
+Product Hardening acrescenta `make seed-hardening`, `make test-hardening`,
+`make verify-production-config`, `make backup`, `make restore-drill` e
+`make load-smoke`. A consola **Sistema → Definições** mostra configuração,
+sessões, continuidade, SLOs, feature flags e edição sem revelar segredos.
+
 ## Estrutura
 
 - `apps/web`: Next.js App Router, Tailwind, React Query, RHF/Zod e gráficos.
@@ -105,7 +110,15 @@ integrações SCM por aplicação instalada, validação de assinaturas/proveni�
 feeds assinados e reporting executivo. Esta lacuna deve ser encerrada antes de
 um lançamento de produção.
 
-Fase 10 recomendada: hardening operacional, políticas PostgreSQL RLS,
-particionamento/retention de eventos, conectores defensivos assinados,
-notificações aprovadas, secret manager, avaliação de fornecedor de IA e testes
-de carga multi-tenant.
+Fase 10 estabelece a baseline de configuração segura, OIDC/PKCE, MFA TOTP,
+sessões server-side, políticas centrais, referências de segredos, SDK de
+conectores read-only, runners fechados, object storage abstrato, retenção,
+licenciamento, telemetria opt-in, CI de segurança, Compose de produção e Helm.
+Consulte `docs/architecture/product-hardening.md` e
+`docs/testing/product-hardening.md`.
+
+Os adaptadores de Vault/cloud secret managers, S3/Azure/GCS e os controladores
+de runners efémeros falham de forma fechada até receberem identidade de
+workload e testes com infraestrutura real. A interoperabilidade OIDC, HA e os
+objetivos RPO/RTO também exigem ambientes externos. Estes itens não são
+apresentados como prontos para produção.

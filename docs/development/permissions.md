@@ -11,3 +11,12 @@ evaluation:
 
 Administrator receives all permissions. Auditor excludes credentials and
 exports. Reviewer is read-only. Client sees only approved posture summaries.
+
+Product hardening adds:
+
+`authentication_providers.read/manage`, `sessions.read/manage`, `mfa.manage`,
+`feature_flags.read/manage`, `license.read/manage`, `telemetry.read/manage`,
+`operations.read`, `backups.read/manage` and `restores.read/manage`.
+
+Sensitive management decisions require step-up strength in the central policy.
+The development seed grants these permissions only to Administrator.

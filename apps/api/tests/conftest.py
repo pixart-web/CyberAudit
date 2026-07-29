@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from cyberaudit import (
     domain_expansion_models,  # noqa: F401
     enterprise_models,  # noqa: F401
+    hardening_models,  # noqa: F401
     phase4_models,  # noqa: F401
     phase5_models,  # noqa: F401
 )

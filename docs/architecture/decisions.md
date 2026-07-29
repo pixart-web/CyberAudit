@@ -34,3 +34,10 @@ deterministic scores and prevent all external writes. See
 24. **IA advisory-only.** Fornecedores implementam `AiProvider`; o contrato separa factos/inferências, exige fontes e mantém `action_executed=false`.
 25. **PostgreSQL continua source of truth.** Security Data Lake e Knowledge Graph são projeções privadas e reconstruíveis.
 26. **Lacuna da Fase 6 explícita.** O histórico recebido contém Fases 1–5. As Fases 7–9 não fingem fornecer OIDC/MFA/object storage/runners de produção previstos para a Fase 6.
+27. **Produção falha fechada.** Configuração insegura impede startup em vez de degradar para SQLite, JWT local, filesystem ou runner local.
+28. **Segredos são referências.** Só a fronteira do fornecedor pode resolver valores; persistência, filas, respostas e telemetria recebem referências/metadados.
+29. **Sessão e token são independentes.** Tokens mantêm compatibilidade API; browsers recebem também uma sessão opaca revogável e CSRF separado.
+30. **Conectores live são read-only.** Manifestos fechados, origens HTTPS exatas, sem redirects e contract test kit precedem qualquer ativação.
+31. **Sem contentor genérico.** O runner recebe operações internas tipadas; descritores Docker/Kubernetes permanecem indisponíveis sem controlador de isolamento.
+32. **Licença não apaga acesso.** Expiração bloqueia capacidades licenciadas e preserva leitura/extração de dados do cliente.
+33. **Telemetria é opt-in.** Só campos agregados allowlisted podem sair; evidência, identidade, segredos e conteúdo ficam excluídos.

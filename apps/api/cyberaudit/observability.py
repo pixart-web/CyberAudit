@@ -2,7 +2,9 @@ import json
 import logging
 from typing import Any
 
-from prometheus_client import Counter, Histogram
+from prometheus_client import Counter, Gauge, Histogram
+
+from cyberaudit.redaction import redact
 
 jobs_created = Counter("cyberaudit_jobs_created_total", "Jobs created", ["adapter_code"])
 jobs_completed = Counter("cyberaudit_jobs_completed_total", "Jobs completed", ["adapter_code"])
@@ -67,7 +69,9 @@ secret_observations = Counter(
     "cyberaudit_secret_observations_total", "Secret observations", ["status"]
 )
 security_gate_evaluations = Counter(
-    "cyberaudit_security_gate_evaluations_total", "Security gate evaluations", ["result"]
+    "cyberaudit_security_gate_evaluations_total",
+    "Security gate evaluations",
+    ["result"],
 )
 appsec_parser_errors = Counter(
     "cyberaudit_appsec_parser_errors_total", "AppSec parser errors", ["parser", "code"]
@@ -80,11 +84,43 @@ appsec_assessment_duration = Histogram(
     "AppSec assessment duration",
     ["adapter_code"],
 )
+authentication_events = Counter(
+    "cyberaudit_authentication_total", "Authentication outcomes", ["method", "result"]
+)
+authorization_decisions = Counter(
+    "cyberaudit_authorization_decisions_total",
+    "Central authorization decisions",
+    ["decision"],
+)
+connector_operations = Counter(
+    "cyberaudit_connector_operations_total",
+    "Connector operations",
+    ["connector", "result"],
+)
+runner_operations = Counter(
+    "cyberaudit_runner_operations_total",
+    "Isolated runner operations",
+    ["runner", "result"],
+)
+backup_operations = Counter(
+    "cyberaudit_backup_operations_total", "Backup lifecycle operations", ["result"]
+)
+restore_operations = Counter(
+    "cyberaudit_restore_operations_total", "Restore lifecycle operations", ["result"]
+)
+http_requests = Counter("http_requests_total", "HTTP responses", ["method", "route", "status"])
+http_request_duration = Histogram(
+    "http_request_duration_seconds", "HTTP request duration", ["method", "route"]
+)
+restore_last_verified = Gauge(
+    "cyberaudit_restore_last_verified_timestamp_seconds",
+    "Unix timestamp of the latest verified restore drill",
+)
 
 logger = logging.getLogger("cyberaudit.execution")
 SENSITIVE = {"token", "password", "secret", "configuration", "raw_output"}
 
 
 def structured_event(event: str, **fields: Any) -> None:
-    safe = {key: value for key, value in fields.items() if key not in SENSITIVE}
+    safe = redact({key: value for key, value in fields.items() if key not in SENSITIVE})
     logger.info(json.dumps({"event": event, **safe}, default=str, sort_keys=True))

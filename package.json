@@ -12,5 +12,13 @@
   "devDependencies": {
     "prettier": "^3.4.2",
     "turbo": "^2.3.3"
+  },
+  "pnpm": {
+    "overrides": {
+      "brace-expansion": "^5.0.8",
+      "postcss": "^8.5.25",
+      "sharp": "^0.35.3",
+      "vite": "^6.4.3"
+    }
   }
 }

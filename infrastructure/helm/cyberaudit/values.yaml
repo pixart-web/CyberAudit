@@ -1,0 +1,26 @@
+replicaCount:
+  api: 2
+  web: 2
+  worker: 2
+image:
+  api: { repository: cyberaudit/api, digest: "", pullPolicy: IfNotPresent }
+  web: { repository: cyberaudit/web, digest: "", pullPolicy: IfNotPresent }
+service:
+  apiPort: 8000
+  webPort: 3000
+ingress:
+  enabled: false
+  className: nginx
+  host: cyberaudit.example.invalid
+  tlsSecret: cyberaudit-tls
+existingSecret: cyberaudit-runtime
+resources:
+  api:
+    requests: { cpu: 250m, memory: 512Mi }
+    limits: { cpu: "1", memory: 1Gi }
+  web:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { cpu: 500m, memory: 512Mi }
+  worker:
+    requests: { cpu: 500m, memory: 1Gi }
+    limits: { cpu: "2", memory: 2Gi }
