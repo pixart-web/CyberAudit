@@ -1,5 +1,19 @@
 # Threat model
 
+## Enterprise connectors
+
+New threats include credential disclosure, cross-tenant inventory access,
+over-privileged provider consent, malicious or oversized connector payloads,
+SSRF, change-event amplification, graph exhaustion and posture presented with
+false confidence.
+
+Controls are closed connector/adaptor allowlists, secret references, recursive
+redaction, passive adapters, pagination, indexed tenant filters, bounded graph
+responses, double validation in the worker, immutable external operation,
+explicit unknown states, audit logs and low-cardinality metrics. External
+provider collection remains disabled until provider SDK threat models and
+integration tests are approved.
+
 ## Phase 5 additions
 
 - **Malicious specifications/SBOMs:** bounded JSON parsing, record caps and

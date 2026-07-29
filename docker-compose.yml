@@ -66,7 +66,7 @@ services:
     build:
       context: .
       dockerfile: infrastructure/docker/api.Dockerfile
-    command: ["dramatiq", "cyberaudit.worker", "cyberaudit.phase4_worker", "cyberaudit.enterprise_worker", "--processes", "1", "--threads", "2"]
+    command: ["dramatiq", "cyberaudit.worker", "cyberaudit.phase4_worker", "cyberaudit.enterprise_worker", "cyberaudit.domain_expansion_worker", "--processes", "1", "--threads", "2"]
     env_file: .env
     depends_on:
       postgres: { condition: service_healthy }

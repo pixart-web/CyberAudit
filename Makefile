@@ -1,4 +1,4 @@
-.PHONY: setup up down restart logs migrate seed test lint format clean worker worker-logs test-worker seed-jobs adapters-health purge-demo-jobs seed-phase3 seed-phase4 seed-phase5 seed-enterprise test-adapters test-network-safety test-discovery test-graph test-vulnerability-intelligence test-risk test-appsec test-soc test-grc test-ai test-enterprise test-web-inventory test-api-security test-dependencies test-sca test-secrets test-sast test-iac test-containers test-cicd test-security-gates lab-services-up lab-services-down lab-network-up lab-network-down appsec-lab-up appsec-lab-down import-demo-results import-demo-api-spec generate-demo-sbom purge-evidence purge-appsec-demo retest-demo sync-vulnerability-feeds recalculate-risk rebuild-appsec-scores refresh-attack-paths rebuild-knowledge-graph coverage-report benchmark-appsec
+.PHONY: setup up down restart logs migrate seed test lint format clean worker worker-logs test-worker seed-jobs adapters-health purge-demo-jobs seed-phase3 seed-phase4 seed-phase5 seed-enterprise enterprise-domain-seed enterprise-domain-test enterprise-domain-sync-demo enterprise-domain-health identity-test cloud-test kubernetes-test zero-trust-test test-adapters test-network-safety test-discovery test-graph test-vulnerability-intelligence test-risk test-appsec test-soc test-grc test-ai test-enterprise test-web-inventory test-api-security test-dependencies test-sca test-secrets test-sast test-iac test-containers test-cicd test-security-gates lab-services-up lab-services-down lab-network-up lab-network-down appsec-lab-up appsec-lab-down import-demo-results import-demo-api-spec generate-demo-sbom purge-evidence purge-appsec-demo retest-demo sync-vulnerability-feeds recalculate-risk rebuild-appsec-scores refresh-attack-paths rebuild-knowledge-graph coverage-report benchmark-appsec
 
 setup:
 	cp -n .env.example .env || true
@@ -37,6 +37,21 @@ seed-phase5:
 
 seed-enterprise:
 	docker compose exec api python -m cyberaudit.seed_enterprise
+
+enterprise-domain-seed:
+	docker compose exec api python -m cyberaudit.seed_domain_expansion
+
+enterprise-domain-test:
+	.venv/bin/pytest apps/api/tests/test_domain_expansion_services.py apps/api/tests/test_domain_expansion_routes.py
+
+identity-test cloud-test kubernetes-test zero-trust-test:
+	.venv/bin/pytest apps/api/tests/test_domain_expansion_services.py apps/api/tests/test_domain_expansion_routes.py
+
+enterprise-domain-sync-demo:
+	@echo "Queue a synthetic connector from Enterprise Connectors; external provider I/O is disabled."
+
+enterprise-domain-health:
+	@echo "GET /api/v1/enterprise/health with an authenticated system_health.read token."
 
 worker:
 	docker compose up --build worker

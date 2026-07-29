@@ -1358,6 +1358,20 @@ async def enterprise_health(
     checksum = hashlib.sha256(user.organization_id.encode()).hexdigest()[:12]
     return {
         "status": "ok",
-        "modules": {"soc": "online", "grc": "online", "ai": "advisory_only"},
+        "modules": {
+            "soc": "online",
+            "grc": "online",
+            "ai": "advisory_only",
+            "connectors": "read_only",
+            "connector_queue": "online",
+            "graph_projection": "bounded",
+            "risk_evaluation": "deterministic",
+            "zero_trust": "deterministic",
+            "identity": "online",
+            "cloud": "online",
+            "kubernetes": "online",
+            "endpoints": "online",
+            "mobile": "online",
+        },
         "tenant_context": checksum,
     }

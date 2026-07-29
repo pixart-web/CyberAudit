@@ -1,5 +1,13 @@
 # Decisões de arquitetura
 
+## ADR-022 — Identity and cloud domain expansion
+
+Accepted. Use common normalized records and a closed adapter registry instead
+of provider-specific execution paths. Store secret-manager references only,
+default connectors to read-only, preserve unknown posture, version
+deterministic scores and prevent all external writes. See
+`adr-022-identity-cloud-domain-expansion.md`.
+
 1. **Tenant no token e na query.** O `organization_id` enviado pelo cliente nunca seleciona o tenant da operação.
 2. **PostgreSQL como sistema de registo.** Redis fica reservado a rate limiting, filas e revogação de curta duração.
 3. **Soft delete.** Clientes, auditorias, scopes, ativos, organizações e utilizadores conservam rastreabilidade.

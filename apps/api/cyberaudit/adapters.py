@@ -387,6 +387,7 @@ class AdapterRegistry:
     def __init__(self, adapters: list[ToolAdapter] | None = None) -> None:
         self._adapters: dict[str, ToolAdapter] = {}
         if adapters is None:
+            from cyberaudit.domain_expansion_adapters import DOMAIN_EXPANSION_ADAPTERS
             from cyberaudit.phase3_adapters import REAL_ADAPTERS
             from cyberaudit.phase4_adapters import PHASE4_ADAPTERS
             from cyberaudit.phase5_adapters import PHASE5_ADAPTERS
@@ -396,6 +397,7 @@ class AdapterRegistry:
                 *REAL_ADAPTERS,
                 *PHASE4_ADAPTERS,
                 *PHASE5_ADAPTERS,
+                *DOMAIN_EXPANSION_ADAPTERS,
             ]
         for adapter in adapters:
             self.register(adapter)

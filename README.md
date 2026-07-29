@@ -40,6 +40,11 @@ Fase 5 acrescenta `make seed-phase5`, `make test-appsec`, `make appsec-lab-up`, 
 Enterprise acrescenta `make seed-enterprise`, `make test-soc`, `make test-grc`,
 `make test-ai`, `make test-enterprise` e `make rebuild-knowledge-graph`.
 
+A expansão Enterprise acrescenta `make enterprise-domain-seed`,
+`make enterprise-domain-test`, `make identity-test`, `make cloud-test`,
+`make kubernetes-test`, `make zero-trust-test` e
+`make enterprise-domain-health`.
+
 ## Estrutura
 
 - `apps/web`: Next.js App Router, Tailwind, React Query, RHF/Zod e gráficos.
@@ -65,6 +70,15 @@ Nas Fases 7–9, eventos usam schemas allowlist, regras de deteção nunca execu
 código, playbooks são checklists não-executáveis e assistentes não efetuam
 ações. Respostas assistidas indicam fontes, factos, inferências, confiança e
 limitações. Fornecedores externos de IA começam desativados.
+
+Os domínios Identity, Active Directory, Entra ID, Microsoft 365, Google
+Workspace, AWS, Azure, GCP, Kubernetes, runtime, endpoint e mobile usam
+inventário tenant-isolated e conectores read-only. A base de dados guarda
+apenas referências a secret managers, nunca o valor das credenciais. Nesta
+entrega os adaptadores Enterprise funcionam exclusivamente em modo
+fixture/importação controlada: não abrem sockets, não executam processos e não
+alteram sistemas externos. O Zero Trust score é determinístico, explica os
+fatores usados e reduz a confiança quando a telemetria é desconhecida.
 
 ## Fluxo de demonstração
 
