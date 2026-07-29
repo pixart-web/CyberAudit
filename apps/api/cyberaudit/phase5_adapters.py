@@ -59,6 +59,10 @@ class SafeApiConfig(ClosedConfig):
     method: Literal["GET", "HEAD"] = "HEAD"
 
 
+class SecretDetectionConfig(ClosedConfig):
+    scenario: Literal["synthetic_demo"] = "synthetic_demo"
+
+
 class BasePhase5Adapter(ToolAdapter):
     code: ClassVar[str]
     name: ClassVar[str]
@@ -250,11 +254,15 @@ class SecretDetectionAdapter(BasePhase5Adapter):
     name = "Secret Detection"
     category = "secrets"
     description = "Deteta padrões e guarda apenas fingerprints e máscaras."
-    configuration_model = DocumentConfig
+    configuration_model = SecretDetectionConfig
 
     async def execute(self, context: AdapterExecutionContext) -> AdapterExecutionResult:
-        config = DocumentConfig.model_validate(context.request.configuration)
-        candidates = detect_secrets(config.content, config.filename)
+        SecretDetectionConfig.model_validate(context.request.configuration)
+        synthetic_value = "demo_" + ("A" * 30)
+        candidates = detect_secrets(
+            f"CYBERAUDIT_SYNTHETIC={synthetic_value}",
+            "synthetic/phase5-demo.env:1",
+        )
         sanitized = [
             {
                 "secret_type": item.secret_type,

@@ -245,10 +245,7 @@ async def seed_phase5() -> None:
                 "secret_detection",
                 [TargetType.REPOSITORY.value],
                 False,
-                {
-                    "filename": "synthetic-demo.env",
-                    "content": "DEMO_VALUE=not-a-real-secret",
-                },
+                {"scenario": "synthetic_demo"},
             ),
             (
                 "Análise CycloneDX Offline",

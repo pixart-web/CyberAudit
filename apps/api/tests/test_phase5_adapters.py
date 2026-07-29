@@ -50,8 +50,7 @@ async def test_phase5_adapter_rejects_extra_configuration_fields() -> None:
     adapter = AdapterRegistry().get("cyberaudit.secret_detection")
     result = await adapter.validate_configuration(
         {
-            "filename": "fixture.env",
-            "content": "DEMO=not-sensitive",
+            "scenario": "synthetic_demo",
             "command": "curl example.invalid",
         }
     )
@@ -62,10 +61,9 @@ async def test_phase5_adapter_rejects_extra_configuration_fields() -> None:
 @pytest.mark.asyncio
 async def test_secret_adapter_outputs_only_fingerprint_and_mask() -> None:
     adapter = AdapterRegistry().get("cyberaudit.secret_detection")
-    raw = "demo_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
     adapter_request = request(
         "cyberaudit.secret_detection",
-        {"filename": "fixture.env", "content": f"VALUE={raw}"},
+        {"scenario": "synthetic_demo"},
     )
     context = AdapterExecutionContext(
         execution_id="phase5-test",
@@ -75,7 +73,7 @@ async def test_secret_adapter_outputs_only_fingerprint_and_mask() -> None:
         allowed_destinations=[],
     )
     result = await adapter.execute(context)
-    assert raw not in result.raw_output.decode()
+    assert "demo_AAAAAAAAA" not in result.raw_output.decode()
     assert "fingerprint" in result.raw_output.decode()
     assert result.summary.simulated is False
 
