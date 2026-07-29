@@ -1,0 +1,73 @@
+name: cyberaudit-production
+services:
+  api:
+    image: ${CYBERAUDIT_API_IMAGE:?Set a digest-pinned API image}
+    read_only: true
+    tmpfs: ["/tmp:size=128m,mode=1770"]
+    environment:
+      ENVIRONMENT: production
+      APP_ORIGIN: ${APP_ORIGIN:?Required}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:?Required JSON array}
+      REQUIRE_HTTPS: "true"
+      SECURE_COOKIES: "true"
+      AUTHENTICATION_MODE: oidc
+      LOCAL_AUTH_ENABLED: "false"
+      OIDC_ENABLED: "true"
+      OIDC_ISSUER: ${OIDC_ISSUER:?Required}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:?Required}
+      OIDC_REDIRECT_URI: ${OIDC_REDIRECT_URI:?Required}
+      OIDC_CLIENT_SECRET_REFERENCE: ${OIDC_CLIENT_SECRET_REFERENCE:?Required}
+      SECRET_PROVIDER: ${SECRET_PROVIDER:?Required}
+      OBJECT_STORAGE_PROVIDER: ${OBJECT_STORAGE_PROVIDER:?Required}
+      OBJECT_STORAGE_BUCKET: ${OBJECT_STORAGE_BUCKET:?Required}
+      CONNECTOR_MODE: live_read_only
+      RUNNER_TYPE: ${RUNNER_TYPE:-docker_ephemeral}
+    secrets: [database_url, redis_url, jwt_secret, encryption_key]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    user: "10001:10001"
+    stop_grace_period: 30s
+    networks: [edge, internal]
+  web:
+    image: ${CYBERAUDIT_WEB_IMAGE:?Set a digest-pinned web image}
+    read_only: true
+    tmpfs: ["/tmp:size=64m,mode=1770"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    user: "1000:1000"
+    networks: [edge]
+  worker:
+    image: ${CYBERAUDIT_API_IMAGE:?Set a digest-pinned API image}
+    command: ["dramatiq", "cyberaudit.worker", "--processes", "2", "--threads", "4"]
+    environment:
+      ENVIRONMENT: production
+      APP_ORIGIN: ${APP_ORIGIN:?Required}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:?Required JSON array}
+      REQUIRE_HTTPS: "true"
+      SECURE_COOKIES: "true"
+      AUTHENTICATION_MODE: oidc
+      LOCAL_AUTH_ENABLED: "false"
+      OIDC_ENABLED: "true"
+      OIDC_ISSUER: ${OIDC_ISSUER:?Required}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:?Required}
+      OIDC_REDIRECT_URI: ${OIDC_REDIRECT_URI:?Required}
+      SECRET_PROVIDER: ${SECRET_PROVIDER:?Required}
+      OBJECT_STORAGE_PROVIDER: ${OBJECT_STORAGE_PROVIDER:?Required}
+      OBJECT_STORAGE_BUCKET: ${OBJECT_STORAGE_BUCKET:?Required}
+      CONNECTOR_MODE: live_read_only
+      RUNNER_TYPE: ${RUNNER_TYPE:-docker_ephemeral}
+    read_only: true
+    tmpfs: ["/tmp:size=512m,mode=1770"]
+    secrets: [database_url, redis_url, encryption_key]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    user: "10001:10001"
+    networks: [internal]
+secrets:
+  database_url: { file: "${CYBERAUDIT_DATABASE_URL_FILE:?Required}" }
+  redis_url: { file: "${CYBERAUDIT_REDIS_URL_FILE:?Required}" }
+  jwt_secret: { file: "${CYBERAUDIT_JWT_SECRET_FILE:?Required}" }
+  encryption_key: { file: "${CYBERAUDIT_ENCRYPTION_KEY_FILE:?Required}" }
+networks:
+  edge:
+  internal: { internal: true }

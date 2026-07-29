@@ -1,0 +1,23 @@
+groups:
+  - name: cyberaudit-product
+    rules:
+      - alert: CyberAuditApiErrorRateHigh
+        expr: sum(rate(http_requests_total{status=~"5.."}[5m])) / sum(rate(http_requests_total[5m])) > 0.05
+        for: 10m
+        labels: { severity: page }
+        annotations: { summary: "CyberAudit API 5xx rate exceeds 5%" }
+      - alert: CyberAuditJobsFailing
+        expr: increase(cyberaudit_jobs_failed_total[15m]) > 10
+        for: 5m
+        labels: { severity: ticket }
+        annotations: { summary: "CyberAudit workers report repeated job failures" }
+      - alert: CyberAuditPolicyDenialsSpike
+        expr: increase(cyberaudit_policy_denials_total[10m]) > 100
+        for: 5m
+        labels: { severity: ticket }
+        annotations: { summary: "Unexpected policy-denial spike" }
+      - alert: CyberAuditRestoreUnverified
+        expr: max(cyberaudit_restore_last_verified_timestamp_seconds) < time() - 7776000
+        for: 1h
+        labels: { severity: ticket }
+        annotations: { summary: "No verified restore drill in 90 days" }
