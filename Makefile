@@ -1,4 +1,4 @@
-.PHONY: setup up down restart logs migrate seed test lint format clean worker worker-logs test-worker seed-jobs adapters-health purge-demo-jobs seed-phase3 test-adapters test-network-safety lab-services-up lab-services-down import-demo-results purge-evidence retest-demo
+.PHONY: setup up down restart logs migrate seed test lint format clean worker worker-logs test-worker seed-jobs adapters-health purge-demo-jobs seed-phase3 seed-phase4 test-adapters test-network-safety test-discovery test-graph test-vulnerability-intelligence test-risk lab-services-up lab-services-down lab-network-up lab-network-down import-demo-results purge-evidence retest-demo sync-vulnerability-feeds recalculate-risk refresh-attack-paths coverage-report
 
 setup:
 	cp -n .env.example .env || true
@@ -29,6 +29,9 @@ seed-jobs:
 seed-phase3:
 	docker compose exec api python -m cyberaudit.seed_phase3
 
+seed-phase4:
+	docker compose exec api python -m cyberaudit.seed_phase4
+
 worker:
 	docker compose up --build worker
 
@@ -47,11 +50,41 @@ test-adapters:
 test-network-safety:
 	.venv/bin/pytest apps/api/tests/test_network_security.py apps/api/tests/test_evidence_imports.py
 
+test-discovery:
+	.venv/bin/pytest apps/api/tests/test_discovery.py apps/api/tests/test_phase4_adapters.py
+
+test-graph:
+	.venv/bin/pytest apps/api/tests/test_asset_graph.py
+
+test-vulnerability-intelligence:
+	.venv/bin/pytest apps/api/tests/test_vulnerability_intelligence.py
+
+test-risk:
+	.venv/bin/pytest apps/api/tests/test_risk_engine.py
+
 lab-services-up:
-	docker compose -f infrastructure/docker-compose.lab.yml up -d
+	docker compose --profile lab up -d lab-http lab-tls
 
 lab-services-down:
-	docker compose -f infrastructure/docker-compose.lab.yml down
+	docker compose --profile lab stop lab-http lab-tls
+
+lab-network-up:
+	docker compose --profile lab up -d lab-http lab-tls lab-banners
+
+lab-network-down:
+	docker compose --profile lab stop lab-http lab-tls lab-banners
+
+sync-vulnerability-feeds:
+	docker compose exec api python -m cyberaudit.phase4_tasks sync-feeds
+
+recalculate-risk:
+	docker compose exec api python -m cyberaudit.phase4_tasks recalculate-risk
+
+refresh-attack-paths:
+	docker compose exec api python -m cyberaudit.phase4_tasks refresh-attack-paths
+
+coverage-report:
+	.venv/bin/pytest --cov=cyberaudit --cov-report=term-missing --cov-report=html apps/api
 
 import-demo-results:
 	@echo "Use Importar Resultados na interface; confirmação exige preview e autorização."

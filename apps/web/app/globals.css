@@ -18,6 +18,11 @@ a { color: inherit; text-decoration: none; }
 .badge-neutral { color:#8fa4ae;background:#101b22; }
 .field { width:100%;border:1px solid #20333e;background:#071017;color:#f2f7f9;border-radius:.55rem;padding:.7rem .8rem;outline:none; }
 .field:focus { border-color:#31f27c;box-shadow:0 0 0 3px rgba(49,242,124,.08); }
+.icon-button { display:inline-flex;align-items:center;justify-content:center;border:1px solid #20333e;background:#071017;color:#8fa4ae;border-radius:.5rem;padding:.5rem;cursor:pointer; }
+.icon-button:hover { border-color:rgba(49,242,124,.35);color:#31f27c; }
+.graph-canvas { background-color:#071017;background-image:radial-gradient(rgba(143,164,174,.2) 1px,transparent 1px);background-size:22px 22px; }
+.graph-node { background:linear-gradient(145deg,rgba(11,21,28,.98),rgba(7,16,23,.92));box-shadow:0 10px 30px rgba(0,0,0,.25);transition:border-color .2s,transform .2s; }
+.graph-node:hover { border-color:rgba(32,217,255,.45); }
 .table { width:100%;border-collapse:collapse; }
 .table th { color:#8fa4ae;font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;text-align:left;padding:.75rem;border-bottom:1px solid #17262f; }
 .table td { padding:.85rem .75rem;border-bottom:1px solid #12212a; }

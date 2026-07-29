@@ -1,6 +1,6 @@
 # CyberAudit
 
-Plataforma profissional para gestão e execução segura de auditorias de cibersegurança autorizadas. Inclui o domínio da Fase 1, o motor de execução da Fase 2 e avaliações de baixo risco da Fase 3.
+Plataforma profissional para gestão e execução segura de auditorias de cibersegurança autorizadas. Inclui o domínio da Fase 1, o motor de execução da Fase 2, avaliações de baixo risco da Fase 3 e o CyberAudit OS da Fase 4: inventário vivo, Cyber Asset Graph e exposure intelligence.
 
 ## Requisitos
 
@@ -18,6 +18,7 @@ make migrate
 make seed
 make seed-jobs
 make seed-phase3
+make seed-phase4
 ```
 
 Web: `http://localhost:3000`  
@@ -32,7 +33,7 @@ Esta password é apenas para `ENVIRONMENT=development`; ambientes diferentes dev
 
 ## Comandos
 
-Além dos comandos anteriores: `make seed-phase3`, `make test-adapters`, `make test-network-safety`, `make lab-services-up`, `make lab-services-down`, `make import-demo-results`, `make purge-evidence` e `make retest-demo`.
+Fase 4 acrescenta `make seed-phase4`, `make test-discovery`, `make test-graph`, `make test-vulnerability-intelligence`, `make test-risk`, `make lab-network-up`, `make lab-network-down`, `make sync-vulnerability-feeds`, `make recalculate-risk`, `make refresh-attack-paths` e `make coverage-report`.
 
 ## Estrutura
 
@@ -51,7 +52,7 @@ Consulte `.env.example`. Nunca versionar `.env`, tokens, passwords reais ou chav
 
 CyberAudit não concede autorização para testar sistemas. Uma auditoria do tipo cliente só pode avançar com responsável, PDF válido, scope ativo e target autorizado. O motor de políticas volta a validar contexto, tenant, janela, técnica, intensidade e emergency stop.
 
-Não existem scanners agressivos, exploração, credenciais ou comandos arbitrários. Os adapters reais apenas fazem inventário consolidado, DNS exato, uma ligação TLS, HTTP limitado, deteção passiva, configuração pública allowlisted e importação privada. DNS/IP/redirect passam por proteção SSRF central.
+Não existem scanners agressivos, exploração, credenciais ou comandos arbitrários. A descoberta de rede da Fase 4 usa apenas TCP connect com perfis internos fechados, limites de hosts/portas/taxa/timeout, scope duplamente validado e laboratório isolado. Correlação de vulnerabilidades é local e conservadora; um match heurístico nunca se torna finding confirmado sem revisão.
 
 ## Fluxo de demonstração
 
@@ -68,8 +69,8 @@ O backend usa Ruff, Black, mypy, pytest e coverage. O frontend usa TypeScript st
 
 ## Laboratório controlado
 
-`make lab-services-up` inicia apenas serviços locais em `127.0.0.1:8080`. Use o engagement `LAB-PHASE3`; nunca execute os testes de integração contra serviços públicos.
+`make lab-network-up` inicia apenas serviços inertes locais em `127.0.0.1` (HTTP, TLS e banners sem protocolo real). Use o engagement `LAB-PHASE3`; nunca execute os testes de integração contra serviços públicos.
 
 ## Próximos passos
 
-Fase 4: OIDC/MFA de produção, object storage, sandbox efémero com egress allowlisted, scheduler/reconciliador, reporting exportável e fontes de vulnerabilidades aprovadas.
+Fase 5: OIDC/MFA de produção, object storage, runner efémero com egress por job, scheduler distribuído/reconciliador, graph store opcional, reporting executivo e conectores de feeds aprovados.

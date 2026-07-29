@@ -66,12 +66,56 @@ services:
     build:
       context: .
       dockerfile: infrastructure/docker/api.Dockerfile
-    command: ["dramatiq", "cyberaudit.worker", "--processes", "1", "--threads", "2"]
+    command: ["dramatiq", "cyberaudit.worker", "cyberaudit.phase4_worker", "--processes", "1", "--threads", "2"]
     env_file: .env
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
-    networks: [internal]
+    networks: [internal, assessment_lab]
+
+  lab-http:
+    profiles: ["lab"]
+    image: python:3.12-alpine
+    command: ["python", "/lab/server.py", "--host-mode", "container"]
+    volumes:
+      - ./infrastructure/lab/server.py:/lab/server.py:ro
+    ports: ["127.0.0.1:8080:8080"]
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    networks: [assessment_lab]
+
+  lab-tls:
+    profiles: ["lab"]
+    build:
+      context: .
+      dockerfile: infrastructure/docker/lab.Dockerfile
+    command: ["python", "/lab/tls_server.py", "--host-mode", "container"]
+    volumes:
+      - ./infrastructure/lab/tls_server.py:/lab/tls_server.py:ro
+    ports: ["127.0.0.1:8443:8443"]
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    networks: [assessment_lab]
+
+  lab-banners:
+    profiles: ["lab"]
+    image: python:3.12-alpine
+    command: ["python", "/lab/network_services.py"]
+    volumes:
+      - ./infrastructure/lab/network_services.py:/lab/network_services.py:ro
+    ports:
+      - "127.0.0.1:2222:2222"
+      - "127.0.0.1:5433:5433"
+      - "127.0.0.1:6380:6380"
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    networks: [assessment_lab]
 
 volumes:
   postgres_data:
@@ -81,3 +125,5 @@ networks:
   internal:
     internal: true
   edge:
+  assessment_lab:
+    internal: true

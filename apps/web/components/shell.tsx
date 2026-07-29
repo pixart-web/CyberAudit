@@ -2,20 +2,24 @@
 
 import {
   Activity, Bell, Boxes, BriefcaseBusiness, Building2, ChevronDown, CircleUserRound,
-  Cloud, Code2, FileCheck2, FileSearch, FlaskConical, Gauge, KeyRound, Menu, Network,
-  PackageSearch, RotateCcw, Search, Settings, ShieldAlert, Smartphone, Users, Webhook,
+  Cloud, Code2, FileCheck2, FileSearch, FlaskConical, Gauge, GitBranch, Globe2, HeartPulse,
+  KeyRound, Layers3, Menu, Network, PackageSearch, Radar, RotateCcw, Search, Settings,
+  ShieldAlert, Smartphone, TimerReset, Users, Webhook,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const groups = [
-  { label: "Visão geral", items: [["Dashboard", "/dashboard", Gauge]] },
-  { label: "Gestão", items: [["Organizações", "/organizations", Building2], ["Clientes", "/clients", BriefcaseBusiness], ["Auditorias", "/engagements", FileSearch], ["Autorizações", "/authorizations", FileCheck2], ["Âmbito", "/scopes", ShieldAlert], ["Ativos", "/assets", Boxes]] },
+  { label: "Operações", items: [["Command Center", "/command-center", Gauge], ["Dashboard", "/dashboard", Activity], ["Notificações", "/notifications", Bell]] },
+  { label: "Asset Intelligence", items: [["Inventário de Ativos", "/assets", Boxes], ["Cyber Asset Graph", "/asset-graph", GitBranch], ["Ambientes", "/environments", Layers3], ["Zonas de Rede", "/network-zones", Network], ["Redes", "/networks", Globe2], ["Serviços", "/services", Radar], ["Alterações", "/asset-changes", TimerReset]] },
+  { label: "Exposure Intelligence", items: [["Exposição", "/exposure", ShieldAlert], ["Vulnerabilidades", "/vulnerabilities", ShieldAlert], ["Correlações", "/vulnerability-matches", GitBranch], ["Threat Feeds", "/vulnerability-feeds", PackageSearch], ["Attack Paths", "/attack-paths", Network], ["Risco", "/risk", Gauge], ["Simulador", "/risk-simulator", Activity], ["Cobertura", "/coverage", FileCheck2]] },
+  { label: "Gestão", items: [["Organizações", "/organizations", Building2], ["Clientes", "/clients", BriefcaseBusiness], ["Auditorias", "/engagements", FileSearch], ["Autorizações", "/authorizations", FileCheck2], ["Âmbito", "/scopes", ShieldAlert]] },
   { label: "Avaliações", items: [["Catálogo", "/assessment-catalog", PackageSearch], ["Jobs", "/jobs", Activity], ["Perfis de Avaliação", "/scan-profiles", Settings], ["Adaptadores", "/adapters", Webhook], ["Aprovações", "/approvals", FileCheck2], ["Importar Resultados", "/imports", FileCheck2], ["Redes", "/assessments/networks", Network], ["Aplicações Web", "/assessments/web", Webhook], ["APIs", "/assessments/apis", Activity], ["Dispositivos Móveis", "/assessments/mobile", Smartphone], ["Cloud", "/assessments/cloud", Cloud], ["Identidades", "/assessments/identities", KeyRound], ["Código Fonte", "/assessments/source", Code2], ["Dependências", "/assessments/dependencies", PackageSearch]] },
   { label: "Resultados", items: [["Findings", "/findings", ShieldAlert], ["Evidências", "/evidence", FileCheck2], ["Retestes", "/retests", RotateCcw], ["Observações de Ativos", "/asset-observations", Boxes], ["Sugestões de Ativos", "/asset-suggestions", Bell], ["Incidentes", "/incidents", Bell], ["Relatórios", "/reports", FileSearch]] },
   { label: "Laboratório", items: [["Laboratório", "/laboratory", FlaskConical], ["Cenários", "/laboratory/scenarios", Boxes], ["Ferramentas", "/laboratory/tools", Settings]] },
-  { label: "Sistema", items: [["Utilizadores", "/users", Users], ["Registos de Auditoria", "/audit-logs", Activity], ["Definições", "/settings", Settings]] },
+  { label: "Automação", items: [["Agendamentos", "/assessment-schedules", TimerReset], ["Discovery Policies", "/discovery-policies", Radar]] },
+  { label: "Sistema", items: [["Utilizadores", "/users", Users], ["Registos de Auditoria", "/audit-logs", Activity], ["Health Center", "/system-health", HeartPulse], ["Definições", "/settings", Settings]] },
 ] as const;
 
 export function Shell({ children, title, eyebrow = "CyberAudit Demo" }: { children: React.ReactNode; title: string; eyebrow?: string }) {

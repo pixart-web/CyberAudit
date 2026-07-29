@@ -31,10 +31,10 @@ export default function LoginPage() {
       <Image src="/logo.svg" width={220} height={48} alt="CyberAudit" className="mx-auto mb-8" priority />
       <div className="mb-6 text-center"><h1 className="text-2xl font-semibold">Acesso seguro</h1><p className="mt-2 text-sm text-muted">Gestão de auditorias autorizadas</p></div>
       {error && <div role="alert" className="mb-4 rounded-lg border border-critical/30 bg-critical/10 p-3 text-sm text-red-300">{error}</div>}
-      <form onSubmit={handleSubmit(submit)} className="space-y-4">
+      <form method="post" onSubmit={handleSubmit(submit)} className="space-y-4">
         <label className="block text-sm"><span className="mb-1.5 block text-muted">Email</span><span className="relative block"><Mail size={17} className="absolute left-3 top-3 text-muted"/><input {...register("email")} className="field pl-10" autoComplete="email"/></span>{errors.email && <small className="text-critical">{errors.email.message}</small>}</label>
         <label className="block text-sm"><span className="mb-1.5 block text-muted">Password</span><span className="relative block"><LockKeyhole size={17} className="absolute left-3 top-3 text-muted"/><input {...register("password")} className="field pl-10" type="password" autoComplete="current-password"/></span>{errors.password && <small className="text-critical">{errors.password.message}</small>}</label>
-        <button className="button w-full" disabled={isSubmitting}>{isSubmitting ? "A autenticar…" : "Entrar na plataforma"}</button>
+        <button type="submit" className="button w-full" disabled={isSubmitting}>{isSubmitting ? "A autenticar…" : "Entrar na plataforma"}</button>
       </form>
       <p className="mt-6 flex items-center justify-center gap-2 text-xs text-muted"><ShieldCheck size={14} className="text-primary"/>Sessão protegida e registada em audit log</p>
     </section>

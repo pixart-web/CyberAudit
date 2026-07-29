@@ -21,7 +21,14 @@ Autorizações, âmbito, targets, dados de clientes, evidências futuras, tokens
 - Execução órfã: timeout e cancelamento cooperativo, com futura terminação pelo sandbox externo.
 - Importação ativa/XXE: formatos allowlisted, tamanho/MIME/extensão, storage privado, `defusedxml`, preview e conteúdo inerte.
 - Fuga por evidência: redação central, excertos limitados, downloads autorizados e headers defensivos.
+- Inventory poisoning: descoberta cria sugestões, mantém fonte/confiança e regista mudanças; relações e matches ambíguos exigem revisão.
+- Descoberta abusiva: CIDR, hosts, portas, taxa, concorrência e timeout têm máximos backend; perfis e portas são allowlisted.
+- Pivot pelo worker: a rede de controlo é separada do laboratório e destinos continuam limitados ao scope calculado.
+- Feed comprometido: schemas fechados, tamanho máximo, hash, sincronização auditada e sem código ou URLs executáveis vindos do feed.
+- Falsos positivos de CVE: versões ausentes ou ambíguas produzem “insufficient information”/review, nunca confirmação automática.
+- Grafo excessivo ou cíclico: limites progressivos de nós, profundidade, caminhos e proteção contra ciclos.
+- Simulador destrutivo: cenários são projeções isoladas e não alteram findings, ativos ou estado operacional.
 
 ## Risco residual
 
-O JWT local e o storage local são adequados apenas a desenvolvimento. Produção requer OIDC, KMS/secret manager, malware scanning, object storage e controlos de rede adicionais.
+O JWT local, storage local e execução in-process são adequados apenas a desenvolvimento. Produção requer OIDC, KMS/secret manager, malware scanning, object storage, runner efémero não-root e egress enforcement externo ao processo Python.
