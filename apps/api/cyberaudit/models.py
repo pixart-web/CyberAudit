@@ -481,6 +481,15 @@ class Finding(Base, TimestampMixin):
     organization_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
     engagement_id: Mapped[str] = mapped_column(ForeignKey("engagements.id"), index=True)
     asset_id: Mapped[str | None] = mapped_column(ForeignKey("assets.id"))
+    # Phase-specific foreign keys are installed by their migrations. Keeping the
+    # metadata columns independent lets a fresh database apply older migrations
+    # before the Phase 5 target tables exist.
+    application_id: Mapped[str | None] = mapped_column(String(36), index=True)
+    api_id: Mapped[str | None] = mapped_column(String(36), index=True)
+    endpoint_id: Mapped[str | None] = mapped_column(String(36))
+    repository_id: Mapped[str | None] = mapped_column(String(36))
+    release_id: Mapped[str | None] = mapped_column(String(36))
+    component_id: Mapped[str | None] = mapped_column(String(36))
     job_id: Mapped[str] = mapped_column(ForeignKey("scan_jobs.id"), index=True)
     title: Mapped[str] = mapped_column(String(240))
     description: Mapped[str] = mapped_column(Text)

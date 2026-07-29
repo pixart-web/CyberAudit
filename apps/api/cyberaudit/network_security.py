@@ -555,7 +555,7 @@ def build_network_policy(
     allowed_ports = (
         discovery_ports
         if category in {"host_discovery", "port_discovery", "service_identification"}
-        else (80, 443, 8080, 8443)
+        else (80, 443, 8080, 8090, 8443)
     )
     requests, response_bytes, redirects = limits.get(category, (2, 65_536, 0))
     total = min(max(float(profile_timeout), 3.0), 120.0)

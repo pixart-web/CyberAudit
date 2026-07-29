@@ -1,4 +1,4 @@
-.PHONY: setup up down restart logs migrate seed test lint format clean worker worker-logs test-worker seed-jobs adapters-health purge-demo-jobs seed-phase3 seed-phase4 test-adapters test-network-safety test-discovery test-graph test-vulnerability-intelligence test-risk lab-services-up lab-services-down lab-network-up lab-network-down import-demo-results purge-evidence retest-demo sync-vulnerability-feeds recalculate-risk refresh-attack-paths coverage-report
+.PHONY: setup up down restart logs migrate seed test lint format clean worker worker-logs test-worker seed-jobs adapters-health purge-demo-jobs seed-phase3 seed-phase4 seed-phase5 test-adapters test-network-safety test-discovery test-graph test-vulnerability-intelligence test-risk test-appsec test-web-inventory test-api-security test-dependencies test-sca test-secrets test-sast test-iac test-containers test-cicd test-security-gates lab-services-up lab-services-down lab-network-up lab-network-down appsec-lab-up appsec-lab-down import-demo-results import-demo-api-spec generate-demo-sbom purge-evidence purge-appsec-demo retest-demo sync-vulnerability-feeds recalculate-risk rebuild-appsec-scores refresh-attack-paths coverage-report benchmark-appsec
 
 setup:
 	cp -n .env.example .env || true
@@ -32,6 +32,9 @@ seed-phase3:
 seed-phase4:
 	docker compose exec api python -m cyberaudit.seed_phase4
 
+seed-phase5:
+	docker compose exec api python -m cyberaudit.seed_phase5
+
 worker:
 	docker compose up --build worker
 
@@ -62,6 +65,12 @@ test-vulnerability-intelligence:
 test-risk:
 	.venv/bin/pytest apps/api/tests/test_risk_engine.py
 
+test-appsec:
+	.venv/bin/pytest apps/api/tests/test_appsec_services.py apps/api/tests/test_phase5_adapters.py apps/api/tests/test_phase5_routes.py
+
+test-web-inventory test-api-security test-dependencies test-sca test-secrets test-sast test-iac test-containers test-cicd test-security-gates:
+	.venv/bin/pytest apps/api/tests/test_appsec_services.py apps/api/tests/test_phase5_adapters.py
+
 lab-services-up:
 	docker compose --profile lab up -d lab-http lab-tls
 
@@ -74,6 +83,12 @@ lab-network-up:
 lab-network-down:
 	docker compose --profile lab stop lab-http lab-tls lab-banners
 
+appsec-lab-up:
+	docker compose --profile appsec-lab up -d appsec-lab
+
+appsec-lab-down:
+	docker compose --profile appsec-lab stop appsec-lab
+
 sync-vulnerability-feeds:
 	docker compose exec api python -m cyberaudit.phase4_tasks sync-feeds
 
@@ -82,6 +97,21 @@ recalculate-risk:
 
 refresh-attack-paths:
 	docker compose exec api python -m cyberaudit.phase4_tasks refresh-attack-paths
+
+rebuild-appsec-scores:
+	@echo "Use GET /api/v1/appsec/risk to inspect the versioned deterministic score."
+
+generate-demo-sbom:
+	@echo "Synthetic CycloneDX fixture: infrastructure/appsec-lab/sbom.json"
+
+import-demo-api-spec:
+	@echo "Import infrastructure/appsec-lab/openapi.json in API Specifications; preview is mandatory."
+
+purge-appsec-demo:
+	@echo "Direct purge is disabled; use audited retention workflows."
+
+benchmark-appsec:
+	.venv/bin/pytest -q apps/api/tests/test_appsec_services.py
 
 coverage-report:
 	.venv/bin/pytest --cov=cyberaudit --cov-report=term-missing --cov-report=html apps/api

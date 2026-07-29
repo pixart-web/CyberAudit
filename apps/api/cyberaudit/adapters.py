@@ -389,8 +389,14 @@ class AdapterRegistry:
         if adapters is None:
             from cyberaudit.phase3_adapters import REAL_ADAPTERS
             from cyberaudit.phase4_adapters import PHASE4_ADAPTERS
+            from cyberaudit.phase5_adapters import PHASE5_ADAPTERS
 
-            adapters = [DemoAssessmentAdapter(), *REAL_ADAPTERS, *PHASE4_ADAPTERS]
+            adapters = [
+                DemoAssessmentAdapter(),
+                *REAL_ADAPTERS,
+                *PHASE4_ADAPTERS,
+                *PHASE5_ADAPTERS,
+            ]
         for adapter in adapters:
             self.register(adapter)
 

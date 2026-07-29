@@ -117,6 +117,19 @@ services:
     security_opt: ["no-new-privileges:true"]
     networks: [assessment_lab]
 
+  appsec-lab:
+    profiles: ["appsec-lab"]
+    image: python:3.12-alpine
+    command: ["python", "-m", "http.server", "8090", "--directory", "/fixtures"]
+    volumes:
+      - ./infrastructure/appsec-lab:/fixtures:ro
+    ports: ["127.0.0.1:8090:8090"]
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    networks: [assessment_lab]
+
 volumes:
   postgres_data:
   redis_data:

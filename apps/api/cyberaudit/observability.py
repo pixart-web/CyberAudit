@@ -53,6 +53,33 @@ feed_syncs = Counter(
 risk_calculations = Counter(
     "cyberaudit_risk_calculations_total", "Contextual risk calculations", ["version"]
 )
+applications_observed = Counter(
+    "cyberaudit_applications_total", "Application inventory changes", ["result"]
+)
+api_endpoints_observed = Counter(
+    "cyberaudit_api_endpoints_total", "API endpoints normalized", ["source"]
+)
+sbom_imports = Counter("cyberaudit_sbom_imports_total", "SBOM imports", ["result"])
+sbom_components = Counter(
+    "cyberaudit_sbom_components_total", "SBOM components normalized", ["type"]
+)
+secret_observations = Counter(
+    "cyberaudit_secret_observations_total", "Secret observations", ["status"]
+)
+security_gate_evaluations = Counter(
+    "cyberaudit_security_gate_evaluations_total", "Security gate evaluations", ["result"]
+)
+appsec_parser_errors = Counter(
+    "cyberaudit_appsec_parser_errors_total", "AppSec parser errors", ["parser", "code"]
+)
+appsec_redactions = Counter(
+    "cyberaudit_appsec_redactions_total", "AppSec values redacted", ["kind"]
+)
+appsec_assessment_duration = Histogram(
+    "cyberaudit_appsec_assessment_duration_seconds",
+    "AppSec assessment duration",
+    ["adapter_code"],
+)
 
 logger = logging.getLogger("cyberaudit.execution")
 SENSITIVE = {"token", "password", "secret", "configuration", "raw_output"}

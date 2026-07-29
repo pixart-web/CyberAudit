@@ -3,7 +3,10 @@ from collections.abc import AsyncIterator
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from cyberaudit import phase4_models  # noqa: F401
+from cyberaudit import (
+    phase4_models,  # noqa: F401
+    phase5_models,  # noqa: F401
+)
 from cyberaudit.db import Base
 
 

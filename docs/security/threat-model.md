@@ -1,5 +1,19 @@
 # Threat model
 
+## Phase 5 additions
+
+- **Malicious specifications/SBOMs:** bounded JSON parsing, record caps and
+  external/file/traversal reference rejection.
+- **Repository and dependency execution:** no clone, hooks, package manager,
+  scripts or user-chosen filesystem paths.
+- **Secret disclosure:** fingerprint-and-mask persistence only; field-level RBAC.
+- **SSRF and rebinding:** all networked adapters require the central HTTP policy,
+  pinned destination and safe methods.
+- **Supply-chain confusion:** releases use immutable hashes/digests and gates
+  distinguish declared, signed and verified provenance.
+- **Cross-tenant inference:** every root query filters the authenticated
+  organization; component access is joined through a tenant-owned SBOM.
+
 ## Ativos protegidos
 
 Autorizações, âmbito, targets, dados de clientes, evidências futuras, tokens e audit logs.

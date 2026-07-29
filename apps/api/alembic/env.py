@@ -4,7 +4,7 @@ from logging.config import fileConfig
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
-from cyberaudit import models, phase4_models  # noqa: F401
+from cyberaudit import models, phase4_models, phase5_models  # noqa: F401
 from cyberaudit.config import get_settings
 from cyberaudit.db import Base
 

@@ -14,5 +14,19 @@
   "activeEngagements": "Auditorias ativas",
   "upcomingJobs": "Próximos jobs",
   "incidentTimeline": "Cronologia de incidentes",
-  "adapterStatus": "Estado dos adaptadores"
+  "adapterStatus": "Estado dos adaptadores",
+  "appsecCommandCenter": "Centro de Comando AppSec",
+  "applications": "Aplicações",
+  "apis": "APIs",
+  "repositories": "Repositórios",
+  "releases": "Releases",
+  "sboms": "Software Bill of Materials",
+  "components": "Componentes",
+  "secretObservations": "Observações de segredos",
+  "securityGates": "Security Gates",
+  "appsecExceptions": "Exceções AppSec",
+  "appsecRemediation": "Remediação AppSec",
+  "supplyChainGraph": "Grafo da cadeia de fornecimento",
+  "simulatedData": "Dados simulados",
+  "noSubmittedCodeExecution": "Sem execução de código submetido"
 }

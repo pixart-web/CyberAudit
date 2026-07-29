@@ -41,6 +41,7 @@ from cyberaudit.models import (
 )
 from cyberaudit.phase3_api import router as phase3_router
 from cyberaudit.phase4_api import router as phase4_router
+from cyberaudit.phase5_api import router as phase5_router
 from cyberaudit.policy import ScopePolicyEngine, normalized_target
 from cyberaudit.schemas import (
     AssetCreate,
@@ -91,6 +92,7 @@ app = FastAPI(title="CyberAudit API", version="1.0.0", lifespan=lifespan)
 app.include_router(execution_router)
 app.include_router(phase3_router)
 app.include_router(phase4_router)
+app.include_router(phase5_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.app_origin],
