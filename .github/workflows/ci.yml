@@ -17,7 +17,7 @@ jobs:
       - run: ruff check apps/api
       - run: black --check apps/api
       - run: mypy apps/api/cyberaudit
-      - run: pytest apps/api --cov-fail-under=60
+      - run: pytest apps/api --cov-fail-under=75
       - run: pip-audit
   frontend:
     runs-on: ubuntu-24.04
@@ -53,6 +53,10 @@ jobs:
         working-directory: apps/api
         env:
           DATABASE_URL: postgresql+asyncpg://cyberaudit:ci-only-password@127.0.0.1:5432/cyberaudit
+      - run: pytest -q tests/test_postgresql_rls_integration.py
+        working-directory: apps/api
+        env:
+          CYBERAUDIT_RLS_TEST_DATABASE_URL: postgresql+asyncpg://cyberaudit:ci-only-password@127.0.0.1:5432/cyberaudit
   secret-scan:
     runs-on: ubuntu-24.04
     steps:

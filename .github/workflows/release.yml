@@ -39,3 +39,52 @@ jobs:
         run: >-
           cosign sign --yes
           ghcr.io/${{ github.repository_owner }}/cyberaudit-${{ matrix.component }}@${{ steps.build.outputs.digest }}
+  release-bundle:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: anchore/sbom-action/download-syft@v0.20.6
+      - uses: sigstore/cosign-installer@v3
+      - name: Generate source SBOMs
+        run: |
+          mkdir -p dist
+          syft dir:apps/api -o cyclonedx-json=dist/cyberaudit-api-${{ github.ref_name }}.cdx.json
+          syft dir:apps/web -o cyclonedx-json=dist/cyberaudit-web-${{ github.ref_name }}.cdx.json
+      - name: Build immutable source bundle
+        run: |
+          git archive --format=tar.gz --prefix=cyberaudit-${{ github.ref_name }}/ \
+            --output=dist/cyberaudit-${{ github.ref_name }}.tar.gz "${{ github.sha }}"
+          syft file:dist/cyberaudit-${{ github.ref_name }}.tar.gz \
+            -o cyclonedx-json=dist/cyberaudit-bundle-${{ github.ref_name }}.cdx.json
+          sha256sum dist/* > dist/SHA256SUMS
+      - name: Keyless-sign release files
+        run: |
+          for artifact in dist/*.json dist/*.tar.gz dist/SHA256SUMS; do
+            cosign sign-blob --yes --bundle "${artifact}.sigstore.json" "$artifact"
+          done
+      - name: Attest release bundle provenance
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: dist/cyberaudit-${{ github.ref_name }}.tar.gz
+      - name: Verify signatures before publication
+        run: |
+          for artifact in dist/*.json dist/*.tar.gz dist/SHA256SUMS; do
+            case "$artifact" in
+              *.sigstore.json) continue ;;
+            esac
+            cosign verify-blob \
+              --bundle "${artifact}.sigstore.json" \
+              --certificate-identity-regexp "^https://github.com/${{ github.repository }}/.github/workflows/release.yml@" \
+              --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+              "$artifact"
+          done
+      - name: Publish release candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "${{ github.ref_name }}" dist/*
+          --verify-tag --prerelease --generate-notes

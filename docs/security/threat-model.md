@@ -1,5 +1,30 @@
 # Threat model
 
+## Production-readiness boundary additions
+
+- **Tenant-context omission or spoofing:** the API derives context from verified
+  identity, PostgreSQL denies missing context and a non-bypass runtime role
+  enforces read/write RLS. The OIDC bootstrap function returns only an active
+  tenant UUID and has a fixed search path.
+- **Phishing/session takeover:** OIDC uses PKCE/state/nonce and WebAuthn provides
+  user-verified step-up. Challenge replay, credential counter rollback and
+  inactive/unverified IdP identities fail closed.
+- **Poison asynchronous messages:** the universal DLQ stores only sanitized
+  metadata and opaque references. Replay requires step-up, schema/feature checks
+  and a closed handler.
+- **Secret/object exfiltration:** Vault and S3 endpoints are fixed deployment
+  configuration; workload identity, tenant key prefixes, size/checksum controls
+  and short-lived URLs constrain access.
+- **Runner escape:** no user commands, arguments, images, environment or mounts
+  enter the runner contract. Immutable images and a locked-down ephemeral
+  security profile are mandatory.
+- **Supply-chain substitution:** release jobs build once, identify artifacts by
+  digest, generate SBOM/provenance, keylessly sign and verify identity before
+  publication.
+
+Residual risk remains high until these controls are exercised against real IdPs,
+Vault/object storage, container/cluster controllers and an HA/DR environment.
+
 ## Enterprise connectors
 
 New threats include credential disclosure, cross-tenant inventory access,

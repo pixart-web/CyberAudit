@@ -1,5 +1,16 @@
 # Decisões de arquitetura
 
+## ADR-024 — Production readiness closure
+
+Production readiness is evidence-driven and tenant-scoped. PostgreSQL RLS is a
+second authorization boundary using a restricted runtime role; identity
+bootstrap exposes only an active organization UUID from a public slug. External
+secrets and objects use Vault/S3 SDK boundaries with workload identity.
+Ephemeral execution is delegated to a separately privileged HTTPS controller
+using immutable operation-to-image mappings. Release promotion requires verified
+SBOM, provenance and signatures. See
+`adr-024-production-readiness-closure.md` and the closure evidence report.
+
 ## ADR-022 — Identity and cloud domain expansion
 
 Accepted. Use common normalized records and a closed adapter registry instead
