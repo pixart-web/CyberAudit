@@ -35,6 +35,9 @@ HARDENING_PERMISSIONS = [
     "backups.manage",
     "restores.read",
     "restores.manage",
+    "dead_letters.read",
+    "dead_letters.manage",
+    "production_readiness.manage",
 ]
 
 
@@ -84,6 +87,7 @@ async def seed() -> None:
             "live_connectors": "Ativa conectores read-only depois dos testes contratuais.",
             "external_runners": "Ativa runners efémeros após health checks.",
             "anonymous_telemetry": "Ativa telemetria mínima apenas com consentimento.",
+            "dead_letter_replay": "Permite replay manual após step-up e revalidação.",
         }.items():
             if not await db.scalar(
                 select(FeatureFlag).where(

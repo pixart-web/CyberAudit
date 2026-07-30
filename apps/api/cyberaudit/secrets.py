@@ -7,10 +7,15 @@ and persistence use `SecretReference`, never the resolved value.
 from __future__ import annotations
 
 import os
+import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Literal
+from urllib.parse import parse_qs, urlparse
+
+import httpx
 
 from cyberaudit.config import Settings, get_settings
 
@@ -26,6 +31,7 @@ class SecretMetadata:
     reference: str
     available: bool
     expires_at: datetime | None = None
+    version: str | None = None
 
 
 @dataclass(frozen=True)
@@ -145,6 +151,152 @@ class ExternalSecretProvider(SecretProvider):
         )
 
 
+@dataclass(frozen=True)
+class VaultReference:
+    mount: str
+    path: str
+    field: str
+    version: int | None
+
+
+class VaultSecretProvider(SecretProvider):
+    """Vault KV v2 client using a deployment-owned token and closed references."""
+
+    scheme = "vault://"
+    _segment = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
+
+    def __init__(
+        self,
+        address: str,
+        token_file: Path,
+        namespace: str | None = None,
+        *,
+        transport: httpx.AsyncBaseTransport | None = None,
+    ) -> None:
+        parsed_address = urlparse(address)
+        if parsed_address.scheme != "https" or not parsed_address.netloc:
+            raise ValueError("Vault address must be an absolute HTTPS URL")
+        if parsed_address.path not in {"", "/"} or parsed_address.query or parsed_address.fragment:
+            raise ValueError("Vault address cannot contain a path, query or fragment")
+        self.address = address.rstrip("/")
+        self.token_file = token_file
+        self.namespace = namespace
+        self.transport = transport
+
+    def _parse(self, reference: SecretReference) -> VaultReference:
+        if len(reference.uri) > 500 or any(character.isspace() for character in reference.uri):
+            raise ValueError("Invalid Vault secret reference")
+        parsed = urlparse(reference.uri)
+        if parsed.scheme != "vault" or not parsed.netloc or not parsed.fragment:
+            raise ValueError("Expected vault://mount/path?version=N#field")
+        mount = parsed.netloc
+        path_parts = [part for part in parsed.path.split("/") if part]
+        if (
+            not self._segment.fullmatch(mount)
+            or not path_parts
+            or any(not self._segment.fullmatch(part) for part in path_parts)
+            or not self._segment.fullmatch(parsed.fragment)
+        ):
+            raise ValueError("Vault reference contains an unsafe segment")
+        query = parse_qs(parsed.query, strict_parsing=True)
+        if set(query) - {"version"} or any(len(values) != 1 for values in query.values()):
+            raise ValueError("Vault reference contains unsupported parameters")
+        version: int | None = None
+        if "version" in query:
+            try:
+                version = int(query["version"][0])
+            except ValueError as exc:
+                raise ValueError("Vault secret version must be an integer") from exc
+            if version < 1:
+                raise ValueError("Vault secret version must be positive")
+        return VaultReference(mount, "/".join(path_parts), parsed.fragment, version)
+
+    def validate_reference(self, reference: SecretReference) -> None:
+        self._parse(reference)
+
+    def _token(self) -> str:
+        try:
+            token = self.token_file.read_text(encoding="utf-8").strip()
+        except OSError as exc:
+            raise RuntimeError("Vault workload token is unavailable") from exc
+        if not token or len(token) > 8192 or any(character.isspace() for character in token):
+            raise RuntimeError("Vault workload token is invalid")
+        return token
+
+    def _headers(self) -> dict[str, str]:
+        headers = {"X-Vault-Token": self._token()}
+        if self.namespace:
+            headers["X-Vault-Namespace"] = self.namespace
+        return headers
+
+    def _client(self) -> httpx.AsyncClient:
+        return httpx.AsyncClient(
+            base_url=self.address,
+            headers=self._headers(),
+            follow_redirects=False,
+            timeout=httpx.Timeout(5.0),
+            transport=self.transport,
+        )
+
+    async def resolve_reference(self, reference: SecretReference) -> str:
+        parsed = self._parse(reference)
+        params = {"version": str(parsed.version)} if parsed.version else None
+        async with self._client() as client:
+            response = await client.get(
+                f"/v1/{parsed.mount}/data/{parsed.path}",
+                params=params,
+            )
+        if response.status_code == 404:
+            raise LookupError("Referenced Vault secret is unavailable")
+        response.raise_for_status()
+        payload = response.json()
+        value = payload.get("data", {}).get("data", {}).get(parsed.field)
+        if not isinstance(value, str):
+            raise LookupError("Referenced Vault secret field is unavailable")
+        return value
+
+    async def rotate_reference(self, reference: SecretReference) -> SecretMetadata:
+        self.validate_reference(reference)
+        raise RuntimeError(
+            "Vault rotation requires an approved provider-side workflow; "
+            "CyberAudit never receives replacement secret values"
+        )
+
+    async def get_metadata(self, reference: SecretReference) -> SecretMetadata:
+        parsed = self._parse(reference)
+        async with self._client() as client:
+            response = await client.get(f"/v1/{parsed.mount}/metadata/{parsed.path}")
+        if response.status_code == 404:
+            return SecretMetadata("vault", reference.uri, False)
+        response.raise_for_status()
+        metadata = response.json().get("data", {})
+        current_version = metadata.get("current_version")
+        return SecretMetadata(
+            "vault",
+            reference.uri,
+            True,
+            version=str(current_version) if current_version is not None else None,
+        )
+
+    async def health_check(self) -> SecretHealth:
+        try:
+            async with self._client() as client:
+                response = await client.get("/v1/sys/health")
+            healthy = response.status_code == 200
+            message = "Vault is active and workload authentication succeeded"
+            if not healthy:
+                message = f"Vault health check returned status {response.status_code}"
+        except (httpx.HTTPError, RuntimeError, OSError):
+            healthy = False
+            message = "Vault health or workload authentication check failed"
+        return SecretHealth(
+            healthy,
+            "vault",
+            message,
+            datetime.now(timezone.utc),
+        )
+
+
 def secret_provider(settings: Settings | None = None) -> SecretProvider:
     config = settings or get_settings()
     if config.secret_provider == "environment":
@@ -156,5 +308,13 @@ def secret_provider(settings: Settings | None = None) -> SecretProvider:
                 "CYBERAUDIT_TOTP_SECRET",
             },
             config.environment,
+        )
+    if config.secret_provider == "vault":
+        if not config.vault_address:
+            raise ValueError("Vault address is required")
+        return VaultSecretProvider(
+            config.vault_address,
+            config.vault_token_file,
+            config.vault_namespace,
         )
     return ExternalSecretProvider(config.secret_provider)

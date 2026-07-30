@@ -76,10 +76,19 @@ def test_safe_production_configuration_is_accepted() -> None:
         oidc_issuer="https://id.example.invalid",
         oidc_client_id="cyberaudit",
         oidc_redirect_uri="https://audit.example.invalid/callback",
+        mfa_required=True,
+        webauthn_enabled=True,
+        webauthn_rp_id="audit.example.invalid",
+        webauthn_origins=["https://audit.example.invalid"],
+        rls_required=True,
+        database_runtime_role="cyberaudit_runtime",
         secret_provider="vault",  # noqa: S106 -- provider selector, not a credential
+        vault_address="https://vault.example.invalid",
         object_storage_provider="s3",
+        object_storage_bucket="cyberaudit",
         connector_mode="live_read_only",
         runner_type="kubernetes_job",
+        runner_controller_url="https://runner.example.invalid",
     )
     assert settings.production_like
 

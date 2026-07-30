@@ -50,6 +50,12 @@ Product Hardening acrescenta `make seed-hardening`, `make test-hardening`,
 `make load-smoke`. A consola **Sistema → Definições** mostra configuração,
 sessões, continuidade, SLOs, feature flags e edição sem revelar segredos.
 
+Production Readiness Closure acrescenta WebAuthn, RLS PostgreSQL, DLQ universal,
+Vault KV v2, S3 e o contrato HTTPS para runners efémeros. A vista
+**Sistema → Definições** apresenta o gate e os seus bloqueadores sanitizados.
+Use `make test-production-readiness` e `make test-rls`; o segundo exige
+`CYBERAUDIT_RLS_TEST_DATABASE_URL` apontado exclusivamente para PostgreSQL local.
+
 ## Estrutura
 
 - `apps/web`: Next.js App Router, Tailwind, React Query, RHF/Zod e gráficos.
@@ -117,8 +123,14 @@ licenciamento, telemetria opt-in, CI de segurança, Compose de produção e Helm
 Consulte `docs/architecture/product-hardening.md` e
 `docs/testing/product-hardening.md`.
 
-Os adaptadores de Vault/cloud secret managers, S3/Azure/GCS e os controladores
-de runners efémeros falham de forma fechada até receberem identidade de
-workload e testes com infraestrutura real. A interoperabilidade OIDC, HA e os
-objetivos RPO/RTO também exigem ambientes externos. Estes itens não são
-apresentados como prontos para produção.
+Vault KV v2 e S3 têm implementações SDK com identidade de workload, limites,
+checksums e isolamento por tenant; os providers cloud alternativos continuam a
+falhar de forma fechada. Os runners efémeros usam um controlador HTTPS e imagens
+fixas por digest, sem aceitar comandos ou Pod specs.
+
+Esta branch é uma **Production-Ready Candidate em construção**, não uma
+declaração de prontidão. Keycloak e um segundo IdP reais, cerimónias WebAuthn
+num browser, Vault/MinIO reais, runners Docker/Kubernetes, backup/restore, HA,
+DR, load/chaos e a release assinada requerem ambientes externos indisponíveis
+neste workspace. O endpoint `/api/v1/operations/production-readiness` mantém
+esses checks bloqueados até receber evidência válida e nunca se autoaprova.

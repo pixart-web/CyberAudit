@@ -19,6 +19,15 @@ def test_hardening_openapi_contains_operational_routes() -> None:
         "/api/v1/operations/backups",
         "/api/v1/operations/restores",
         "/api/v1/operations/slos",
+        "/api/v1/auth/webauthn/registration/options",
+        "/api/v1/auth/webauthn/registration/verify",
+        "/api/v1/auth/webauthn/step-up/options",
+        "/api/v1/auth/webauthn/step-up/verify",
+        "/api/v1/auth/webauthn/credentials/{factor_id}",
+        "/api/v1/operations/dead-letters",
+        "/api/v1/operations/dead-letters/{message_id}",
+        "/api/v1/operations/dead-letters/{message_id}/{action}",
+        "/api/v1/operations/production-readiness",
     } <= routes
 
 

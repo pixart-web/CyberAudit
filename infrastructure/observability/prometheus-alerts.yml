@@ -21,3 +21,78 @@ groups:
         for: 1h
         labels: { severity: ticket }
         annotations: { summary: "No verified restore drill in 90 days" }
+      - alert: CyberAuditRlsDisabled
+        expr: rls_enabled != 1
+        for: 5m
+        labels: { severity: page }
+        annotations: { summary: "PostgreSQL RLS enforcement is disabled" }
+      - alert: CyberAuditTenantContextMissing
+        expr: increase(tenant_context_missing_total[10m]) > 0
+        for: 1m
+        labels: { severity: ticket }
+        annotations: { summary: "A database operation was rejected without tenant context" }
+      - alert: CyberAuditCrossTenantDenialsSpike
+        expr: increase(cross_tenant_denials_total[10m]) > 10
+        for: 5m
+        labels: { severity: page }
+        annotations: { summary: "Cross-tenant access denials are increasing" }
+      - alert: CyberAuditDeadLetterQueueGrowing
+        expr: increase(dead_letter_messages_total[15m]) - increase(dead_letter_replays_total[15m]) > 20
+        for: 10m
+        labels: { severity: ticket }
+        annotations: { summary: "Dead-letter messages are accumulating" }
+      - alert: CyberAuditSecretProviderUnavailable
+        expr: increase(secret_provider_failures_total[10m]) > 2
+        for: 5m
+        labels: { severity: page }
+        annotations: { summary: "Secret provider failures exceeded policy" }
+      - alert: CyberAuditObjectStorageUnavailable
+        expr: increase(object_storage_failures_total[10m]) > 2
+        for: 5m
+        labels: { severity: page }
+        annotations: { summary: "Object storage failures exceeded policy" }
+      - alert: CyberAuditRunnerCleanupFailure
+        expr: increase(runner_failures_total{code="cleanup_failed"}[10m]) > 0
+        for: 1m
+        labels: { severity: page }
+        annotations: { summary: "An ephemeral runner could not be cleaned up" }
+      - alert: CyberAuditBackupExpired
+        expr: backup_last_success_timestamp_seconds < time() - 86400
+        for: 1h
+        labels: { severity: page }
+        annotations: { summary: "No verified backup in 24 hours" }
+      - alert: CyberAuditRestoreFailed
+        expr: increase(restore_failure_total[24h]) > 0
+        for: 1m
+        labels: { severity: page }
+        annotations: { summary: "A restore validation failed" }
+      - alert: CyberAuditReplicaLagHigh
+        expr: database_replica_lag_seconds > 30
+        for: 5m
+        labels: { severity: page }
+        annotations: { summary: "PostgreSQL replica lag exceeds 30 seconds" }
+      - alert: CyberAuditFailoverFailed
+        expr: increase(ha_failover_total{result="failed"}[1h]) > 0
+        for: 1m
+        labels: { severity: page }
+        annotations: { summary: "A high-availability failover failed" }
+      - alert: CyberAuditReleaseSignatureInvalid
+        expr: release_signature_valid != 1 or increase(release_signature_failures_total[10m]) > 0
+        for: 5m
+        labels: { severity: page }
+        annotations: { summary: "The running release signature is not verified" }
+      - alert: CyberAuditReleaseSbomMissing
+        expr: release_sbom_present != 1
+        for: 15m
+        labels: { severity: ticket }
+        annotations: { summary: "The running release has no verified SBOM" }
+      - alert: CyberAuditCoverageBelowPolicy
+        expr: test_coverage_percent < 75
+        for: 15m
+        labels: { severity: ticket }
+        annotations: { summary: "Backend test coverage is below the 75% policy" }
+      - alert: CyberAuditReadinessBlocked
+        expr: production_readiness_blockers > 0
+        for: 15m
+        labels: { severity: ticket }
+        annotations: { summary: "Production readiness gate has active blockers" }
