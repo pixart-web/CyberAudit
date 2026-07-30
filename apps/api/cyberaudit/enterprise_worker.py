@@ -20,6 +20,7 @@ from cyberaudit.enterprise_models import (
 )
 from cyberaudit.enterprise_services import DetectionEngine
 from cyberaudit.queue import broker as _configured_broker  # noqa: F401
+from cyberaudit.rls import set_tenant_context, set_tenant_context_from_resource
 
 
 @dramatiq.actor(queue_name="cyberaudit.soc", max_retries=2, time_limit=60_000)
@@ -29,6 +30,9 @@ def process_security_event(event_id: str) -> None:
 
 async def _process_security_event(event_id: str) -> None:
     async with SessionLocal() as db:
+        if db.get_bind().dialect.name == "postgresql":
+            if not await set_tenant_context_from_resource(db, "security_event", event_id):
+                return
         event = await db.get(SecurityEvent, event_id)
         if not event:
             return
@@ -43,6 +47,7 @@ def rebuild_enterprise_knowledge(organization_id: str) -> None:
 
 async def _rebuild_enterprise_knowledge(organization_id: str) -> None:
     async with SessionLocal() as db:
+        await set_tenant_context(db, organization_id)
         incidents = list(
             (
                 await db.scalars(

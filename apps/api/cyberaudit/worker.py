@@ -59,6 +59,7 @@ from cyberaudit.orchestrator import approval_is_expired, transition_job, update_
 from cyberaudit.phase4_processing import process_phase4_observations
 from cyberaudit.policy import ScopePolicyEngine
 from cyberaudit.queue import broker as _configured_broker  # noqa: F401
+from cyberaudit.rls import set_tenant_context_from_resource
 from cyberaudit.schemas import PolicyRequest
 
 registry = AdapterRegistry()
@@ -72,6 +73,9 @@ def execute_scan_job(job_id: str) -> None:
 
 async def run_job(job_id: str) -> None:
     async with SessionLocal() as db:
+        if db.get_bind().dialect.name == "postgresql":
+            if not await set_tenant_context_from_resource(db, "scan_job", job_id):
+                return
         job = await db.get(ScanJob, job_id)
         if not job or job.status not in {JobStatus.QUEUED, JobStatus.CANCELLING}:
             return

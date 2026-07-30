@@ -1,5 +1,6 @@
 from collections.abc import AsyncIterator
 
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
@@ -27,6 +28,19 @@ if settings.database_url.startswith("postgresql"):
         }
     )
 engine = create_async_engine(settings.database_url, **engine_options)
+if settings.database_url.startswith("postgresql") and settings.database_runtime_role:
+    if settings.database_runtime_role != "cyberaudit_runtime":
+        raise ValueError("Unsupported database runtime role")
+
+    @event.listens_for(engine.sync_engine, "connect")
+    def assume_runtime_role(dbapi_connection: object, _connection_record: object) -> None:
+        cursor = dbapi_connection.cursor()  # type: ignore[attr-defined]
+        try:
+            cursor.execute("SET ROLE cyberaudit_runtime")
+        finally:
+            cursor.close()
+
+
 SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
 

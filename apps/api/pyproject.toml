@@ -10,25 +10,28 @@ dependencies = [
   "alembic>=1.14,<2",
   "aiosqlite>=0.20,<1",
   "asyncpg>=0.30,<1",
+  "boto3>=1.43.59,<2",
   "email-validator>=2.2,<3",
   "dramatiq[redis]>=1.17,<2",
   "defusedxml>=0.7,<1",
   "dnspython>=2.7,<3",
   "fastapi>=0.115,<1",
   "httpx>=0.28,<1",
-  "cryptography>=48.0.1,<49",
+  "cryptography>=49.0,<50",
   "passlib[argon2]>=1.7,<2",
   "pydantic-settings>=2.7,<3",
   "pyjwt>=2.10,<3",
   "python-multipart>=0.0.20,<1",
   "redis>=5.2,<6",
   "sqlalchemy[asyncio]>=2.0,<3",
-  "uvicorn[standard]>=0.34,<1"
+  "uvicorn[standard]>=0.34,<1",
+  "webauthn>=3.0,<4"
 ]
 
 [project.optional-dependencies]
 dev = [
   "black>=26.3.1,<27",
+  "boto3-stubs[s3]>=1.43.59,<2",
   "coverage>=7.6,<8",
   "mypy>=1.14,<2",
   "pytest>=9.0.3,<10",
@@ -66,5 +69,13 @@ plugins = ["pydantic.mypy", "sqlalchemy.ext.mypy.plugin"]
 exclude = ["alembic"]
 
 [[tool.mypy.overrides]]
-module = ["passlib.*", "dns.*", "defusedxml.*"]
+module = [
+  "passlib.*",
+  "dns.*",
+  "defusedxml.*",
+  "boto3",
+  "boto3.*",
+  "botocore",
+  "botocore.*"
+]
 ignore_missing_imports = true

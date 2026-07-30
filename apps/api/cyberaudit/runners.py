@@ -8,8 +8,10 @@ import secrets
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Literal
 
+import httpx
 from pydantic import BaseModel, ConfigDict, Field
 
 from cyberaudit.redaction import redact
@@ -145,3 +147,133 @@ class EphemeralRunnerDescriptor(ExecutionRunner):
             "runner": self.runner_type,
             "message": "Controller integration is not configured.",
         }
+
+
+class EphemeralRunnerController(ExecutionRunner):
+    """HTTPS client for a separately privileged, fixed-spec runner controller."""
+
+    _images = {
+        "validate_json": "registry.invalid/cyberaudit/runner-json@sha256:" + "1" * 64,
+        "sha256": "registry.invalid/cyberaudit/runner-hash@sha256:" + "2" * 64,
+        "connector_read": "registry.invalid/cyberaudit/runner-connector@sha256:" + "3" * 64,
+    }
+
+    def __init__(
+        self,
+        runner_type: Literal["docker_ephemeral", "kubernetes_job"],
+        controller_url: str,
+        token_file: Path,
+        *,
+        transport: httpx.AsyncBaseTransport | None = None,
+    ) -> None:
+        if not controller_url.startswith("https://"):
+            raise ValueError("Runner controller must use HTTPS")
+        self.runner_type = runner_type
+        self.controller_url = controller_url.rstrip("/")
+        self.token_file = token_file
+        self.transport = transport
+        self.security = RunnerSecurityProfile()
+
+    def _token(self) -> str:
+        try:
+            token = self.token_file.read_text(encoding="utf-8").strip()
+        except OSError as exc:
+            raise RuntimeError("Runner workload token is unavailable") from exc
+        if not token or len(token) > 8192 or any(character.isspace() for character in token):
+            raise RuntimeError("Runner workload token is invalid")
+        return token
+
+    def build_spec(self, request: RunnerRequest) -> dict[str, Any]:
+        """Build an immutable execution declaration; commands cannot be supplied."""
+        image = self._images[request.operation]
+        security = {
+            "read_only_filesystem": True,
+            "run_as_non_root": True,
+            "drop_capabilities": ["ALL"],
+            "no_new_privileges": True,
+            "process_limit": self.security.process_limit,
+            "cpu_limit": self.security.cpu_limit,
+            "memory_limit_mb": self.security.memory_limit_mb,
+            "network_mode": "none",
+            "metadata_service_blocked": True,
+            "docker_socket_mounted": False,
+            "host_mounts": [],
+        }
+        return {
+            "api_version": "cyberaudit.io/runner/v1",
+            "runner_type": self.runner_type,
+            "operation": request.operation,
+            "image": image,
+            "input": redact(request.payload),
+            "limits": {
+                "timeout_seconds": request.timeout_seconds,
+                "maximum_output_bytes": request.maximum_output_bytes,
+            },
+            "security": security,
+        }
+
+    def _client(self) -> httpx.AsyncClient:
+        return httpx.AsyncClient(
+            base_url=self.controller_url,
+            headers={"Authorization": f"Bearer {self._token()}"},
+            timeout=httpx.Timeout(10),
+            follow_redirects=False,
+            transport=self.transport,
+        )
+
+    async def execute(self, request: RunnerRequest) -> RunnerResult:
+        started = datetime.now(timezone.utc)
+        async with self._client() as client:
+            response = await client.post("/v1/executions", json=self.build_spec(request))
+        response.raise_for_status()
+        payload = response.json()
+        output = redact(payload.get("output", {}))
+        canonical = json.dumps(output, sort_keys=True, separators=(",", ":")).encode()
+        if len(canonical) > request.maximum_output_bytes:
+            raise ValueError("Runner output exceeds configured limit")
+        status = payload.get("status")
+        if status not in {"completed", "failed", "cancelled", "timed_out"}:
+            raise ValueError("Runner controller returned an invalid terminal state")
+        return RunnerResult(
+            str(payload["execution_id"]),
+            status,
+            started,
+            datetime.now(timezone.utc),
+            output,
+            hashlib.sha256(canonical).hexdigest(),
+            metadata={
+                "runner": self.runner_type,
+                "ephemeral": True,
+                "image": self._images[request.operation],
+            },
+            error_code=payload.get("error_code"),
+        )
+
+    async def cancel(self, execution_id: str) -> None:
+        if (
+            not execution_id
+            or len(execution_id) > 128
+            or not execution_id.replace("-", "").isalnum()
+        ):
+            raise ValueError("Invalid runner execution identifier")
+        async with self._client() as client:
+            response = await client.post(f"/v1/executions/{execution_id}/cancel")
+        response.raise_for_status()
+
+    async def health_check(self) -> dict[str, Any]:
+        try:
+            async with self._client() as client:
+                response = await client.get("/health")
+            response.raise_for_status()
+            payload = response.json()
+            return {
+                "healthy": payload.get("status") == "ok",
+                "runner": self.runner_type,
+                "controller_authenticated": True,
+            }
+        except (httpx.HTTPError, RuntimeError, ValueError):
+            return {
+                "healthy": False,
+                "runner": self.runner_type,
+                "controller_authenticated": False,
+            }

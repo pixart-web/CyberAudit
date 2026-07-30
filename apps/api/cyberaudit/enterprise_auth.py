@@ -41,15 +41,29 @@ class OidcTransaction:
 
 
 class OidcClient:
-    def __init__(self, settings: Settings) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        *,
+        transport: httpx.AsyncBaseTransport | None = None,
+    ) -> None:
         self.settings = settings
         if not settings.oidc_enabled or not settings.oidc_issuer:
             raise ValueError("OIDC is disabled")
         self.issuer = settings.oidc_issuer.rstrip("/")
+        self.transport = transport
+
+    def _client(self, timeout: float) -> httpx.AsyncClient:
+        return httpx.AsyncClient(
+            timeout=timeout,
+            follow_redirects=False,
+            verify=True,
+            transport=self.transport,
+        )
 
     async def discovery(self) -> dict[str, Any]:
         url = f"{self.issuer}/.well-known/openid-configuration"
-        async with httpx.AsyncClient(timeout=10, follow_redirects=False, verify=True) as client:
+        async with self._client(10) as client:
             response = await client.get(url, headers={"accept": "application/json"})
             response.raise_for_status()
             document = response.json()
@@ -100,7 +114,7 @@ class OidcClient:
         }
         if client_secret:
             data["client_secret"] = client_secret
-        async with httpx.AsyncClient(timeout=15, follow_redirects=False, verify=True) as client:
+        async with self._client(15) as client:
             token_response = await client.post(discovery["token_endpoint"], data=data)
             token_response.raise_for_status()
             token_payload = token_response.json()
@@ -126,14 +140,42 @@ class OidcClient:
         if not hmac.compare_digest(str(claims["nonce"]), transaction.nonce):
             raise ValueError("OIDC nonce mismatch")
         email = str(claims.get("email", "")).lower()
+        if not email or "@" not in email:
+            raise ValueError("OIDC email claim is missing")
+        if self.settings.oidc_require_verified_email and claims.get("email_verified") is not True:
+            raise ValueError("OIDC email is not verified")
+        if (
+            claims.get("account_status") in {"suspended", "disabled", "locked"}
+            or claims.get("active") is False
+        ):
+            raise ValueError("OIDC account is inactive")
         if self.settings.oidc_allowed_domains:
             domain = email.rsplit("@", 1)[-1]
             if domain not in self.settings.oidc_allowed_domains:
                 raise ValueError("OIDC email domain is not allowed")
-        groups = set(claims.get("groups") or [])
+        raw_groups = claims.get("groups") or []
+        if not isinstance(raw_groups, list) or any(
+            not isinstance(group, str) for group in raw_groups
+        ):
+            raise ValueError("OIDC groups claim is invalid")
+        if len(raw_groups) > self.settings.oidc_max_groups:
+            raise ValueError("OIDC groups claim exceeds its configured limit")
+        groups = set(raw_groups)
         if self.settings.oidc_required_group and self.settings.oidc_required_group not in groups:
             raise ValueError("Required OIDC group is missing")
         return claims
+
+    def mapped_roles(self, claims: dict[str, Any]) -> set[str]:
+        raw_groups = claims.get("groups") or []
+        if not isinstance(raw_groups, list):
+            return set()
+        allowed_roles = {"Client", "Reviewer", "Auditor", "Administrator"}
+        return {
+            role
+            for group in raw_groups
+            if isinstance(group, str)
+            and (role := self.settings.oidc_group_role_mapping.get(group)) in allowed_roles
+        }
 
 
 class OidcStateStore:

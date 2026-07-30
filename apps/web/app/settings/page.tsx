@@ -10,6 +10,8 @@ import {
   HardDrive,
   KeyRound,
   Radio,
+  ServerCog,
+  ShieldAlert,
   ShieldCheck,
 } from "lucide-react";
 import { Shell } from "@/components/shell";
@@ -32,6 +34,22 @@ type Collection<T> = { items: T[]; total: number };
 type Flag = { id: string; code: string; description: string; enabled: boolean; environment: string };
 type Slo = { id: string; code: string; service: string; target: number; status: string };
 type License = { edition: string; provider: string; status: string; capabilities: string[] };
+type ReadinessCheck = {
+  code: string;
+  status: string;
+  summary?: string;
+  observed_at?: string;
+  evidence_references?: string[];
+};
+type Readiness = {
+  state: "blocked" | "incomplete" | "candidate" | "approved";
+  blockers: string[];
+  checks: ReadinessCheck[];
+  environment: string;
+  application_version: string;
+  evaluated_at: string;
+  formal_approval_required: boolean;
+};
 
 export default function EnterpriseSettings() {
   const health = useQuery({
@@ -50,6 +68,11 @@ export default function EnterpriseSettings() {
   const license = useQuery({
     queryKey: ["license"],
     queryFn: () => api<License>("/license"),
+  });
+  const readiness = useQuery({
+    queryKey: ["production-readiness"],
+    queryFn: () => api<Readiness>("/operations/production-readiness"),
+    refetchInterval: 30_000,
   });
   const data = health.data;
 
@@ -141,6 +164,60 @@ export default function EnterpriseSettings() {
           </p>
         </Card>
       </div>
+
+      <Card className="mt-4 p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="text-medium" size={20} />
+            <div>
+              <h2 className="font-semibold">Production Readiness Gate</h2>
+              <p className="text-xs text-muted">
+                Evidência sanitizada; o estado aprovado exige decisão formal.
+              </p>
+            </div>
+          </div>
+          <Badge tone={readiness.data?.state === "approved" ? "success" : "warning"}>
+            {readiness.data?.state ?? "a verificar"}
+          </Badge>
+        </div>
+        {readiness.error && (
+          <p className="mt-4 rounded-lg border border-critical/30 p-3 text-sm text-red-300">
+            O gate não está disponível ou a conta não possui a permissão necessária.
+          </p>
+        )}
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {readiness.data?.checks.map((check) => (
+            <div key={check.code} className="rounded-lg border border-border p-3">
+              <div className="flex items-start justify-between gap-2">
+                <span className="text-xs font-medium">{check.code.replaceAll("_", " ")}</span>
+                <Badge tone={check.status === "passed" ? "success" : "neutral"}>
+                  {check.status}
+                </Badge>
+              </div>
+              {check.observed_at && (
+                <p className="mt-2 text-[11px] text-muted">
+                  {new Intl.DateTimeFormat("pt-PT", {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  }).format(new Date(check.observed_at))}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+        {!readiness.data?.checks.length && (
+          <div className="mt-4 flex items-center gap-2 text-sm text-muted">
+            <ServerCog size={16} />
+            Ainda não existe evidência operacional válida.
+          </div>
+        )}
+        {!!readiness.data?.blockers.length && (
+          <p className="mt-4 text-xs text-muted">
+            {readiness.data.blockers.length} bloqueadores ativos. Nenhum segredo, endpoint privado
+            ou topologia sensível é apresentado nesta vista.
+          </p>
+        )}
+      </Card>
     </Shell>
   );
 }

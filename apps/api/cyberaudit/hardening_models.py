@@ -90,9 +90,17 @@ class MfaFactor(Base, EnterpriseMixin):
     credential_id: Mapped[str | None] = mapped_column(String(500))
     public_key: Mapped[str | None] = mapped_column(Text)
     sign_count: Mapped[int] = mapped_column(Integer, default=0)
+    transports: Mapped[list[str]] = mapped_column(JSON, default=list)
+    aaguid: Mapped[str | None] = mapped_column(String(80))
+    authenticator_attachment: Mapped[str | None] = mapped_column(String(30))
+    discoverable: Mapped[bool] = mapped_column(Boolean, default=False)
+    backup_eligible: Mapped[bool] = mapped_column(Boolean, default=False)
+    backup_state: Mapped[bool] = mapped_column(Boolean, default=False)
     status: Mapped[str] = mapped_column(String(30), default="pending")
     verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked_by: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
 
 
 class RecoveryCode(Base, EnterpriseMixin):
@@ -213,3 +221,60 @@ class ServiceLevelObjective(Base, EnterpriseMixin):
     status: Mapped[str] = mapped_column(String(30), default="unmeasured")
     owner: Mapped[str | None] = mapped_column(String(180))
     evidence: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+
+
+class DeadLetterMessage(Base, EnterpriseMixin):
+    __tablename__ = "dead_letter_messages"
+    __table_args__ = (
+        UniqueConstraint("organization_id", "queue_name", "idempotency_key"),
+        Index("ix_dead_letters_org_status", "organization_id", "status", "last_failed_at"),
+    )
+    queue_name: Mapped[str] = mapped_column(String(120))
+    message_type: Mapped[str] = mapped_column(String(120))
+    message_id: Mapped[str] = mapped_column(String(160))
+    idempotency_key: Mapped[str] = mapped_column(String(160))
+    payload_reference: Mapped[str] = mapped_column(String(1000))
+    schema_version: Mapped[int] = mapped_column(Integer, default=1)
+    error_code: Mapped[str] = mapped_column(String(120))
+    error_summary: Mapped[str] = mapped_column(String(500))
+    attempts: Mapped[int] = mapped_column(Integer, default=1)
+    first_failed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    last_failed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    status: Mapped[str] = mapped_column(String(30), default="pending")
+    replay_count: Mapped[int] = mapped_column(Integer, default=0)
+    acknowledged_by: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
+    acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ProductionReadinessEvidence(Base, EnterpriseMixin):
+    __tablename__ = "production_readiness_evidence"
+    __table_args__ = (
+        UniqueConstraint("organization_id", "environment", "check_code"),
+        Index(
+            "ix_readiness_evidence_org_environment",
+            "organization_id",
+            "environment",
+            "observed_at",
+        ),
+    )
+    check_code: Mapped[str] = mapped_column(String(120))
+    status: Mapped[str] = mapped_column(String(30))
+    summary: Mapped[str] = mapped_column(String(500))
+    evidence_references: Mapped[list[str]] = mapped_column(JSON, default=list)
+    details: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    environment: Mapped[str] = mapped_column(String(40))
+    application_version: Mapped[str] = mapped_column(String(80))
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    recorded_by: Mapped[str] = mapped_column(ForeignKey("users.id"))
+
+
+class ProductionReadinessApproval(Base, EnterpriseMixin):
+    __tablename__ = "production_readiness_approvals"
+    environment: Mapped[str] = mapped_column(String(40))
+    status: Mapped[str] = mapped_column(String(30), default="pending")
+    decision: Mapped[str | None] = mapped_column(String(30))
+    requested_by: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    reviewed_by: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    notes: Mapped[str | None] = mapped_column(String(1000))

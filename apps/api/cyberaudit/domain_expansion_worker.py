@@ -10,6 +10,7 @@ import dramatiq
 from cyberaudit.db import SessionLocal
 from cyberaudit.domain_expansion_models import ConnectorExecution, EnterpriseConnector
 from cyberaudit.queue import broker as _configured_broker  # noqa: F401
+from cyberaudit.rls import set_tenant_context_from_resource
 
 
 def connector_execution_allowed(
@@ -31,6 +32,9 @@ def process_connector_execution(execution_id: str) -> None:
 async def _process_connector_execution(execution_id: str) -> None:
     """Validate persisted state again and process only controlled local metadata."""
     async with SessionLocal() as db:
+        if db.get_bind().dialect.name == "postgresql":
+            if not await set_tenant_context_from_resource(db, "connector_execution", execution_id):
+                return
         execution = await db.get(ConnectorExecution, execution_id)
         if not execution:
             return

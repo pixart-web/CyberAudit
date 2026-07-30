@@ -54,7 +54,9 @@ class UserRead(ORMModel):
     id: str
     organization_id: str
     name: str
-    email: EmailStr
+    # Development compatibility: the documented demo identity uses the
+    # reserved `.local` suffix and must still be serializable.
+    email: str = Field(pattern=r"^[^@\s]+@[^@\s]+$", max_length=254)
     status: str
     mfa_enabled: bool
 

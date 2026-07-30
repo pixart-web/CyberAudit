@@ -1,4 +1,4 @@
-.PHONY: setup up down restart logs migrate seed test lint format clean worker worker-logs test-worker seed-jobs adapters-health purge-demo-jobs seed-phase3 seed-phase4 seed-phase5 seed-enterprise seed-hardening enterprise-domain-seed enterprise-domain-test enterprise-domain-sync-demo enterprise-domain-health identity-test cloud-test kubernetes-test zero-trust-test test-adapters test-network-safety test-discovery test-graph test-vulnerability-intelligence test-risk test-appsec test-soc test-grc test-ai test-enterprise test-hardening verify-production-config backup restore-drill load-smoke test-web-inventory test-api-security test-dependencies test-sca test-secrets test-sast test-iac test-containers test-cicd test-security-gates lab-services-up lab-services-down lab-network-up lab-network-down appsec-lab-up appsec-lab-down import-demo-results import-demo-api-spec generate-demo-sbom purge-evidence purge-appsec-demo retest-demo sync-vulnerability-feeds recalculate-risk rebuild-appsec-scores refresh-attack-paths rebuild-knowledge-graph coverage-report benchmark-appsec
+.PHONY: setup up down restart logs migrate seed test lint format clean worker worker-logs test-worker seed-jobs adapters-health purge-demo-jobs seed-phase3 seed-phase4 seed-phase5 seed-enterprise seed-hardening enterprise-domain-seed enterprise-domain-test enterprise-domain-sync-demo enterprise-domain-health identity-test cloud-test kubernetes-test zero-trust-test test-adapters test-network-safety test-discovery test-graph test-vulnerability-intelligence test-risk test-appsec test-soc test-grc test-ai test-enterprise test-hardening test-production-readiness test-rls verify-production-config backup restore-drill load-smoke test-web-inventory test-api-security test-dependencies test-sca test-secrets test-sast test-iac test-containers test-cicd test-security-gates lab-services-up lab-services-down lab-network-up lab-network-down appsec-lab-up appsec-lab-down import-demo-results import-demo-api-spec generate-demo-sbom purge-evidence purge-appsec-demo retest-demo sync-vulnerability-feeds recalculate-risk rebuild-appsec-scores refresh-attack-paths rebuild-knowledge-graph coverage-report benchmark-appsec
 
 setup:
 	cp -n .env.example .env || true
@@ -43,6 +43,12 @@ seed-hardening:
 
 test-hardening:
 	.venv/bin/pytest apps/api/tests/test_product_hardening.py
+
+test-production-readiness:
+	.venv/bin/pytest apps/api/tests/test_production_readiness_closure.py
+
+test-rls:
+	.venv/bin/pytest apps/api/tests/test_postgresql_rls_integration.py
 
 verify-production-config:
 	.venv/bin/python infrastructure/scripts/verify_production_config.py
