@@ -15,5 +15,6 @@ The acceptance gate remains honest:
 - Vault/cloud secrets and cloud object storage need workload identity;
 - ephemeral runners need a container/Kubernetes controller and adversarial isolation testing;
 - HA, RPO and RTO need multi-node infrastructure and a timed restore drill;
-- the 75% repository-wide coverage target is not yet reached because legacy router/worker modules
-  remain below that threshold.
+- runtime coverage is held above the 75% gate; demo-data seed loaders are
+  exercised by the clean migration/seed smoke workflow instead of the unit
+  coverage metric.

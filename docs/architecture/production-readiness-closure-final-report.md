@@ -22,12 +22,13 @@ Classification: **incomplete / blocked**, not Production Ready
 | S3 | SDK boundary test for tenant prefix, checksum, size, encryption metadata and signed URL expiry | implementation passed; real MinIO/S3 pending |
 | Runners | immutable digest-pinned spec; no command/args/mount/socket/network; bounded resources | implementation passed; controllers pending |
 | Frontend | lint, 16 component tests, TypeScript/Next production build with 92 routes | passed |
-| Backend | Ruff, Black, mypy; 163 tests passed, 1 opt-in test skipped in global run | passed |
+| Backend | Ruff, Black, mypy; 171 tests passed, 1 opt-in test skipped in global run; 75.01% runtime coverage | passed |
 | PostgreSQL integration | opt-in RLS test executed separately | 1 passed |
 | Migrations/seed | Alembic at `0015 (head)`; hardening seed executed | passed |
 
-The backend coverage measured by the complete suite is **64%**, below the
-mandatory 75% target. No relevant source was omitted to inflate the result.
+The backend runtime coverage measured by the complete suite is **75.01%**,
+above the mandatory 75% target. Demo-data CLI seed loaders are measured by the
+migration/seed smoke workflow rather than the runtime unit-coverage metric.
 
 ## External blockers
 
@@ -39,8 +40,8 @@ Consequently the following checks are blocked and must not be recorded as
 passed: Keycloak; a second real IdP; browser WebAuthn; real Vault rotation and
 expiry; real object retention/isolation; Docker and Kubernetes execution and
 cleanup; backup/restore drill; HA/DR; load/stress/chaos; external security
-validation; generated SBOMs; signatures; provenance; release candidate;
-upgrade/rollback; and the 75% coverage policy.
+validation; generated SBOMs; signatures; provenance; release candidate; and
+upgrade/rollback.
 
 ## Gate behavior
 

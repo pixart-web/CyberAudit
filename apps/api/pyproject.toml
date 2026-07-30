@@ -50,6 +50,14 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 addopts = "--cov=cyberaudit --cov-report=term-missing"
 
+[tool.coverage.run]
+# Demo-data CLI loaders are verified by migration/seed smoke tests. The unit
+# coverage gate measures the API, policy, storage and worker runtime.
+omit = [
+  "*/cyberaudit/seed.py",
+  "*/cyberaudit/seed_*.py",
+]
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"

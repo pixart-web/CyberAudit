@@ -85,27 +85,49 @@ def upgrade() -> None:
         tables=[Base.metadata.tables[name] for name in NEW_TABLES],
         checkfirst=True,
     )
+    inspector = sa.inspect(connection)
+    existing_columns = {column["name"] for column in inspector.get_columns("mfa_factors")}
+    existing_foreign_keys = {
+        foreign_key["name"]
+        for foreign_key in inspector.get_foreign_keys("mfa_factors")
+        if foreign_key["name"]
+    }
     with op.batch_alter_table("mfa_factors") as batch:
-        batch.add_column(sa.Column("transports", sa.JSON(), nullable=False, server_default="[]"))
-        batch.add_column(sa.Column("aaguid", sa.String(length=80), nullable=True))
-        batch.add_column(sa.Column("authenticator_attachment", sa.String(length=30), nullable=True))
-        batch.add_column(
-            sa.Column("discoverable", sa.Boolean(), nullable=False, server_default=sa.false())
-        )
-        batch.add_column(
-            sa.Column("backup_eligible", sa.Boolean(), nullable=False, server_default=sa.false())
-        )
-        batch.add_column(
-            sa.Column("backup_state", sa.Boolean(), nullable=False, server_default=sa.false())
-        )
-        batch.add_column(sa.Column("revoked_at", sa.DateTime(timezone=True), nullable=True))
-        batch.add_column(sa.Column("revoked_by", sa.String(length=36), nullable=True))
-        batch.create_foreign_key(
-            "fk_mfa_factors_revoked_by_users",
-            "users",
-            ["revoked_by"],
-            ["id"],
-        )
+        if "transports" not in existing_columns:
+            batch.add_column(
+                sa.Column("transports", sa.JSON(), nullable=False, server_default="[]")
+            )
+        if "aaguid" not in existing_columns:
+            batch.add_column(sa.Column("aaguid", sa.String(length=80), nullable=True))
+        if "authenticator_attachment" not in existing_columns:
+            batch.add_column(
+                sa.Column("authenticator_attachment", sa.String(length=30), nullable=True)
+            )
+        if "discoverable" not in existing_columns:
+            batch.add_column(
+                sa.Column("discoverable", sa.Boolean(), nullable=False, server_default=sa.false())
+            )
+        if "backup_eligible" not in existing_columns:
+            batch.add_column(
+                sa.Column(
+                    "backup_eligible", sa.Boolean(), nullable=False, server_default=sa.false()
+                )
+            )
+        if "backup_state" not in existing_columns:
+            batch.add_column(
+                sa.Column("backup_state", sa.Boolean(), nullable=False, server_default=sa.false())
+            )
+        if "revoked_at" not in existing_columns:
+            batch.add_column(sa.Column("revoked_at", sa.DateTime(timezone=True), nullable=True))
+        if "revoked_by" not in existing_columns:
+            batch.add_column(sa.Column("revoked_by", sa.String(length=36), nullable=True))
+        if "fk_mfa_factors_revoked_by_users" not in existing_foreign_keys:
+            batch.create_foreign_key(
+                "fk_mfa_factors_revoked_by_users",
+                "users",
+                ["revoked_by"],
+                ["id"],
+            )
     _enable_postgresql_rls(connection)
 
 
@@ -120,8 +142,16 @@ def downgrade() -> None:
             policy = preparer.quote(f"cyberaudit_tenant_isolation_{table}"[:63])
             connection.execute(sa.text(f"DROP POLICY IF EXISTS {policy} ON {quoted}"))
             connection.execute(sa.text(f"ALTER TABLE {quoted} DISABLE ROW LEVEL SECURITY"))
+    inspector = sa.inspect(connection)
+    existing_columns = {column["name"] for column in inspector.get_columns("mfa_factors")}
+    existing_foreign_keys = {
+        foreign_key["name"]
+        for foreign_key in inspector.get_foreign_keys("mfa_factors")
+        if foreign_key["name"]
+    }
     with op.batch_alter_table("mfa_factors") as batch:
-        batch.drop_constraint("fk_mfa_factors_revoked_by_users", type_="foreignkey")
+        if "fk_mfa_factors_revoked_by_users" in existing_foreign_keys:
+            batch.drop_constraint("fk_mfa_factors_revoked_by_users", type_="foreignkey")
         for column in (
             "revoked_by",
             "revoked_at",
@@ -132,6 +162,7 @@ def downgrade() -> None:
             "aaguid",
             "transports",
         ):
-            batch.drop_column(column)
+            if column in existing_columns:
+                batch.drop_column(column)
     for table in reversed(NEW_TABLES):
         op.drop_table(table)

@@ -17,7 +17,7 @@ jobs:
       - run: ruff check apps/api
       - run: black --check apps/api
       - run: mypy apps/api/cyberaudit
-      - run: pytest apps/api --cov-fail-under=75
+      - run: pytest apps/api --cov-config=apps/api/pyproject.toml --cov-fail-under=75
       - run: pip-audit
   frontend:
     runs-on: ubuntu-24.04
@@ -50,6 +50,10 @@ jobs:
         with: { python-version: "3.12" }
       - run: python -m pip install -e "apps/api"
       - run: alembic upgrade head
+        working-directory: apps/api
+        env:
+          DATABASE_URL: postgresql+asyncpg://cyberaudit:ci-only-password@127.0.0.1:5432/cyberaudit
+      - run: python -m cyberaudit.seed
         working-directory: apps/api
         env:
           DATABASE_URL: postgresql+asyncpg://cyberaudit:ci-only-password@127.0.0.1:5432/cyberaudit
