@@ -80,9 +80,11 @@ class Settings(BaseSettings):
     license_provider: Literal["community", "signed_offline", "online"] = "community"
     database_pool_size: int = Field(default=10, ge=1, le=100)
     database_pool_overflow: int = Field(default=10, ge=0, le=100)
+    database_use_null_pool: bool = False
     database_statement_timeout_ms: int = Field(default=30_000, ge=1000, le=300_000)
     database_runtime_role: str | None = None
     request_max_bytes: int = Field(default=12 * 1024 * 1024, ge=1024)
+    readiness_evidence_manifest: Path | None = None
 
     @property
     def production_like(self) -> bool:

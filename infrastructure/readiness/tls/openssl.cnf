@@ -1,0 +1,26 @@
+[req]
+distinguished_name = dn
+prompt = no
+req_extensions = req_ext
+
+[dn]
+CN = CyberAudit Readiness Services
+O = CyberAudit Synthetic Laboratory
+
+[req_ext]
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = localhost
+DNS.2 = cyberaudit.localhost
+DNS.3 = idp.localhost
+DNS.4 = postgres
+DNS.5 = redis
+DNS.6 = vault
+DNS.7 = minio
+DNS.8 = keycloak
+DNS.9 = keycloak-proxy
+DNS.10 = api
+DNS.11 = web
+IP.1 = 127.0.0.1
+IP.2 = ::1

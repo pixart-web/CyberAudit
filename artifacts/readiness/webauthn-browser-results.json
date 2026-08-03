@@ -1,0 +1,8 @@
+{
+  "status": "blocked",
+  "virtual_authenticator_executed": false,
+  "physical_authenticator_executed": false,
+  "reason": "A trusted browser origin and an operator-controlled authenticator are required.",
+  "required_action": "Complete the ceremony matrix in docs/testing/webauthn-browser-validation.md.",
+  "private_keys_recorded": false
+}

@@ -177,6 +177,21 @@ async def test_dead_letter_capture_deduplicates_and_replay_requires_step_up(db) 
     assert replayed == [message.id]
 
 
+def test_dead_letter_payload_reference_accepts_non_whitespace_s_characters() -> None:
+    envelope = DeadLetterEnvelope(
+        organization_id="00000000-0000-4000-8000-000000000001",
+        queue_name="connector_sync",
+        message_type="readiness.message",
+        message_id="message-with-s",
+        idempotency_key="idempotency-with-s",
+        payload_reference="object://readiness/synthetic-message",
+        error_code="SYNTHETIC_FAILURE",
+        error_summary="Synthetic failure",
+    )
+
+    assert envelope.payload_reference == "object://readiness/synthetic-message"
+
+
 @pytest.mark.asyncio
 async def test_dead_letter_cross_tenant_and_unknown_queue_are_denied(db) -> None:
     organization, _ = await _identity(db)

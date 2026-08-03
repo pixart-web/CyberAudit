@@ -56,6 +56,15 @@ Vault KV v2, S3 e o contrato HTTPS para runners efémeros. A vista
 Use `make test-production-readiness` e `make test-rls`; o segundo exige
 `CYBERAUDIT_RLS_TEST_DATABASE_URL` apontado exclusivamente para PostgreSQL local.
 
+Infrastructure Validation acrescenta o laboratório production-like com TLS,
+Keycloak, Vault, MinIO, PostgreSQL, Redis, runners Docker/Kubernetes, métricas e
+tracing. O fluxo principal é `make readiness-environment-check`,
+`make readiness-up`, os alvos `readiness-*-test` e `make readiness-evidence`.
+`make readiness-gate` falha deliberadamente enquanto existir qualquer evidência
+ausente, falhada, expirada ou sem revisão humana obrigatória. O alvo
+`release-candidate` nunca cria uma tag local: a publicação é exclusiva do
+workflow protegido e só é alcançável depois do gate.
+
 ## Estrutura
 
 - `apps/web`: Next.js App Router, Tailwind, React Query, RHF/Zod e gráficos.
@@ -129,8 +138,11 @@ falhar de forma fechada. Os runners efémeros usam um controlador HTTPS e imagen
 fixas por digest, sem aceitar comandos ou Pod specs.
 
 Esta branch é uma **Production-Ready Candidate em construção**, não uma
-declaração de prontidão. Keycloak e um segundo IdP reais, cerimónias WebAuthn
-num browser, Vault/MinIO reais, runners Docker/Kubernetes, backup/restore, HA,
-DR, load/chaos e a release assinada requerem ambientes externos indisponíveis
-neste workspace. O endpoint `/api/v1/operations/production-readiness` mantém
-esses checks bloqueados até receber evidência válida e nunca se autoaprova.
+declaração de prontidão. Keycloak, Vault/MinIO, PostgreSQL/Redis, runners
+Docker/Kubernetes, backup/restore, SBOM, scans e carga pública sintética foram
+exercitados localmente e deixaram evidência sanitizada. Permanecem bloqueadores:
+segundo IdP independente, WebAuthn num browser com origem confiável, HA completa
+da camada de dados, DR num segundo ambiente, findings HIGH/CRITICAL sem
+aceitação, assinatura/proveniência keyless, instalação/upgrade/rollback e
+avaliação externa. O endpoint `/api/v1/operations/production-readiness` combina
+registos tenant-scoped com o manifesto externo e nunca se autoaprova.

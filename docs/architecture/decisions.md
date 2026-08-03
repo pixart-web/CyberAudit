@@ -1,5 +1,16 @@
 # Decisões de arquitetura
 
+## ADR-025 — Infrastructure evidence and release gating
+
+Accepted. Production-like validation uses version-pinned local infrastructure
+and stores only sanitized, checksum-bound summaries. An artefact's declared
+`failed`, `partial` or `blocked` status overrides its mere existence. Backup,
+restore, HA, DR, signing, provenance, vulnerabilities and external identity or
+assessment controls require a non-automation reviewer. Same-host failover is
+never DR, local provenance is never keyless identity, and the local release
+target cannot create a tag. The protected release workflow depends on the
+evidence gate and rejects unaccepted HIGH/CRITICAL vulnerabilities.
+
 ## ADR-024 — Production readiness closure
 
 Production readiness is evidence-driven and tenant-scoped. PostgreSQL RLS is a

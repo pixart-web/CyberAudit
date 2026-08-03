@@ -1,0 +1,21 @@
+{
+  "status": "passed",
+  "missing_context_assets": 0,
+  "own_assets": 5,
+  "foreign_assets": 0,
+  "foreign_join_rows": 0,
+  "foreign_subquery_rows": 0,
+  "own_insert_rows": 1,
+  "foreign_delete_rows": 0,
+  "tenant_tables_without_rls": 0,
+  "tenant_tables_without_runtime_policy": 0,
+  "representative_paths": [
+    "api",
+    "worker",
+    "exports",
+    "graph",
+    "ai_retrieval"
+  ],
+  "runtime_user_bypassrls": false,
+  "runtime_user_superuser": false
+}

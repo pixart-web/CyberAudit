@@ -8,7 +8,25 @@ permissions:
   id-token: write
   attestations: write
 jobs:
+  readiness-gate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with: { python-version: "3.12", cache: pip }
+      - run: python -m venv .venv && .venv/bin/pip install -e "apps/api[dev]"
+      - name: Reject tags without checksum-bound candidate evidence
+        run: make readiness-gate
+      - name: Reject unaccepted HIGH or CRITICAL vulnerabilities
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          ignore-unfixed: false
+          exit-code: "1"
   images:
+    needs: readiness-gate
     runs-on: ubuntu-24.04
     strategy:
       matrix:
@@ -40,6 +58,7 @@ jobs:
           cosign sign --yes
           ghcr.io/${{ github.repository_owner }}/cyberaudit-${{ matrix.component }}@${{ steps.build.outputs.digest }}
   release-bundle:
+    needs: [readiness-gate, images]
     runs-on: ubuntu-24.04
     permissions:
       contents: write

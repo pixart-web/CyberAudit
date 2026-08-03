@@ -1,0 +1,11 @@
+{
+  "issuer": "https://idp.localhost:18444/realms/cyberaudit-readiness",
+  "authorization_endpoint": "https://idp.localhost:18444/realms/cyberaudit-readiness/protocol/openid-connect/auth",
+  "token_endpoint": "https://idp.localhost:18444/realms/cyberaudit-readiness/protocol/openid-connect/token",
+  "jwks_uri": "https://idp.localhost:18444/realms/cyberaudit-readiness/protocol/openid-connect/certs",
+  "code_challenge_methods_supported": [
+    "plain",
+    "S256"
+  ],
+  "supports_pkce_s256": true
+}

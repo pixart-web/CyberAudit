@@ -14,6 +14,7 @@ from cyberaudit.hardening_models import (
     ProductionReadinessApproval,
     ProductionReadinessEvidence,
 )
+from cyberaudit.readiness_evidence import validate_evidence_manifest
 from cyberaudit.rls import require_tenant_context
 
 ReadinessState = Literal["blocked", "incomplete", "candidate", "approved"]
@@ -43,6 +44,7 @@ MANDATORY_CHECKS = (
     "release_validation",
     "upgrade",
     "rollback",
+    "external_assessment",
 )
 
 
@@ -81,6 +83,23 @@ class ProductionReadinessGate:
             ).all()
         )
         by_code = {record.check_code: record for record in records}
+        manifest_checks = None
+        manifest_errors: list[str] = []
+        manifest_checksum: str | None = None
+        if self.settings.readiness_evidence_manifest is not None:
+            try:
+                validation = validate_evidence_manifest(
+                    self.settings.readiness_evidence_manifest,
+                    environment=environment,
+                    application_version=self.application_version,
+                    now=now,
+                )
+                manifest_checks = validation.valid_checks
+                manifest_errors = validation.errors
+                manifest_checksum = validation.manifest_checksum
+            except (OSError, ValueError):
+                manifest_checks = {}
+                manifest_errors = ["manifest_unavailable_or_invalid"]
         checks: list[ReadinessCheck] = []
         blockers: list[str] = []
         missing = 0
@@ -95,6 +114,12 @@ class ProductionReadinessGate:
                 continue
             expired = record.expires_at is not None and self._utc(record.expires_at) <= now
             status = "expired" if expired else record.status
+            if status == "passed" and manifest_checks is not None:
+                external = manifest_checks.get(code)
+                if external is None:
+                    status = "external_evidence_missing"
+                elif external.status != "passed":
+                    status = f"external_evidence_{external.status}"
             if status != "passed":
                 blockers.append(code)
             checks.append(
@@ -143,4 +168,9 @@ class ProductionReadinessGate:
             "environment": environment,
             "application_version": self.application_version,
             "formal_approval_required": state != "approved",
+            "evidence_manifest": {
+                "configured": self.settings.readiness_evidence_manifest is not None,
+                "checksum": manifest_checksum,
+                "errors": manifest_errors,
+            },
         }

@@ -8,6 +8,12 @@ Base: `fb3c9b86d12042032cfa6154d1c941bda531b4c3`
 
 Classification: **incomplete / blocked**, not Production Ready
 
+> Historical baseline report. Infrastructure capabilities have since been
+> exercised on `codex/readiness-infrastructure-enablement`; current results and
+> remaining blockers are recorded in
+> `infrastructure-validation-release-candidate-final-report.md`. Statements
+> below about unavailable local tools describe the earlier baseline only.
+
 ## Implemented and locally verified
 
 | Control | Evidence | Result |

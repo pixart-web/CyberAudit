@@ -41,7 +41,7 @@ class DeadLetterEnvelope(BaseModel):
     message_type: str = Field(pattern=r"^[a-z0-9_.-]{2,120}$")
     message_id: str = Field(min_length=8, max_length=160)
     idempotency_key: str = Field(min_length=8, max_length=160)
-    payload_reference: str = Field(pattern=r"^(s3|azure|gcs|object)://[^\\s]{8,990}$")
+    payload_reference: str = Field(pattern=r"^(s3|azure|gcs|object)://[^\s]{8,990}$")
     schema_version: int = Field(default=1, ge=1, le=100)
     error_code: str = Field(pattern=r"^[A-Z0-9_]{2,120}$")
     error_summary: str = Field(min_length=2, max_length=500)

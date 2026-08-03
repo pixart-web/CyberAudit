@@ -1,0 +1,26 @@
+{
+  "schema_version": "1.0",
+  "application_version": "0.2.0",
+  "backup_id": "cyberaudit-readiness-20260803T214034Z",
+  "created_at": "2026-08-03T21:40:35Z",
+  "encrypted": true,
+  "archive": "cyberaudit-readiness-20260803T214034Z.tar.gz.age",
+  "sha256": "33531c060a935858f52de82751d983b64e3fa93b17703aa733b6b7b2879ef78e",
+  "size_bytes": 87338,
+  "database_counts": {
+    "organizations": 1,
+    "users": 1,
+    "roles": 4,
+    "permissions": 31,
+    "clients": 1,
+    "engagements": 2,
+    "assets": 5,
+    "findings": 0,
+    "audit_logs": 5,
+    "incidents": 0,
+    "knowledge_nodes": 0,
+    "zero_trust_assessments": 0
+  },
+  "minio_object_count": 1,
+  "synthetic_data_only": true
+}

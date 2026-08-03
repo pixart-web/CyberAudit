@@ -140,3 +140,20 @@ Integrações reais de secret manager/object storage, WebAuthn, controladores
 efémeros, PostgreSQL RLS por sessão e HA/DR medido dependem de infraestrutura
 externa. As interfaces falham fechadas, mas esses controlos só podem ser
 considerados eficazes após testes nos ambientes de destino.
+
+# Infrastructure Validation (Fase 10.2)
+
+- **Evidência forjada ou obsoleta:** manifesto tipado, paths confinados,
+  artefactos não vazios, SHA-256, ambiente/versão, timestamps com timezone,
+  expiração e rejeição de reviewers automáticos nos controlos humanos.
+- **CA de laboratório abusada:** chaves privadas ficam em runtime ignorado; os
+  testes não ignoram TLS e a instalação de confiança global exige decisão
+  explícita do operador.
+- **Falso HA/DR:** réplica de aplicação no mesmo host é marcada `partial`; restore
+  no mesmo Docker host nunca conta como DR completo.
+- **Compromisso da supply chain:** versões fixas, SBOM CycloneDX/SPDX, scans de
+  filesystem/imagens/manifests e bloqueio em HIGH/CRITICAL sem aceitação formal.
+- **Assinatura local não atribuível:** nenhuma chave local é fabricada como
+  substituto; a assinatura keyless exige identidade OIDC do workflow protegido.
+- **Publicação prematura:** o alvo local avalia primeiro o gate e não cria tags;
+  controlos externos continuam a exigir revisão humana independente.

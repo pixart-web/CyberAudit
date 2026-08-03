@@ -1,0 +1,74 @@
+{
+  "predicateType": "https://slsa.dev/provenance/v1",
+  "status": "partial",
+  "subject": [
+    {
+      "sha256": "58100681c258a9b01f86f1901527a5906fbecbdd4fbfa0c23a6c8c85194929ab",
+      "path": "artifacts/release/sbom/api-image.cyclonedx.json"
+    },
+    {
+      "sha256": "546a8f5b87d7771ec8b1023e1fa8e15d1f2f39560660c8a8669ad533cb2cbbb0",
+      "path": "artifacts/release/sbom/api-image.spdx.json"
+    },
+    {
+      "sha256": "c08653d5eac7ffd8963bde5ffae80ade3a8c71c62a319f83923938d4e3ed6259",
+      "path": "artifacts/release/sbom/api-source.cyclonedx.json"
+    },
+    {
+      "sha256": "b2204d660ee074dc50ae736adb9a90466ce507301f256709ebd21bc3aa49f6eb",
+      "path": "artifacts/release/sbom/api-source.spdx.json"
+    },
+    {
+      "sha256": "aace0efd26fc2c8f99d4dfb5a02987ebbde6cdbea2683ef6bbd7bf2afcd96ecc",
+      "path": "artifacts/release/sbom/runner-image.cyclonedx.json"
+    },
+    {
+      "sha256": "47cd37a2f42c08ff1a2d0296b7fb6bd0a66d073871f6842a09760f12dda4cbaa",
+      "path": "artifacts/release/sbom/runner-image.spdx.json"
+    },
+    {
+      "sha256": "e1c1757f022e81df5abbd437cd73860570b3cfbec951daa1133ad342371e154a",
+      "path": "artifacts/release/sbom/web-image.cyclonedx.json"
+    },
+    {
+      "sha256": "d1e5938b9c59a6ff11428b928ca4a5b14cd44079c8f028c03f0e18d75bf60772",
+      "path": "artifacts/release/sbom/web-image.spdx.json"
+    },
+    {
+      "sha256": "767a677e28b047e694bda4bda0368f42397b84c2d8bdb05ebb2856f7682efc62",
+      "path": "artifacts/release/sbom/web-source.cyclonedx.json"
+    },
+    {
+      "sha256": "1c2f7b581cf75be26870ed66423b7c439847c6ddb950acfd0454fa3b75b0ad04",
+      "path": "artifacts/release/sbom/web-source.spdx.json"
+    },
+    {
+      "sha256": "494ca8b495c2f1658c77e556a66c609c0706ebdeb0e1807cf3bcf9cdd446572b",
+      "path": "artifacts/release/sbom/worker-image.cyclonedx.json"
+    },
+    {
+      "sha256": "914e46dd7798001845a68fa59bd2d80c49257690c71d1f2ce2cffc3c8a97e1cc",
+      "path": "artifacts/release/sbom/worker-image.spdx.json"
+    }
+  ],
+  "buildDefinition": {
+    "externalParameters": {
+      "commit": "17740539c7e97d9d8372391b798e6e546ae376f9",
+      "branch": "codex/readiness-infrastructure-enablement"
+    },
+    "resolvedDependencies": []
+  },
+  "runDetails": {
+    "builder": {
+      "id": "local:cyberaudit-readiness-harness"
+    },
+    "metadata": {
+      "invocationId": "local-17740539c7e9",
+      "startedOn": "2026-08-03T22:18:06Z",
+      "finishedOn": "2026-08-03T22:18:06Z"
+    }
+  },
+  "workflow_identity": null,
+  "working_tree_dirty": true,
+  "notes": "Local provenance is not releasable until the commit is frozen and CI identity attests it."
+}

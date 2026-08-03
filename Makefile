@@ -1,4 +1,4 @@
-.PHONY: setup up down restart logs migrate seed test lint format clean worker worker-logs test-worker seed-jobs adapters-health purge-demo-jobs seed-phase3 seed-phase4 seed-phase5 seed-enterprise seed-hardening enterprise-domain-seed enterprise-domain-test enterprise-domain-sync-demo enterprise-domain-health identity-test cloud-test kubernetes-test zero-trust-test test-adapters test-network-safety test-discovery test-graph test-vulnerability-intelligence test-risk test-appsec test-soc test-grc test-ai test-enterprise test-hardening test-production-readiness test-rls verify-production-config backup restore-drill load-smoke test-web-inventory test-api-security test-dependencies test-sca test-secrets test-sast test-iac test-containers test-cicd test-security-gates lab-services-up lab-services-down lab-network-up lab-network-down appsec-lab-up appsec-lab-down import-demo-results import-demo-api-spec generate-demo-sbom purge-evidence purge-appsec-demo retest-demo sync-vulnerability-feeds recalculate-risk rebuild-appsec-scores refresh-attack-paths rebuild-knowledge-graph coverage-report benchmark-appsec
+.PHONY: setup up down restart logs migrate seed test lint format clean worker worker-logs test-worker seed-jobs adapters-health purge-demo-jobs seed-phase3 seed-phase4 seed-phase5 seed-enterprise seed-hardening enterprise-domain-seed enterprise-domain-test enterprise-domain-sync-demo enterprise-domain-health identity-test cloud-test kubernetes-test zero-trust-test test-adapters test-network-safety test-discovery test-graph test-vulnerability-intelligence test-risk test-appsec test-soc test-grc test-ai test-enterprise test-hardening test-production-readiness test-rls verify-production-config backup restore-drill load-smoke readiness-environment-check readiness-tools-verify readiness-up readiness-down readiness-keycloak readiness-vault readiness-minio readiness-kind readiness-oidc-test readiness-webauthn-test readiness-rls-test readiness-cross-tenant-test readiness-dlq-test readiness-runner-test readiness-providers-test readiness-collect readiness-backup readiness-restore readiness-ha-test readiness-dr-test readiness-sbom readiness-scan readiness-provenance readiness-sign readiness-verify-signatures readiness-load-test readiness-coverage readiness-evidence readiness-gate release-candidate test-web-inventory test-api-security test-dependencies test-sca test-secrets test-sast test-iac test-containers test-cicd test-security-gates lab-services-up lab-services-down lab-network-up lab-network-down appsec-lab-up appsec-lab-down appsec-lab-down import-demo-results import-demo-api-spec generate-demo-sbom purge-evidence purge-appsec-demo retest-demo sync-vulnerability-feeds recalculate-risk rebuild-appsec-scores refresh-attack-paths rebuild-knowledge-graph coverage-report benchmark-appsec
 
 setup:
 	cp -n .env.example .env || true
@@ -61,6 +61,98 @@ restore-drill:
 
 load-smoke:
 	.venv/bin/python infrastructure/testing/load_smoke.py
+
+readiness-environment-check:
+	scripts/readiness/check-environment.sh
+
+readiness-tools-verify:
+	scripts/readiness/verify-tools.sh
+
+readiness-up:
+	scripts/readiness/start-production-like.sh
+
+readiness-down:
+	scripts/readiness/stop-production-like.sh
+
+readiness-keycloak:
+	docker-compose --env-file infrastructure/readiness/runtime/readiness.env -f infrastructure/readiness/compose.production-like.yml up -d keycloak keycloak-proxy
+
+readiness-vault:
+	scripts/readiness/bootstrap-vault.sh
+
+readiness-minio:
+	scripts/readiness/bootstrap-minio.sh
+
+readiness-kind:
+	scripts/readiness/create-kind-cluster.sh
+
+readiness-oidc-test:
+	scripts/readiness/validate-oidc-browser.sh
+
+readiness-webauthn-test:
+	scripts/readiness/validate-webauthn-browser.sh
+
+readiness-rls-test:
+	scripts/readiness/validate-rls.sh
+
+readiness-cross-tenant-test:
+	scripts/readiness/validate-cross-tenant.sh
+
+readiness-dlq-test:
+	scripts/readiness/validate-dlq.sh
+
+readiness-runner-test:
+	scripts/readiness/validate-docker-runner.sh
+	scripts/readiness/create-kind-cluster.sh
+	scripts/readiness/validate-kubernetes-runner.sh
+
+readiness-providers-test:
+	scripts/readiness/validate-providers.sh
+
+readiness-collect:
+	scripts/readiness/collect-runtime-evidence.sh
+
+readiness-backup:
+	scripts/readiness/backup-production-like.sh
+
+readiness-restore:
+	scripts/readiness/restore-production-like.sh
+
+readiness-ha-test:
+	scripts/readiness/validate-ha.sh
+
+readiness-dr-test:
+	scripts/readiness/validate-dr.sh
+
+readiness-sbom:
+	scripts/readiness/generate-sbom.sh
+
+readiness-scan:
+	scripts/readiness/scan-release.sh
+
+readiness-provenance:
+	scripts/readiness/generate-provenance.sh
+
+readiness-sign:
+	scripts/readiness/sign-release-artifacts.sh
+
+readiness-verify-signatures:
+	scripts/readiness/verify-release-signatures.sh
+
+readiness-load-test:
+	scripts/readiness/run-load-test.sh
+
+readiness-coverage:
+	scripts/readiness/collect-coverage.sh
+
+readiness-evidence:
+	scripts/readiness/build-evidence-manifest.py
+
+readiness-gate:
+	PYTHONPATH=apps/api .venv/bin/python scripts/readiness/evaluate-gate.py
+
+release-candidate:
+	scripts/readiness/release-candidate.sh
 
 enterprise-domain-seed:
 	docker compose exec api python -m cyberaudit.seed_domain_expansion
