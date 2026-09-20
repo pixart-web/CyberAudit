@@ -34,6 +34,8 @@ import CaseDetail from "@/app/cases/[id]/page";
 import HuntDetail from "@/app/hunts/[id]/page";
 import RiskRegisterDetail from "@/app/grc/risks/[id]/page";
 import ZeroTrustAssessmentDetail from "@/app/zero-trust/assessments/[id]/page";
+import CloudAccountDetail from "@/app/cloud-security/accounts/[id]/page";
+import KubernetesWorkloadDetail from "@/app/kubernetes/workloads/[id]/page";
 
 afterEach(cleanup);
 vi.mock("next/navigation", () => ({
@@ -164,6 +166,34 @@ const socFixtures: Record<string, unknown> = {
     evaluated_at: "2026-09-20T00:00:00Z",
     dimensions: [],
   },
+  "/cloud/accounts/obj-1": {
+    account: {
+      id: "obj-1",
+      provider: "aws",
+      account_type: "standard",
+      external_id: "123456789012-demo",
+      name: "AWS environment",
+      environment: "laboratory",
+      owner: null,
+      criticality: "high",
+      status: "active",
+      risk_score: 85,
+    },
+    resources: [],
+  },
+  "/kubernetes/workloads/obj-1": {
+    workload: {
+      id: "obj-1",
+      object_type: "workload",
+      namespace: "demo",
+      name: "Privileged workload",
+      privileged: true,
+      public_exposure: false,
+      risk_score: 92,
+      configuration_hash: "b".repeat(64),
+    },
+    cluster: null,
+  },
 };
 
 vi.mock("@/lib/api", () => ({
@@ -281,6 +311,8 @@ describe("axe-core automated accessibility audit (jsdom, layout rules excluded)"
     ["Hunt detail", HuntDetail],
     ["Risk Register detail", RiskRegisterDetail],
     ["Zero Trust assessment detail", ZeroTrustAssessmentDetail],
+    ["Cloud Account detail", CloudAccountDetail],
+    ["Kubernetes Workload detail", KubernetesWorkloadDetail],
   ])("SOC/Risk Workspace: %s has no automated a11y violations", async (_label, Page) => {
     const { container } = render(
       <QueryClientProvider client={new QueryClient()}>

@@ -683,11 +683,32 @@ async def cloud_accounts(
     return await _cloud_page(CloudAccount, values, db, user, provider)
 
 
+@router.get("/cloud/accounts/{account_id}")
+async def cloud_account_detail(
+    account_id: str,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permission("cloud.read")),
+):
+    account = await tenant_record(db, CloudAccount, account_id, user.organization_id)
+    resources = list(
+        (
+            await db.scalars(
+                select(CloudResource).where(
+                    CloudResource.organization_id == user.organization_id,
+                    CloudResource.account_id == account.id,
+                )
+            )
+        ).all()
+    )
+    return {"account": serialize(account), "resources": [serialize(item) for item in resources]}
+
+
 @router.get("/cloud/resources")
 async def cloud_resources(
     provider: str | None = None,
     resource_type: str | None = None,
     public_exposure: bool | None = None,
+    account_id: str | None = Query(default=None, max_length=36),
     values: tuple[int, int] = Depends(pagination),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permission("cloud.read")),
@@ -699,7 +720,25 @@ async def cloud_resources(
         filters.append(CloudResource.resource_type == resource_type)
     if public_exposure is not None:
         filters.append(CloudResource.public_exposure == public_exposure)
+    if account_id:
+        filters.append(CloudResource.account_id == account_id)
     return await page(db, CloudResource, user.organization_id, values, extra=tuple(filters))
+
+
+@router.get("/cloud/resources/{resource_id}")
+async def cloud_resource_detail(
+    resource_id: str,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permission("cloud.read")),
+):
+    resource = await tenant_record(db, CloudResource, resource_id, user.organization_id)
+    account = await db.scalar(
+        select(CloudAccount).where(
+            CloudAccount.id == resource.account_id,
+            CloudAccount.organization_id == user.organization_id,
+        )
+    )
+    return {"resource": serialize(resource), "account": serialize(account) if account else None}
 
 
 @router.get("/cloud/networks")
@@ -849,14 +888,52 @@ async def kubernetes_clusters(
     return await page(db, KubernetesCluster, user.organization_id, values)
 
 
+@router.get("/kubernetes/clusters/{cluster_id}")
+async def kubernetes_cluster_detail(
+    cluster_id: str,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permission("kubernetes.read")),
+):
+    cluster = await tenant_record(db, KubernetesCluster, cluster_id, user.organization_id)
+    objects = list(
+        (
+            await db.scalars(
+                select(KubernetesObject).where(
+                    KubernetesObject.organization_id == user.organization_id,
+                    KubernetesObject.cluster_id == cluster.id,
+                )
+            )
+        ).all()
+    )
+    return {"cluster": serialize(cluster), "objects": [serialize(item) for item in objects]}
+
+
 @router.get("/kubernetes/workloads")
 @router.get("/kubernetes/rbac")
 async def kubernetes_objects(
+    cluster_id: str | None = Query(default=None, max_length=36),
     values: tuple[int, int] = Depends(pagination),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permission("kubernetes.read")),
 ):
-    return await page(db, KubernetesObject, user.organization_id, values)
+    extra = (KubernetesObject.cluster_id == cluster_id,) if cluster_id else ()
+    return await page(db, KubernetesObject, user.organization_id, values, extra=extra)
+
+
+@router.get("/kubernetes/workloads/{object_id}")
+async def kubernetes_object_detail(
+    object_id: str,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permission("kubernetes.read")),
+):
+    workload = await tenant_record(db, KubernetesObject, object_id, user.organization_id)
+    cluster = await db.scalar(
+        select(KubernetesCluster).where(
+            KubernetesCluster.id == workload.cluster_id,
+            KubernetesCluster.organization_id == user.organization_id,
+        )
+    )
+    return {"workload": serialize(workload), "cluster": serialize(cluster) if cluster else None}
 
 
 @router.get("/kubernetes/posture")
