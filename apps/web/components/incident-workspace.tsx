@@ -2,6 +2,7 @@
 
 import { Badge, Button, Card, ConfirmationDialog, EmptyState, ErrorState, LoadingState, SeverityBadge, Tabs, TabPanel } from "@cyberaudit/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { BrainCircuit } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { Shell } from "@/components/shell";
@@ -23,12 +24,19 @@ type TimelineEntry = { id: string; entry_type: string; title: string; descriptio
 type IncidentDetail = { incident: Incident; timeline: TimelineEntry[] };
 type CaseRecord = { id: string; reference: string; title: string; status: string };
 type Alert = { id: string; title: string; severity: string; status: string };
+type AgentAnswer = {
+  response: string;
+  citations: { node_id?: string; source_id?: string }[];
+  confidence: number;
+  limitations: string[];
+};
 
 const TABS = [
   { id: "overview", label: "Visão Geral" },
   { id: "timeline", label: "Cronologia" },
   { id: "cases", label: "Casos" },
   { id: "alerts", label: "Deteções" },
+  { id: "ai", label: "Cyber AI" },
 ];
 
 const TRANSITIONS: Record<string, string[]> = {
@@ -66,6 +74,17 @@ export function IncidentWorkspace({ id }: { id: string }) {
     mutationFn: (status: string) =>
       api(`/incidents/${id}/transition`, { method: "POST", body: JSON.stringify({ status }) }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["incident", id] }),
+  });
+
+  const analyze = useMutation({
+    mutationFn: () =>
+      api<AgentAnswer>("/agents/incident_analyst/ask", {
+        method: "POST",
+        body: JSON.stringify({
+          question: "Reconstrói a cronologia deste incidente a partir da evidência registada.",
+          source_ids: [id],
+        }),
+      }),
   });
 
   if (detail.isLoading) return <Shell title="Incidente"><LoadingState /></Shell>;
@@ -171,6 +190,36 @@ export function IncidentWorkspace({ id }: { id: string }) {
                 </li>
               ))}
             </ul>
+          </TabPanel>
+
+          <TabPanel id="ai" active={tab}>
+            <button
+              type="button"
+              className="mb-4 inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-4 py-2 text-sm font-medium hover:border-primary disabled:opacity-50"
+              onClick={() => analyze.mutate()}
+              disabled={analyze.isPending}
+            >
+              <BrainCircuit size={16} className="text-primary" />
+              {analyze.isPending ? "A analisar…" : "Analisar incidente"}
+            </button>
+            {analyze.data && (
+              <div className="space-y-3 rounded-lg border border-border bg-surface p-4 text-sm">
+                <p>{analyze.data.response}</p>
+                {analyze.data.citations.length > 0 && (
+                  <p className="text-xs text-muted">
+                    Fontes: {analyze.data.citations.map((citation) => citation.source_id ?? citation.node_id).join(", ")}
+                  </p>
+                )}
+                <p className="text-xs text-muted">Confiança: {(analyze.data.confidence * 100).toFixed(0)}%</p>
+                {analyze.data.limitations.length > 0 && (
+                  <ul className="list-disc pl-4 text-xs text-muted">
+                    {analyze.data.limitations.map((limitation, index) => (
+                      <li key={index}>{limitation}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
           </TabPanel>
         </div>
       </Card>

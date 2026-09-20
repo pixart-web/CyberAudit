@@ -1,7 +1,8 @@
 "use client";
 
 import { Badge, Card, EmptyState, ErrorState, LoadingState, SeverityBadge, Tabs, TabPanel } from "@cyberaudit/ui";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { BrainCircuit } from "lucide-react";
 import { useState } from "react";
 import { Shell } from "@/components/shell";
 import { api } from "@/lib/api";
@@ -35,6 +36,12 @@ type Posture = {
   posture_score: number;
 };
 type Relationship = { id: string; relationship_type: string; target_type: string; target_id: string; source_id: string };
+type AgentAnswer = {
+  response: string;
+  citations: { node_id?: string; source_id?: string }[];
+  confidence: number;
+  limitations: string[];
+};
 
 const REASON_LABELS: Record<string, string> = {
   privileged_identity: "Identidade privilegiada",
@@ -74,6 +81,16 @@ export function IdentityWorkspace({ id }: { id: string }) {
     queryKey: ["identity-relationships", id],
     queryFn: () => api<Items<Relationship>>(`/identity/relationships?identity_id=${id}`),
     enabled: tab === "relationships",
+  });
+  const explain = useMutation({
+    mutationFn: () =>
+      api<AgentAnswer>("/agents/identity_analyst/ask", {
+        method: "POST",
+        body: JSON.stringify({
+          question: "Explica a postura e o risco de privilégio desta identidade a partir do que está registado.",
+          source_ids: [id],
+        }),
+      }),
   });
 
   if (identity.isLoading) return <Shell title="Identidade"><LoadingState /></Shell>;
@@ -147,6 +164,26 @@ export function IdentityWorkspace({ id }: { id: string }) {
                       </li>
                     ))}
                   </ul>
+                )}
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-4 py-2 text-sm font-medium hover:border-primary disabled:opacity-50"
+                  onClick={() => explain.mutate()}
+                  disabled={explain.isPending}
+                >
+                  <BrainCircuit size={16} className="text-primary" />
+                  {explain.isPending ? "A analisar…" : "Explicar risco desta identidade"}
+                </button>
+                {explain.data && (
+                  <div className="space-y-2 rounded-lg border border-border bg-surface p-4 text-sm">
+                    <p>{explain.data.response}</p>
+                    {explain.data.citations.length > 0 && (
+                      <p className="text-xs text-muted">
+                        Fontes: {explain.data.citations.map((citation) => citation.source_id ?? citation.node_id).join(", ")}
+                      </p>
+                    )}
+                    <p className="text-xs text-muted">Confiança: {(explain.data.confidence * 100).toFixed(0)}%</p>
+                  </div>
                 )}
               </div>
             )}
