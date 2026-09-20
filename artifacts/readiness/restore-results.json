@@ -1,0 +1,26 @@
+{
+  "status": "passed",
+  "executed_at": "2026-08-03T21:40:36Z",
+  "isolated_database": "cyberaudit_restore_drill",
+  "destructive_scope": "isolated_restore_database_and_restore_bucket_only",
+  "database_counts": {
+    "organizations": 1,
+    "users": 1,
+    "roles": 4,
+    "permissions": 31,
+    "clients": 1,
+    "engagements": 2,
+    "assets": 5,
+    "findings": 0,
+    "audit_logs": 5,
+    "incidents": 0,
+    "knowledge_nodes": 0,
+    "zero_trust_assessments": 0
+  },
+  "database_counts_match": true,
+  "minio_checksums_match": true,
+  "encrypted_backup_verified": true,
+  "rto_seconds": 1,
+  "observed_rpo_seconds": 0,
+  "synthetic_data_only": true
+}

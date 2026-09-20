@@ -1,0 +1,7 @@
+{
+  "status": "blocked",
+  "sigstore_bundles": 0,
+  "certificate_identity": "GitHub protected release workflow",
+  "certificate_oidc_issuer": "https://token.actions.githubusercontent.com",
+  "reason": "No release signatures exist because the gate is closed."
+}

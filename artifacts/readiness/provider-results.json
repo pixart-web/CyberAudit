@@ -1,0 +1,33 @@
+{
+  "object_storage": {
+    "checksum_verified": true,
+    "deleted_after_validation": true,
+    "health": {
+      "bucket_configured": true,
+      "healthy": true,
+      "provider": "s3",
+      "workload_identity": true
+    },
+    "quarantine": true,
+    "size_bytes": 37,
+    "tenant_prefix": true
+  },
+  "status": "passed",
+  "synthetic_data_only": true,
+  "vault": {
+    "health": {
+      "checked_at": "2026-08-03 21:30:43.361952+00:00",
+      "healthy": true,
+      "message": "Vault is active and workload authentication succeeded",
+      "provider": "vault"
+    },
+    "metadata": {
+      "available": true,
+      "expires_at": null,
+      "provider": "vault",
+      "reference": "vault://cyberaudit/organizations/platform/storage#access_key",
+      "version": "5"
+    },
+    "resolved_nonempty": true
+  }
+}

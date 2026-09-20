@@ -1,0 +1,10 @@
+{
+  "status": "blocked",
+  "executed_at": "2026-08-03T22:10:40Z",
+  "isolated_restore_status": "passed",
+  "second_environment": false,
+  "endpoint_failover_executed": false,
+  "controlled_failback_executed": false,
+  "reason": "The isolated restore drill runs on the same Docker host and is not classified as disaster recovery.",
+  "required_action": "Run the documented drill on a second cluster or server and attach independently reviewed evidence."
+}
