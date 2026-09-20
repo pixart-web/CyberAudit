@@ -436,20 +436,53 @@ async def identity_permissions(
 
 @router.get("/identity/relationships")
 async def identity_relationships(
+    identity_id: str | None = Query(default=None, max_length=36),
     values: tuple[int, int] = Depends(pagination),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permission("identity.read")),
 ):
-    return await _identity_page(IdentityRelationship, values, db, user)
+    extra = (
+        (
+            or_(
+                IdentityRelationship.source_id == identity_id,
+                IdentityRelationship.target_id == identity_id,
+            ),
+        )
+        if identity_id
+        else ()
+    )
+    return await page(db, IdentityRelationship, user.organization_id, values, extra=extra)
 
 
 @router.get("/identity/posture")
 async def identity_posture(
+    identity_id: str | None = Query(default=None, max_length=36),
     values: tuple[int, int] = Depends(pagination),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permission("identity.posture.read")),
 ):
-    return await page(db, AuthenticationPosture, user.organization_id, values)
+    extra = (AuthenticationPosture.identity_id == identity_id,) if identity_id else ()
+    return await page(db, AuthenticationPosture, user.organization_id, values, extra=extra)
+
+
+def _stale_days(identity: ExternalIdentity) -> int | None:
+    """Days since this identity was last seen active, from whichever
+
+    timestamp the source connector actually populated. `None` (not 0)
+    when neither is known -- identity_risk_factors() correctly treats
+    "unknown" as not triggering the stale-account factor, rather than
+    silently scoring an identity with no activity data as fresh.
+    """
+    reference = identity.last_activity_at or identity.last_login_at
+    if reference is None:
+        return None
+    # SQLite (the local/dev database) does not persist tzinfo on a
+    # DateTime(timezone=True) column, so a value read back from it comes
+    # back naive even though it was written timezone-aware. Treat a naive
+    # value as UTC rather than letting the subtraction below raise.
+    if reference.tzinfo is None:
+        reference = reference.replace(tzinfo=timezone.utc)
+    return (datetime.now(timezone.utc) - reference).days
 
 
 @router.get("/identity/risk")
@@ -475,7 +508,7 @@ async def identity_risk(
                     privileged=identity.privileged,
                     mfa_enforced=identity.mfa_state,
                     enabled=identity.enabled,
-                    stale_days=None,
+                    stale_days=_stale_days(identity),
                     guest=identity.guest,
                     owner=identity.owner,
                 ),
@@ -483,6 +516,24 @@ async def identity_risk(
             for identity in identities
         ]
     }
+
+
+@router.get("/identity/users/{identity_id}/risk")
+async def identity_user_risk(
+    identity_id: str,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permission("identity.risk.read")),
+):
+    identity = await tenant_record(db, ExternalIdentity, identity_id, user.organization_id)
+    score, reasons = identity_risk_factors(
+        privileged=identity.privileged,
+        mfa_enforced=identity.mfa_state,
+        enabled=identity.enabled,
+        stale_days=_stale_days(identity),
+        guest=identity.guest,
+        owner=identity.owner,
+    )
+    return {"score": score, "reasons": reasons, "calculation_version": "identity-risk-1.0.0"}
 
 
 @router.get("/identity/graph")

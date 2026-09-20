@@ -27,6 +27,7 @@ import {
   TabPanel,
 } from "@cyberaudit/ui";
 import { IncidentWorkspace } from "../incident-workspace";
+import { IdentityWorkspace } from "../identity-workspace";
 import SecurityEventDetail from "@/app/security-events/[id]/page";
 import DetectionAlertDetail from "@/app/detections/[id]/page";
 import CaseDetail from "@/app/cases/[id]/page";
@@ -102,6 +103,30 @@ const socFixtures: Record<string, unknown> = {
     time_until: "2026-09-20T00:00:00Z",
     result_count: 0,
     findings: [],
+  },
+  "/identity/users/obj-1": {
+    id: "obj-1",
+    username: "jdoe",
+    display_name: "Jane Doe",
+    email: "jdoe@example.invalid",
+    identity_type: "user",
+    enabled: true,
+    privileged: true,
+    guest: false,
+    service_account: false,
+    owner: null,
+    department: "Engineering",
+    job_title: "SRE",
+    mfa_state: "false",
+    risk_state: "high",
+    risk_score: 60,
+    last_login_at: "2026-09-19T00:00:00Z",
+    last_activity_at: "2025-01-01T00:00:00Z",
+  },
+  "/identity/users/obj-1/risk": {
+    score: 90,
+    reasons: ["privileged_identity", "mfa_not_enforced"],
+    calculation_version: "identity-risk-1.0.0",
   },
 };
 
@@ -187,6 +212,17 @@ describe("axe-core automated accessibility audit (jsdom, layout rules excluded)"
         onCancel={() => {}}
       />,
     );
+    const violations = await auditedViolations(container);
+    expect(violations, JSON.stringify(violations, null, 2)).toHaveLength(0);
+  });
+
+  test("IdentityWorkspace has no automated a11y violations", async () => {
+    const { container } = render(
+      <QueryClientProvider client={new QueryClient()}>
+        <IdentityWorkspace id="obj-1" />
+      </QueryClientProvider>,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 50));
     const violations = await auditedViolations(container);
     expect(violations, JSON.stringify(violations, null, 2)).toHaveLength(0);
   });

@@ -147,7 +147,11 @@ export function DomainCommandCenter({ kind }: { kind: CenterKind }) {
               <p className="p-8 text-center text-sm text-muted">Ainda não existem dados de inventário.</p>
             )}
             {rows.map((row, index) => (
-              <div key={String(row.id ?? index)} className="flex items-center gap-3 p-4">
+              <Link
+                key={String(row.id ?? index)}
+                href={`${center.listHref}/${String(row.id ?? "")}`}
+                className="flex items-center gap-3 p-4 hover:bg-surface"
+              >
                 <Fingerprint size={17} className="text-primary" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">
@@ -160,7 +164,7 @@ export function DomainCommandCenter({ kind }: { kind: CenterKind }) {
                 <Badge tone={Number(row.risk_score ?? 0) >= 70 ? "warning" : "success"}>
                   {row.risk_score !== undefined ? `Risco ${row.risk_score}` : String(row.status ?? "observado")}
                 </Badge>
-              </div>
+              </Link>
             ))}
           </div>
         </Card>
