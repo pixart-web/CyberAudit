@@ -748,6 +748,31 @@ async def list_iocs(
     )
 
 
+@router.get("/iocs/{indicator_id}")
+async def get_ioc(
+    indicator_id: str,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permission("threat_intel.read")),
+):
+    indicator = await db.scalar(
+        select(ThreatIndicator).where(
+            ThreatIndicator.id == indicator_id,
+            ThreatIndicator.organization_id == user.organization_id,
+        )
+    )
+    if not indicator:
+        raise HTTPException(404, "Indicator not found")
+    feed = None
+    if indicator.feed_id:
+        feed = await db.scalar(
+            select(ThreatIntelFeed).where(
+                ThreatIntelFeed.id == indicator.feed_id,
+                ThreatIntelFeed.organization_id == user.organization_id,
+            )
+        )
+    return {"indicator": serialize(indicator), "feed": serialize(feed) if feed else None}
+
+
 @router.get("/threat-intelligence/feeds")
 async def list_threat_feeds(
     pagination_values: tuple[int, int] = Depends(pagination),
@@ -1537,6 +1562,46 @@ async def list_knowledge_nodes(
         page_size=pagination_values[1],
         extra=extra,
     )
+
+
+@router.get("/knowledge-nodes/{node_id}")
+async def get_knowledge_node(
+    node_id: str,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permission("knowledge_graph.read")),
+):
+    node = await db.scalar(
+        select(KnowledgeNode).where(
+            KnowledgeNode.id == node_id, KnowledgeNode.organization_id == user.organization_id
+        )
+    )
+    if not node:
+        raise HTTPException(404, "Knowledge node not found")
+    outgoing = list(
+        (
+            await db.scalars(
+                select(KnowledgeEdge).where(
+                    KnowledgeEdge.organization_id == user.organization_id,
+                    KnowledgeEdge.source_node_id == node.id,
+                )
+            )
+        ).all()
+    )
+    incoming = list(
+        (
+            await db.scalars(
+                select(KnowledgeEdge).where(
+                    KnowledgeEdge.organization_id == user.organization_id,
+                    KnowledgeEdge.target_node_id == node.id,
+                )
+            )
+        ).all()
+    )
+    return {
+        "node": serialize(node),
+        "outgoing_edges": [serialize(edge) for edge in outgoing],
+        "incoming_edges": [serialize(edge) for edge in incoming],
+    }
 
 
 @router.post("/knowledge-graph/nodes", status_code=201)

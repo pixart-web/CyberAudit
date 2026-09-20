@@ -36,6 +36,8 @@ import RiskRegisterDetail from "@/app/grc/risks/[id]/page";
 import ZeroTrustAssessmentDetail from "@/app/zero-trust/assessments/[id]/page";
 import CloudAccountDetail from "@/app/cloud-security/accounts/[id]/page";
 import KubernetesWorkloadDetail from "@/app/kubernetes/workloads/[id]/page";
+import IocDetail from "@/app/threat-intelligence/[id]/page";
+import KnowledgeNodeDetail from "@/app/knowledge-graph/[id]/page";
 
 afterEach(cleanup);
 vi.mock("next/navigation", () => ({
@@ -194,6 +196,35 @@ const socFixtures: Record<string, unknown> = {
     },
     cluster: null,
   },
+  "/iocs/obj-1": {
+    indicator: {
+      id: "obj-1",
+      indicator_type: "ip",
+      display_value: "198.51.100.7",
+      confidence: 0.9,
+      severity: "high",
+      status: "active",
+      valid_from: "2026-09-01T00:00:00Z",
+      valid_until: null,
+      labels: [],
+      references: [],
+    },
+    feed: null,
+  },
+  "/knowledge-nodes/obj-1": {
+    node: {
+      id: "obj-1",
+      node_type: "finding",
+      source_id: "finding-1",
+      label: "Missing security headers",
+      facts: {},
+      source_references: [],
+      confidence: 0.95,
+      indexed_at: "2026-09-20T00:00:00Z",
+    },
+    outgoing_edges: [],
+    incoming_edges: [],
+  },
 };
 
 vi.mock("@/lib/api", () => ({
@@ -313,6 +344,8 @@ describe("axe-core automated accessibility audit (jsdom, layout rules excluded)"
     ["Zero Trust assessment detail", ZeroTrustAssessmentDetail],
     ["Cloud Account detail", CloudAccountDetail],
     ["Kubernetes Workload detail", KubernetesWorkloadDetail],
+    ["IOC detail", IocDetail],
+    ["Knowledge Node detail", KnowledgeNodeDetail],
   ])("SOC/Risk Workspace: %s has no automated a11y violations", async (_label, Page) => {
     const { container } = render(
       <QueryClientProvider client={new QueryClient()}>
