@@ -1,5 +1,40 @@
 # Decisões de arquitetura
 
+## ADR-034 — SOC and Identity Workspaces: browser validation as a bug-finding tool (Phase 10.4.1)
+
+Accepted. Two real backend bugs were found only by exercising the new
+Workspaces in a real browser against a real running backend, not by the
+unit/integration test suite:
+
+1. **Threat Hunting** had no execute path at all before this phase --
+   `POST /hunts` created a row and `GET /hunts` listed it, but nothing
+   ever ran the hunt's declarative query. `POST /hunts/{id}/execute` now
+   runs the same field-allowlisted equality filter the create endpoint
+   already validates, scoped to the hunt's own tenant and time window,
+   capped at 200 matches (invariant 22: declarative only, no eval, no
+   free-form SQL).
+2. **Identity risk's stale-account factor was dead code**: the one call
+   site (`GET /identity/risk`) hardcoded `stale_days=None`, so
+   `enabled_stale_identity` could never fire despite `ExternalIdentity`
+   recording `last_activity_at`/`last_login_at`. Fixed in `_stale_days()`,
+   which also had to handle a second, genuinely environment-specific bug:
+   SQLite (the local/dev database) does not persist tzinfo on a
+   `DateTime(timezone=True)` column, so a value read back from a live
+   request came back naive, and subtracting it from an aware
+   `datetime.now(timezone.utc)` raised `TypeError`. The unit test suite's
+   in-memory SQLite session didn't catch this because the ORM object
+   never left process memory to be re-serialized; only a real HTTP
+   request through a real running server did. The fix normalizes a naive
+   timestamp to UTC before subtracting, and a dedicated regression test
+   reproduces the exact naive-datetime shape (verified by temporarily
+   reverting the fix and confirming the test fails, then restoring it).
+
+This is recorded as a standing argument for section 34's "browser
+validation is mandatory" requirement, not a one-off anecdote: a Workspace
+that only exercises its own endpoint's happy path in a mocked frontend
+test can ship with a completely non-functional feature (Hunting) or a
+500 on every real request (Identity risk) and still show all-green CI.
+
 ## ADR-033 — Product Completion: real filters over ResourcePage duplication (Phase 10.4.1)
 
 Accepted. Rather than building a bespoke detail-fetch layer per domain,
