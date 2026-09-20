@@ -520,6 +520,24 @@ async def engagements(
     return await paginated(db, Engagement, where, page, page_size, Engagement.created_at.desc())
 
 
+@app.get("/api/v1/engagements/{item_id}", response_model=EngagementRead, tags=["engagements"])
+async def get_engagement(
+    item_id: str,
+    user: User = Depends(require_permission("engagements.read")),
+    db: AsyncSession = Depends(get_db),
+):
+    item = await db.scalar(
+        select(Engagement).where(
+            Engagement.id == item_id,
+            Engagement.organization_id == user.organization_id,
+            Engagement.deleted_at.is_(None),
+        )
+    )
+    if not item:
+        raise HTTPException(404, "Engagement not found")
+    return item
+
+
 @app.post(
     "/api/v1/engagements",
     response_model=EngagementRead,
