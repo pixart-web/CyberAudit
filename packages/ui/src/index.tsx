@@ -71,8 +71,15 @@ export function toSecurityState(value: unknown): SecurityState {
   if (["active", "open", "valid", "covered", "success", "passed", "installed"].includes(normalized)) {
     return "healthy";
   }
-  if (["pending", "pending_authorization", "draft", "downloading"].includes(normalized)) {
+  if (
+    ["pending", "pending_authorization", "draft", "downloading", "not_installed", "unverified"].includes(
+      normalized,
+    )
+  ) {
     return "warning";
+  }
+  if (["verified"].includes(normalized)) {
+    return "healthy";
   }
   if (["blocked", "denied", "error", "corrupt", "revoked"].includes(normalized)) {
     return "failed";
