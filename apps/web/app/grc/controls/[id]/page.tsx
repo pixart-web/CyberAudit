@@ -1,9 +1,9 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { IncidentWorkspace } from "@/components/incident-workspace";
+import { ControlWorkspace } from "@/components/control-workspace";
 
 export default function Detail() {
   const { id } = useParams<{ id: string }>();
-  return <IncidentWorkspace id={id} />;
+  return <ControlWorkspace id={id} />;
 }

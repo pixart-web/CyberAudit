@@ -1,7 +1,7 @@
 import { ResourcePage } from "@/components/resource-page";
 
 export default function Page() {
-  return <ResourcePage title="Findings" endpoint="/findings" columns={[
+  return <ResourcePage title="Findings" endpoint="/findings" rowHref="/findings" columns={[
     ["title", "Finding"],
     ["category", "Categoria"],
     ["affected_component", "Componente"],
