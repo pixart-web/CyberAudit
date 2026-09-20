@@ -7,6 +7,7 @@ from sqlalchemy.pool import StaticPool
 from cyberaudit import (
     ai_runtime_models,  # noqa: F401
     domain_expansion_models,  # noqa: F401
+    engagement_models,  # noqa: F401
     enterprise_models,  # noqa: F401
     hardening_models,  # noqa: F401
     phase4_models,  # noqa: F401

@@ -7,6 +7,7 @@ from alembic import context
 from cyberaudit import (  # noqa: F401
     ai_runtime_models,
     domain_expansion_models,
+    engagement_models,
     enterprise_models,
     hardening_models,
     models,

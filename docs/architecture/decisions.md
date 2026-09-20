@@ -1,5 +1,20 @@
 # Decisões de arquitetura
 
+## ADR-028 — Engagement domain completion and reporting
+
+Accepted. The Client → Engagement → Scope/Assets/Evidence/Findings chain
+already existed; this closes the remaining gaps the engagement domain
+needed (structured notes, a timeline, and generated reports) without
+duplicating any of it. `EngagementNote` and `EngagementTimelineEntry` are
+new, directly tenant- and engagement-scoped tables with PostgreSQL RLS
+policies. `ReportService` assembles a `Report`/`ReportSection` tree purely
+from already-recorded findings and evidence; an optional AI-generated
+executive-summary section (via the existing `report_agent`) is always
+tagged `content_type="ai_generated"` with its citations attached, and is
+never merged into the `finding`/`evidence` sections it summarizes. See
+`docs/architecture/adr-026-sovereign-local-ai-runtime.md` and
+`adr-027-cyber-agent-runtime.md` for the AI/agent pieces it reuses.
+
 ## ADR-027 — CyberAgentRuntime and AgentToolGateway
 
 Accepted. Ten specialized agents are one shared runtime parameterized by
@@ -86,3 +101,4 @@ deterministic scores and prevent all external writes. See
 33. **Telemetria é opt-in.** Só campos agregados allowlisted podem sair; evidência, identidade, segredos e conteúdo ficam excluídos.
 34. **IA local é opt-in e nunca decide.** Sem modelo instalado o CyberAudit responde de forma determinística; com modelo, este só reformula factos já calculados, nunca substitui o motor de segurança, o RBAC ou o Policy Engine.
 35. **Agentes não têm acesso direto.** Todo o tool call de um agente passa pelo `AgentToolGateway`; nunca há acesso direto a base de dados, socket Docker ou shell a partir de um agente.
+36. **Relatórios distinguem origem.** Cada `ReportSection` marca `content_type` (evidence/finding/analyst_conclusion/ai_generated); conteúdo gerado por IA nunca se torna evidência ou finding silenciosamente.

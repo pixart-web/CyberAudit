@@ -31,6 +31,8 @@ from cyberaudit.audit import write_audit
 from cyberaudit.config import get_settings
 from cyberaudit.db import Base, engine, get_db
 from cyberaudit.domain_expansion_api import router as domain_expansion_router
+from cyberaudit.engagement_api import reports_router as engagement_reports_router
+from cyberaudit.engagement_api import router as engagement_domain_router
 from cyberaudit.enterprise_api import router as enterprise_router
 from cyberaudit.enterprise_auth import SessionService
 from cyberaudit.execution_api import router as execution_router
@@ -125,6 +127,8 @@ app.include_router(domain_expansion_router)
 app.include_router(hardening_router)
 app.include_router(ai_runtime_router)
 app.include_router(agent_router)
+app.include_router(engagement_domain_router)
+app.include_router(engagement_reports_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.app_origin],
