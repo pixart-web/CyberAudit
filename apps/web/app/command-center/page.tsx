@@ -19,6 +19,10 @@ type CommandCenter = {
   known_exploited: number;
   coverage: number;
   running_jobs: number;
+  open_incidents: number;
+  active_engagements: number;
+  failing_controls: number;
+  high_risk_identities: number;
   top_assets: { id: string; name: string; risk: number }[];
 };
 
@@ -64,7 +68,50 @@ export default function CommandCenterPage() {
         <Badge tone="info" className="mt-5">Atualização a cada 15 s</Badge>
       </Card>
     </div>
+    <Card className="mt-4 p-5">
+      <h2 className="mb-4 text-sm font-semibold">O que precisa de atenção agora</h2>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <AttentionCard
+          href="/incidents"
+          label="Incidentes ativos"
+          value={data?.open_incidents}
+          danger={Boolean(data?.open_incidents)}
+        />
+        <AttentionCard href="/engagements" label="Auditorias ativas" value={data?.active_engagements} />
+        <AttentionCard
+          href="/grc/controls"
+          label="Controlos não implementados"
+          value={data?.failing_controls}
+          danger={Boolean(data?.failing_controls)}
+        />
+        <AttentionCard
+          href="/identity/users"
+          label="Identidades de alto risco"
+          value={data?.high_risk_identities}
+          danger={Boolean(data?.high_risk_identities)}
+        />
+      </div>
+    </Card>
   </Shell>;
+}
+
+function AttentionCard({
+  href,
+  label,
+  value,
+  danger = false,
+}: {
+  href: string;
+  label: string;
+  value: number | undefined;
+  danger?: boolean;
+}) {
+  return (
+    <Link href={href} className="rounded-lg border border-border p-4 hover:border-primary/40">
+      <p className="text-xs text-muted">{label}</p>
+      <p className={`mt-2 text-2xl font-semibold ${danger ? "text-critical" : "text-foreground"}`}>{value ?? "—"}</p>
+    </Link>
+  );
 }
 
 function Signal({label,value,danger=false}:{label:string;value:number|undefined;danger?:boolean}) {

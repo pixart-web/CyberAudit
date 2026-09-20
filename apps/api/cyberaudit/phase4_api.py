@@ -20,6 +20,8 @@ from cyberaudit.asset_graph import (
 from cyberaudit.audit import write_audit
 from cyberaudit.config import get_settings
 from cyberaudit.db import get_db
+from cyberaudit.domain_expansion_models import ExternalIdentity
+from cyberaudit.enterprise_models import Incident, UnifiedControl
 from cyberaudit.models import (
     Asset,
     Client,
@@ -1583,6 +1585,38 @@ async def command_center(
             ),
         )
     )
+    open_incidents = await db.scalar(
+        select(func.count())
+        .select_from(Incident)
+        .where(
+            Incident.organization_id == user.organization_id,
+            Incident.status.not_in(["closed", "cancelled"]),
+        )
+    )
+    active_engagements = await db.scalar(
+        select(func.count())
+        .select_from(Engagement)
+        .where(
+            Engagement.organization_id == user.organization_id,
+            Engagement.status == "active",
+        )
+    )
+    failing_controls = await db.scalar(
+        select(func.count())
+        .select_from(UnifiedControl)
+        .where(
+            UnifiedControl.organization_id == user.organization_id,
+            UnifiedControl.implementation_status.in_(["not_implemented", "partially_implemented"]),
+        )
+    )
+    high_risk_identities = await db.scalar(
+        select(func.count())
+        .select_from(ExternalIdentity)
+        .where(
+            ExternalIdentity.organization_id == user.organization_id,
+            ExternalIdentity.risk_score >= 70,
+        )
+    )
     return {
         "security_posture": max(
             0, round(100 - sum(asset.risk_score for asset in assets) / max(1, len(assets)), 1)
@@ -1602,6 +1636,10 @@ async def command_center(
         "known_exploited": sum(item.known_exploited for item in vulnerabilities),
         "coverage": round(sum(item.coverage_score for item in coverage) / max(1, len(coverage)), 1),
         "running_jobs": running_jobs or 0,
+        "open_incidents": open_incidents or 0,
+        "active_engagements": active_engagements or 0,
+        "failing_controls": failing_controls or 0,
+        "high_risk_identities": high_risk_identities or 0,
         "top_assets": sorted(
             [{"id": asset.id, "name": asset.name, "risk": asset.risk_score} for asset in assets],
             key=lambda item: cast(float, item["risk"]),
