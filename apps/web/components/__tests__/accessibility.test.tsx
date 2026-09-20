@@ -32,6 +32,8 @@ import SecurityEventDetail from "@/app/security-events/[id]/page";
 import DetectionAlertDetail from "@/app/detections/[id]/page";
 import CaseDetail from "@/app/cases/[id]/page";
 import HuntDetail from "@/app/hunts/[id]/page";
+import RiskRegisterDetail from "@/app/grc/risks/[id]/page";
+import ZeroTrustAssessmentDetail from "@/app/zero-trust/assessments/[id]/page";
 
 afterEach(cleanup);
 vi.mock("next/navigation", () => ({
@@ -127,6 +129,40 @@ const socFixtures: Record<string, unknown> = {
     score: 90,
     reasons: ["privileged_identity", "mfa_not_enforced"],
     calculation_version: "identity-risk-1.0.0",
+  },
+  "/grc/risks/obj-1": {
+    risk: {
+      id: "obj-1",
+      reference: "RISK-000001",
+      title: "Unpatched public-facing service",
+      description: "A public service is missing critical patches.",
+      risk_type: "cyber",
+      category: "vulnerability_management",
+      status: "open",
+      asset_id: null,
+      third_party: null,
+      likelihood: 4,
+      impact: 4,
+      inherent_score: 16,
+      control_effectiveness: 0.25,
+      residual_score: 12,
+      appetite: 5,
+      treatment_strategy: "mitigate",
+    },
+    treatments: [],
+  },
+  "/zero-trust/assessments/obj-1": {
+    id: "obj-1",
+    subject_type: "asset",
+    subject_id: null,
+    score: 62,
+    status: "weak",
+    confidence: 0.7,
+    recommendations: [],
+    unknown_factors: [],
+    algorithm_version: "zero-trust-1.0.0",
+    evaluated_at: "2026-09-20T00:00:00Z",
+    dimensions: [],
   },
 };
 
@@ -243,7 +279,9 @@ describe("axe-core automated accessibility audit (jsdom, layout rules excluded)"
     ["Detection Alert detail", DetectionAlertDetail],
     ["Case detail", CaseDetail],
     ["Hunt detail", HuntDetail],
-  ])("SOC Workspace: %s has no automated a11y violations", async (_label, Page) => {
+    ["Risk Register detail", RiskRegisterDetail],
+    ["Zero Trust assessment detail", ZeroTrustAssessmentDetail],
+  ])("SOC/Risk Workspace: %s has no automated a11y violations", async (_label, Page) => {
     const { container } = render(
       <QueryClientProvider client={new QueryClient()}>
         <Page />

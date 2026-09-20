@@ -3,6 +3,7 @@
 import { Badge, Card, EmptyState, LoadingState, SeverityBadge, Tabs, TabPanel } from "@cyberaudit/ui";
 import { useQuery } from "@tanstack/react-query";
 import { Boxes, Network, ShieldAlert } from "lucide-react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { Shell } from "@/components/shell";
@@ -26,6 +27,8 @@ type RiskResult = {
   contributing_factors: string[];
   reducing_factors: string[];
 };
+type RiskRegisterEntry = { id: string; reference: string; title: string; status: string; residual_score: number };
+type AttackPathSummary = { id: string; name: string; severity: string; overall_risk: number; status: string };
 
 const TABS = [
   { id: "overview", label: "Visão Geral" },
@@ -51,6 +54,16 @@ export default function AssetDetailPage() {
   const risk = useQuery({
     queryKey: ["asset-risk", id],
     queryFn: () => api<RiskResult>(`/assets/${id}/risk`),
+    enabled: tab === "risk",
+  });
+  const riskRegister = useQuery({
+    queryKey: ["asset-risk-register", id],
+    queryFn: () => api<{ items: RiskRegisterEntry[] }>(`/grc/risks?asset_id=${id}`),
+    enabled: tab === "risk",
+  });
+  const attackPaths = useQuery({
+    queryKey: ["asset-attack-paths", id],
+    queryFn: () => api<{ items: AttackPathSummary[] }>(`/attack-paths?asset_id=${id}`),
     enabled: tab === "risk",
   });
   const asset = data?.asset;
@@ -121,6 +134,44 @@ export default function AssetDetailPage() {
                 <p className="text-sm text-muted">{risk.data.explanation}</p>
               </div>
             )}
+            <div className="mt-6">
+              <h2 className="mb-2 text-sm font-semibold">Registo de risco associado</h2>
+              {riskRegister.data?.items.length === 0 && (
+                <p className="text-sm text-muted">Sem entradas no Risk Register para este ativo.</p>
+              )}
+              <ul className="space-y-2">
+                {riskRegister.data?.items.map((entry) => (
+                  <li key={entry.id}>
+                    <Link
+                      href={`/grc/risks/${entry.id}`}
+                      className="flex items-center justify-between rounded-lg border border-border p-3 text-sm hover:border-primary/40"
+                    >
+                      <span>{entry.reference} · {entry.title}</span>
+                      <Badge tone="neutral">{entry.status}</Badge>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="mt-6">
+              <h2 className="mb-2 text-sm font-semibold">Attack Paths que envolvem este ativo</h2>
+              {attackPaths.data?.items.length === 0 && (
+                <p className="text-sm text-muted">Sem caminhos de ataque identificados para este ativo.</p>
+              )}
+              <ul className="space-y-2">
+                {attackPaths.data?.items.map((path) => (
+                  <li key={path.id}>
+                    <Link
+                      href={`/attack-paths/${path.id}`}
+                      className="flex items-center justify-between rounded-lg border border-border p-3 text-sm hover:border-primary/40"
+                    >
+                      <span>{path.name}</span>
+                      <SeverityBadge state={path.severity} />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </TabPanel>
         </div>
       </Card>

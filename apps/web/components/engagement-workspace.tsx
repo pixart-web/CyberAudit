@@ -3,6 +3,7 @@
 import { Badge, Button, Card, EmptyState, ErrorState, LoadingState, SeverityBadge, Tabs, TabPanel } from "@cyberaudit/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BrainCircuit, FileText, ShieldAlert } from "lucide-react";
+import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { Shell } from "@/components/shell";
 import { api } from "@/lib/api";
@@ -217,9 +218,14 @@ export function EngagementWorkspace({ id }: { id: string }) {
             )}
             <ul className="space-y-2">
               {reports.data?.items.map((row) => (
-                <li key={row.id} className="flex items-center justify-between rounded-lg border border-border p-3 text-sm">
-                  <span className="flex items-center gap-2"><FileText size={14} className="text-muted" />{row.title}</span>
-                  <SeverityBadge state={row.status} />
+                <li key={row.id}>
+                  <Link
+                    href={`/reports/${row.id}`}
+                    className="flex items-center justify-between rounded-lg border border-border p-3 text-sm hover:border-primary/40"
+                  >
+                    <span className="flex items-center gap-2"><FileText size={14} className="text-muted" />{row.title}</span>
+                    <SeverityBadge state={row.status} />
+                  </Link>
                 </li>
               ))}
             </ul>

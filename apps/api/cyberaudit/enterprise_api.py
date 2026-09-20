@@ -1208,10 +1208,12 @@ async def create_control_assessment(
 @router.get("/grc/risks")
 async def list_risks(
     q: str | None = Query(default=None, max_length=200),
+    asset_id: str | None = Query(default=None, max_length=36),
     pagination_values: tuple[int, int] = Depends(pagination),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permission("enterprise_risks.read")),
 ):
+    extra = (EnterpriseRisk.asset_id == asset_id,) if asset_id else ()
     return await page(
         db,
         EnterpriseRisk,
@@ -1220,7 +1222,34 @@ async def list_risks(
         page_size=pagination_values[1],
         q=q,
         search_fields=(EnterpriseRisk.reference, EnterpriseRisk.title, EnterpriseRisk.category),
+        extra=extra,
     )
+
+
+@router.get("/grc/risks/{risk_id}")
+async def get_risk(
+    risk_id: str,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permission("enterprise_risks.read")),
+):
+    risk = await db.scalar(
+        select(EnterpriseRisk).where(
+            EnterpriseRisk.id == risk_id, EnterpriseRisk.organization_id == user.organization_id
+        )
+    )
+    if not risk:
+        raise HTTPException(404, "Risk not found")
+    treatments = list(
+        (
+            await db.scalars(
+                select(RiskTreatmentPlan).where(
+                    RiskTreatmentPlan.organization_id == user.organization_id,
+                    RiskTreatmentPlan.risk_id == risk.id,
+                )
+            )
+        ).all()
+    )
+    return {"risk": serialize(risk), "treatments": [serialize(item) for item in treatments]}
 
 
 @router.post("/grc/risks", status_code=201)

@@ -1123,6 +1123,7 @@ async def list_feed_syncs(
 @router.get("/attack-paths")
 async def list_attack_paths(
     status: str | None = None,
+    asset_id: str | None = Query(default=None, max_length=36),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     user: User = Depends(require_permission("attack_paths.read")),
@@ -1131,6 +1132,10 @@ async def list_attack_paths(
     where = [AttackPath.organization_id == user.organization_id]
     if status:
         where.append(AttackPath.status == status)
+    if asset_id:
+        where.append(
+            or_(AttackPath.entry_asset_id == asset_id, AttackPath.target_asset_id == asset_id)
+        )
     return await _page(db, AttackPath, where, page, page_size, AttackPath.overall_risk.desc())
 
 
