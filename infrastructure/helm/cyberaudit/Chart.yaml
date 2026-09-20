@@ -1,0 +1,6 @@
+apiVersion: v2
+name: cyberaudit
+description: CyberAudit API, web and worker; PostgreSQL, Redis and object storage are external.
+type: application
+version: 0.1.0
+appVersion: "0.2.0"

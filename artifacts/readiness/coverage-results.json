@@ -1,0 +1,8 @@
+{
+  "status": "passed",
+  "executed_at": "2026-09-20T14:31:35Z",
+  "backend_percent": 76.47696929238985,
+  "backend_minimum": 75,
+  "frontend_coverage": "not configured as a release threshold",
+  "source": "full pytest coverage database"
+}

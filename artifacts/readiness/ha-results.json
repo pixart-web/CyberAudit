@@ -1,0 +1,16 @@
+{
+  "status": "partial",
+  "executed_at": "2026-08-03T22:10:22Z",
+  "api_replicas": 2,
+  "worker_replicas": 2,
+  "load_balancer": "nginx with Docker DNS re-resolution",
+  "api_kill_survived": true,
+  "worker_kill_survived": true,
+  "sessions_distributed": true,
+  "missing_components": [
+    "PostgreSQL primary/replica failover",
+    "Redis failover",
+    "distributed MinIO"
+  ],
+  "notes": "Application-tier failover was exercised. This is not complete HA evidence until data-layer failover is independently exercised."
+}

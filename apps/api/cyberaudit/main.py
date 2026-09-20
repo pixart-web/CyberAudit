@@ -1,22 +1,42 @@
 import hashlib
+import time
 import uuid
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
-from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
+import redis.asyncio as redis
+from fastapi import (
+    Depends,
+    FastAPI,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+)
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.responses import Response
 
+from cyberaudit.agent_api import router as agent_router
+from cyberaudit.ai_runtime_api import router as ai_runtime_router
 from cyberaudit.audit import write_audit
 from cyberaudit.config import get_settings
 from cyberaudit.db import Base, engine, get_db
+from cyberaudit.domain_expansion_api import router as domain_expansion_router
+from cyberaudit.engagement_api import reports_router as engagement_reports_router
+from cyberaudit.engagement_api import router as engagement_domain_router
+from cyberaudit.enterprise_api import router as enterprise_router
+from cyberaudit.enterprise_auth import SessionService
 from cyberaudit.execution_api import router as execution_router
+from cyberaudit.hardening_api import router as hardening_router
 from cyberaudit.models import (
     Asset,
     AuditLog,
@@ -39,8 +59,12 @@ from cyberaudit.models import (
     User,
     utcnow,
 )
+from cyberaudit.observability import http_request_duration, http_requests, structured_event
 from cyberaudit.phase3_api import router as phase3_router
+from cyberaudit.phase4_api import router as phase4_router
+from cyberaudit.phase5_api import router as phase5_router
 from cyberaudit.policy import ScopePolicyEngine, normalized_target
+from cyberaudit.rate_limit import enforce_rate_limit
 from cyberaudit.schemas import (
     AssetCreate,
     AssetRead,
@@ -72,6 +96,8 @@ from cyberaudit.security import (
     verify_password,
 )
 from cyberaudit.storage import LocalStorage
+from cyberaudit.tracing import trace_context
+from cyberaudit.update_api import router as update_router
 
 settings = get_settings()
 policy_engine = ScopePolicyEngine()
@@ -86,9 +112,25 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="CyberAudit API", version="1.0.0", lifespan=lifespan)
+app = FastAPI(
+    title="CyberAudit API",
+    version="0.2.0",
+    lifespan=lifespan,
+    docs_url=None if settings.production_like else "/docs",
+    redoc_url=None if settings.production_like else "/redoc",
+)
 app.include_router(execution_router)
 app.include_router(phase3_router)
+app.include_router(phase4_router)
+app.include_router(phase5_router)
+app.include_router(enterprise_router)
+app.include_router(domain_expansion_router)
+app.include_router(hardening_router)
+app.include_router(ai_runtime_router)
+app.include_router(agent_router)
+app.include_router(engagement_domain_router)
+app.include_router(engagement_reports_router)
+app.include_router(update_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.app_origin],
@@ -96,6 +138,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_hosts)
 
 
 def error_response(
@@ -117,12 +160,56 @@ def error_response(
 
 @app.middleware("http")
 async def request_context(request: Request, call_next):
+    started_at = time.perf_counter()
     request.state.request_id = request.headers.get("x-request-id", str(uuid.uuid4()))
+    trace = trace_context(request.headers.get("traceparent"))
+    request.state.trace_id = trace.trace_id
+    content_length = request.headers.get("content-length")
+    if content_length:
+        try:
+            if int(content_length) > settings.request_max_bytes:
+                return error_response(
+                    request,
+                    413,
+                    "REQUEST_TOO_LARGE",
+                    "Request exceeds the configured limit",
+                )
+        except ValueError:
+            return error_response(request, 400, "INVALID_CONTENT_LENGTH", "Invalid request")
     response = await call_next(request)
     response.headers["x-request-id"] = request.state.request_id
+    response.headers["traceparent"] = trace.child_header()
     response.headers["x-content-type-options"] = "nosniff"
     response.headers["x-frame-options"] = "DENY"
     response.headers["referrer-policy"] = "no-referrer"
+    response.headers["permissions-policy"] = "camera=(), microphone=(), geolocation=()"
+    if request.url.path in {"/docs", "/redoc"}:
+        response.headers["content-security-policy"] = (
+            "default-src 'self' https://cdn.jsdelivr.net; "
+            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "img-src 'self' data: https://fastapi.tiangolo.com; frame-ancestors 'none'"
+        )
+    else:
+        response.headers["content-security-policy"] = (
+            "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
+        )
+    response.headers["cache-control"] = "no-store"
+    if settings.require_https:
+        response.headers["strict-transport-security"] = "max-age=31536000; includeSubDomains"
+    route = getattr(request.scope.get("route"), "path", "unmatched")
+    duration = time.perf_counter() - started_at
+    http_requests.labels(method=request.method, route=route, status=str(response.status_code)).inc()
+    http_request_duration.labels(method=request.method, route=route).observe(duration)
+    structured_event(
+        "http_request",
+        request_id=request.state.request_id,
+        trace_id=trace.trace_id,
+        method=request.method,
+        route=route,
+        status=response.status_code,
+        duration_ms=round(duration * 1000, 2),
+    )
     return response
 
 
@@ -136,9 +223,41 @@ async def validation_error(request: Request, exc: RequestValidationError):
     return error_response(request, 422, "VALIDATION_ERROR", "Invalid request", exc.errors())
 
 
+@app.exception_handler(Exception)
+async def unexpected_error(request: Request, exc: Exception):
+    structured_event(
+        "unhandled_api_error",
+        request_id=request.state.request_id,
+        error_type=type(exc).__name__,
+    )
+    return error_response(request, 500, "INTERNAL_ERROR", "An unexpected error occurred")
+
+
 @app.get("/health", tags=["system"])
 async def health():
     return {"status": "ok", "service": "cyberaudit-api"}
+
+
+@app.get("/ready", tags=["system"])
+async def readiness(db: AsyncSession = Depends(get_db)):
+    dependencies: dict[str, str] = {}
+    try:
+        await db.execute(select(1))
+        dependencies["postgresql"] = "ok"
+    except Exception as exc:
+        dependencies["postgresql"] = "unavailable"
+        structured_event("readiness_failed", dependency="postgresql", error_type=type(exc).__name__)
+    client = redis.from_url(settings.redis_url, decode_responses=True)
+    try:
+        dependencies["redis"] = "ok" if await client.ping() else "unavailable"
+    except (OSError, redis.RedisError) as exc:
+        dependencies["redis"] = "unavailable"
+        structured_event("readiness_failed", dependency="redis", error_type=type(exc).__name__)
+    finally:
+        await client.aclose()
+    if any(value != "ok" for value in dependencies.values()):
+        raise HTTPException(503, {"status": "not_ready", "dependencies": dependencies})
+    return {"status": "ready", "dependencies": dependencies}
 
 
 @app.get("/metrics", include_in_schema=False)
@@ -147,7 +266,15 @@ async def metrics():
 
 
 @app.post("/api/v1/auth/login", response_model=TokenResponse, tags=["auth"])
-async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)):
+async def login(
+    payload: LoginRequest,
+    response: Response,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    await enforce_rate_limit(request, category="login", limit=10, window_seconds=60)
+    if not settings.local_auth_enabled:
+        raise HTTPException(403, "Local authentication is disabled")
     user = await db.scalar(select(User).where(func.lower(User.email) == payload.email.lower()))
     now = datetime.now(timezone.utc)
     if not user:
@@ -166,8 +293,35 @@ async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)):
     user.locked_until = None
     user.last_login_at = now
     refresh = await issue_refresh_token(db, user)
+    _, raw_session, csrf = await SessionService.create(
+        db,
+        user,
+        settings,
+        authentication_method="local",
+        authentication_strength="mfa" if user.mfa_enabled else "single_factor",
+        source_ip=request.client.host if request.client else None,
+        user_agent_family=request.headers.get("user-agent", "")[:120] or None,
+    )
     await write_audit(db, user, "auth.login", "user", user.id)
     await db.commit()
+    response.set_cookie(
+        "cyberaudit_session",
+        raw_session,
+        httponly=True,
+        secure=settings.secure_cookies,
+        samesite="strict",
+        max_age=settings.session_absolute_hours * 3600,
+        path="/",
+    )
+    response.set_cookie(
+        "cyberaudit_csrf",
+        csrf,
+        httponly=False,
+        secure=settings.secure_cookies,
+        samesite="strict",
+        max_age=settings.session_absolute_hours * 3600,
+        path="/",
+    )
     return TokenResponse(
         access_token=create_access_token(user),
         refresh_token=refresh,
@@ -209,12 +363,26 @@ async def refresh(refresh_token: str, db: AsyncSession = Depends(get_db)):
 
 
 @app.post("/api/v1/auth/logout", status_code=204, tags=["auth"])
-async def logout(refresh_token: str, db: AsyncSession = Depends(get_db)):
+async def logout(
+    refresh_token: str,
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+):
     token_id = refresh_token.split(".", 1)[0]
     stored = await db.get(RefreshToken, token_id)
     if stored:
         stored.revoked_at = utcnow()
-        await db.commit()
+    raw_session = request.cookies.get("cyberaudit_session")
+    if raw_session:
+        session = await SessionService.authenticate(db, raw_session)
+        if session:
+            session.status = "revoked"
+            session.revoked_at = utcnow()
+            session.revoke_reason = "logout"
+    await db.commit()
+    response.delete_cookie("cyberaudit_session", path="/")
+    response.delete_cookie("cyberaudit_csrf", path="/")
 
 
 @app.get("/api/v1/auth/me", response_model=UserRead, tags=["auth"])
@@ -223,7 +391,12 @@ async def me(user: User = Depends(current_user)):
 
 
 async def paginated(
-    db: AsyncSession, model: Any, where: list[Any], page: int, page_size: int, order: Any
+    db: AsyncSession,
+    model: Any,
+    where: list[Any],
+    page: int,
+    page_size: int,
+    order: Any,
 ):
     total = await db.scalar(select(func.count()).select_from(model).where(*where))
     items = list(
@@ -240,7 +413,11 @@ async def paginated(
     return {"items": items, "total": total or 0, "page": page, "page_size": page_size}
 
 
-@app.get("/api/v1/organizations", response_model=Page[OrganizationRead], tags=["organizations"])
+@app.get(
+    "/api/v1/organizations",
+    response_model=Page[OrganizationRead],
+    tags=["organizations"],
+)
 async def organizations(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -279,7 +456,10 @@ async def clients(
     user: User = Depends(require_permission("clients.read")),
     db: AsyncSession = Depends(get_db),
 ):
-    where = [Client.organization_id == user.organization_id, Client.deleted_at.is_(None)]
+    where = [
+        Client.organization_id == user.organization_id,
+        Client.deleted_at.is_(None),
+    ]
     if q:
         where.append(or_(Client.name.ilike(f"%{q}%"), Client.legal_name.ilike(f"%{q}%")))
     return await paginated(db, Client, where, page, page_size, Client.name)
@@ -329,7 +509,10 @@ async def engagements(
     user: User = Depends(require_permission("engagements.read")),
     db: AsyncSession = Depends(get_db),
 ):
-    where = [Engagement.organization_id == user.organization_id, Engagement.deleted_at.is_(None)]
+    where = [
+        Engagement.organization_id == user.organization_id,
+        Engagement.deleted_at.is_(None),
+    ]
     if q:
         where.append(or_(Engagement.name.ilike(f"%{q}%"), Engagement.code.ilike(f"%{q}%")))
     if status:
@@ -337,8 +520,29 @@ async def engagements(
     return await paginated(db, Engagement, where, page, page_size, Engagement.created_at.desc())
 
 
+@app.get("/api/v1/engagements/{item_id}", response_model=EngagementRead, tags=["engagements"])
+async def get_engagement(
+    item_id: str,
+    user: User = Depends(require_permission("engagements.read")),
+    db: AsyncSession = Depends(get_db),
+):
+    item = await db.scalar(
+        select(Engagement).where(
+            Engagement.id == item_id,
+            Engagement.organization_id == user.organization_id,
+            Engagement.deleted_at.is_(None),
+        )
+    )
+    if not item:
+        raise HTTPException(404, "Engagement not found")
+    return item
+
+
 @app.post(
-    "/api/v1/engagements", response_model=EngagementRead, status_code=201, tags=["engagements"]
+    "/api/v1/engagements",
+    response_model=EngagementRead,
+    status_code=201,
+    tags=["engagements"],
 )
 async def create_engagement(
     payload: EngagementCreate,
@@ -357,13 +561,16 @@ async def create_engagement(
     if payload.owner_id:
         owner = await db.scalar(
             select(User).where(
-                User.id == payload.owner_id, User.organization_id == user.organization_id
+                User.id == payload.owner_id,
+                User.organization_id == user.organization_id,
             )
         )
         if not owner:
             raise HTTPException(422, "Owner must belong to the organization")
     item = Engagement(
-        organization_id=user.organization_id, status=EngagementStatus.DRAFT, **payload.model_dump()
+        organization_id=user.organization_id,
+        status=EngagementStatus.DRAFT,
+        **payload.model_dump(),
     )
     db.add(item)
     await db.flush()
@@ -374,7 +581,10 @@ async def create_engagement(
 
 
 TRANSITIONS = {
-    EngagementStatus.DRAFT: {EngagementStatus.PENDING_AUTHORIZATION, EngagementStatus.CANCELLED},
+    EngagementStatus.DRAFT: {
+        EngagementStatus.PENDING_AUTHORIZATION,
+        EngagementStatus.CANCELLED,
+    },
     EngagementStatus.PENDING_AUTHORIZATION: {
         EngagementStatus.AUTHORIZED,
         EngagementStatus.CANCELLED,
@@ -392,7 +602,9 @@ TRANSITIONS = {
 
 
 @app.patch(
-    "/api/v1/engagements/{item_id}/status", response_model=EngagementRead, tags=["engagements"]
+    "/api/v1/engagements/{item_id}/status",
+    response_model=EngagementRead,
+    tags=["engagements"],
 )
 async def change_engagement_status(
     item_id: str,
@@ -411,7 +623,8 @@ async def change_engagement_status(
         raise HTTPException(404, "Engagement not found")
     if payload.status not in TRANSITIONS[item.status]:
         raise HTTPException(
-            409, f"Invalid transition from {item.status.value} to {payload.status.value}"
+            409,
+            f"Invalid transition from {item.status.value} to {payload.status.value}",
         )
     if payload.status in {EngagementStatus.AUTHORIZED, EngagementStatus.ACTIVE}:
         today = date.today()
@@ -445,7 +658,8 @@ async def change_engagement_status(
             not auth or not scope or not target or not item.owner_id
         ):
             raise HTTPException(
-                409, "Valid authorization, active scope, allowed target and owner are required"
+                409,
+                "Valid authorization, active scope, allowed target and owner are required",
             )
     old = item.status.value
     item.status = payload.status
@@ -523,7 +737,10 @@ async def scope_targets(
 
 
 @app.post(
-    "/api/v1/scope-targets", response_model=TargetRead, status_code=201, tags=["scope-targets"]
+    "/api/v1/scope-targets",
+    response_model=TargetRead,
+    status_code=201,
+    tags=["scope-targets"],
 )
 async def create_target(
     payload: TargetCreate,
@@ -637,7 +854,8 @@ async def upload_authorization(
 ):
     engagement = await db.scalar(
         select(Engagement).where(
-            Engagement.id == engagement_id, Engagement.organization_id == user.organization_id
+            Engagement.id == engagement_id,
+            Engagement.organization_id == user.organization_id,
         )
     )
     if not engagement:
@@ -729,7 +947,8 @@ async def audit_logs(
 
 @app.get("/api/v1/dashboard", tags=["dashboard"])
 async def dashboard(
-    user: User = Depends(require_permission("engagements.read")), db: AsyncSession = Depends(get_db)
+    user: User = Depends(require_permission("engagements.read")),
+    db: AsyncSession = Depends(get_db),
 ):
     assets_count = await db.scalar(
         select(func.count())
@@ -751,7 +970,10 @@ async def dashboard(
                 .where(
                     Engagement.organization_id == user.organization_id,
                     Engagement.status.in_(
-                        [EngagementStatus.ACTIVE, EngagementStatus.PENDING_AUTHORIZATION]
+                        [
+                            EngagementStatus.ACTIVE,
+                            EngagementStatus.PENDING_AUTHORIZATION,
+                        ]
                     ),
                 )
                 .limit(5)
@@ -840,17 +1062,37 @@ async def dashboard(
             "retest_rate": 84,
         },
         "severity": [
-            {"name": "Crítica", "value": finding_counts["CRITICAL"], "color": "#FF404D"},
+            {
+                "name": "Crítica",
+                "value": finding_counts["CRITICAL"],
+                "color": "#FF404D",
+            },
             {"name": "Alta", "value": finding_counts["HIGH"], "color": "#FF851B"},
             {"name": "Média", "value": finding_counts["MEDIUM"], "color": "#F4CA24"},
             {"name": "Baixa", "value": finding_counts["LOW"], "color": "#20D9FF"},
         ],
         "top_risks": [
-            {"title": "Autenticação sem MFA", "severity": "critical", "asset": "Identity Gateway"},
+            {
+                "title": "Autenticação sem MFA",
+                "severity": "critical",
+                "asset": "Identity Gateway",
+            },
             {"title": "TLS desatualizado", "severity": "high", "asset": "api.internal"},
-            {"title": "Privilégios excessivos", "severity": "high", "asset": "Cloud Account"},
-            {"title": "Headers incompletos", "severity": "medium", "asset": "Web Portal"},
-            {"title": "Inventário divergente", "severity": "medium", "asset": "Network"},
+            {
+                "title": "Privilégios excessivos",
+                "severity": "high",
+                "asset": "Cloud Account",
+            },
+            {
+                "title": "Headers incompletos",
+                "severity": "medium",
+                "asset": "Web Portal",
+            },
+            {
+                "title": "Inventário divergente",
+                "severity": "medium",
+                "asset": "Network",
+            },
         ],
         "engagements": [
             {
@@ -884,7 +1126,11 @@ async def dashboard(
             },
         ],
         "incidents": [
-            {"time": "09:14", "title": "Tentativa de acesso bloqueada", "tone": "danger"},
+            {
+                "time": "09:14",
+                "title": "Tentativa de acesso bloqueada",
+                "tone": "danger",
+            },
             {"time": "11:42", "title": "Âmbito atualizado", "tone": "info"},
             {"time": "14:20", "title": "Autorização validada", "tone": "success"},
         ],
@@ -892,7 +1138,10 @@ async def dashboard(
             {"name": "PostgreSQL", "status": "online"},
             {"name": "Redis", "status": "online"},
             {"name": "Local Storage", "status": "online"},
-            {"name": "Adaptadores", "status": "online" if adapters_online else "disabled"},
+            {
+                "name": "Adaptadores",
+                "status": "online" if adapters_online else "disabled",
+            },
         ],
         "execution_metrics": {
             "running": jobs_running or 0,

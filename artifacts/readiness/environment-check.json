@@ -1,0 +1,165 @@
+{
+  "environment": {
+    "architecture": "arm64",
+    "cpu_count": 10,
+    "memory_bytes": 34359738368,
+    "operating_system": "Darwin",
+    "operating_system_release": "25.5.0",
+    "workspace_disk_free_bytes": 92852957184,
+    "workspace_disk_total_bytes": 494384795648
+  },
+  "schema_version": "1.0",
+  "summary": {
+    "blocking": 0,
+    "ready": 21
+  },
+  "tools": [
+    {
+      "installed": true,
+      "required": true,
+      "status": "ready",
+      "tool": "python3",
+      "version": "Python 3.9.6"
+    },
+    {
+      "installed": true,
+      "required": true,
+      "status": "ready",
+      "tool": "node",
+      "version": "v25.2.1"
+    },
+    {
+      "installed": true,
+      "required": true,
+      "status": "ready",
+      "tool": "pnpm",
+      "version": "11.9.0"
+    },
+    {
+      "installed": true,
+      "required": true,
+      "status": "ready",
+      "tool": "psql",
+      "version": "psql (PostgreSQL) 16.14 (Homebrew)"
+    },
+    {
+      "installed": true,
+      "required": true,
+      "status": "ready",
+      "tool": "redis-cli",
+      "version": "redis-cli 8.8.0"
+    },
+    {
+      "installed": true,
+      "required": true,
+      "status": "ready",
+      "tool": "docker",
+      "version": "Docker version 29.7.1, build e9452d6e78"
+    },
+    {
+      "installed": true,
+      "required": true,
+      "status": "ready",
+      "tool": "docker-compose",
+      "version": "Docker Compose version 5.4.0"
+    },
+    {
+      "installed": true,
+      "required": true,
+      "status": "ready",
+      "tool": "kubectl",
+      "version": "Client Version: v1.36.3"
+    },
+    {
+      "installed": true,
+      "required": true,
+      "status": "ready",
+      "tool": "helm",
+      "version": "v4.2.3+g43e8b7f"
+    },
+    {
+      "installed": true,
+      "required": true,
+      "status": "ready",
+      "tool": "kind",
+      "version": "kind v0.32.0 go1.26.3 darwin/arm64"
+    },
+    {
+      "installed": true,
+      "required": true,
+      "status": "ready",
+      "tool": "vault",
+      "version": "Vault v2.0.3 (7193f9a48ff6093ca61b3b627a8671e770428ba6), built 2026-06-17T12:39:45Z"
+    },
+    {
+      "installed": true,
+      "required": true,
+      "status": "ready",
+      "tool": "mc",
+      "version": "mc version RELEASE.2025-08-13T08-35-41Z (commit-id=7394ce0dd2a80935aded936b09fa12cbb3cb8096)"
+    },
+    {
+      "installed": true,
+      "required": true,
+      "status": "ready",
+      "tool": "syft",
+      "version": "Version:       1.50.0"
+    },
+    {
+      "installed": true,
+      "required": true,
+      "status": "ready",
+      "tool": "cosign",
+      "version": "v3.1.2"
+    },
+    {
+      "installed": true,
+      "required": true,
+      "status": "ready",
+      "tool": "trivy",
+      "version": "Version: 0.73.0"
+    },
+    {
+      "installed": true,
+      "required": true,
+      "status": "ready",
+      "tool": "k6",
+      "version": "k6 v2.1.0 (commit/devel, go1.26.4, darwin/arm64)"
+    },
+    {
+      "installed": true,
+      "required": true,
+      "status": "ready",
+      "tool": "openssl",
+      "version": "OpenSSL 3.6.3 9 Jun 2026 (Library: OpenSSL 3.6.3 9 Jun 2026)"
+    },
+    {
+      "installed": true,
+      "required": true,
+      "status": "ready",
+      "tool": "gh",
+      "version": "gh version 2.96.0 (2026-07-02)"
+    },
+    {
+      "installed": true,
+      "required": true,
+      "status": "ready",
+      "tool": "git",
+      "version": "git version 2.50.1 (Apple Git-155)"
+    },
+    {
+      "installed": true,
+      "required": true,
+      "status": "ready",
+      "tool": "curl",
+      "version": "curl 8.7.1 (x86_64-apple-darwin25.0) libcurl/8.7.1 (SecureTransport) LibreSSL/3.3.6 zlib/1.2.12 nghttp2/1.68.1"
+    },
+    {
+      "installed": true,
+      "required": true,
+      "status": "ready",
+      "tool": "jq",
+      "version": "jq-1.7.1-apple"
+    }
+  ]
+}

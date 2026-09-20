@@ -1,0 +1,23 @@
+{
+  "discard_completed": true,
+  "duplicate_deduplicated": true,
+  "old_schema_replay_denied": true,
+  "redis_queue": "cyberaudit.readiness.dlq",
+  "replay_completed": true,
+  "scenarios": [
+    "invalid_message",
+    "timeout",
+    "permanent_error",
+    "poison_message",
+    "duplicate_message",
+    "old_schema",
+    "invalid_tenant",
+    "authorization_expired",
+    "worker_failure"
+  ],
+  "secrets_absent": true,
+  "status": "passed",
+  "synthetic_data_only": true,
+  "tenant_scoped": true,
+  "worker_processed": 9
+}

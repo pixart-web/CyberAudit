@@ -1,9 +1,23 @@
 from datetime import date, datetime, time
 from typing import Any, Generic, Literal, TypeVar
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    field_validator,
+    model_validator,
+)
 
-from cyberaudit.models import Criticality, EngagementMode, EngagementStatus, Intensity, TargetType
+from cyberaudit.models import (
+    Criticality,
+    EngagementMode,
+    EngagementStatus,
+    Intensity,
+    TargetType,
+)
+from cyberaudit.password_policy import validate_password_policy
 
 T = TypeVar("T")
 
@@ -40,7 +54,9 @@ class UserRead(ORMModel):
     id: str
     organization_id: str
     name: str
-    email: EmailStr
+    # Development compatibility: the documented demo identity uses the
+    # reserved `.local` suffix and must still be serializable.
+    email: str = Field(pattern=r"^[^@\s]+@[^@\s]+$", max_length=254)
     status: str
     mfa_enabled: bool
 
@@ -48,8 +64,13 @@ class UserRead(ORMModel):
 class UserCreate(BaseModel):
     name: str = Field(min_length=2, max_length=160)
     email: EmailStr
-    password: str = Field(min_length=12, max_length=128)
+    password: str = Field(min_length=14, max_length=128)
     role: str = "Auditor"
+
+    @model_validator(mode="after")
+    def secure_local_password(self) -> "UserCreate":
+        validate_password_policy(self.password, email=str(self.email))
+        return self
 
 
 class ClientCreate(BaseModel):
