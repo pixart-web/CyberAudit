@@ -82,6 +82,30 @@ Engagement Workspace is the template to replicate for them.
 - **Performance measurement**: not instrumented beyond the existing
   Next.js build output (route bundle sizes, shown in the build log).
 
+## Phase 10.4.1 update — what changed since the above
+
+The two items directly above ("accessibility audit with real tooling",
+"performance measurement") and the diagnostic bundle deferral in
+`docs/security/threat-model.md` are now closed — see that file's
+"Diagnostic bundle generator" and "New Workspace-detail attack surface"
+sections, and this repo's Phase 10.4.1 final report for the measured
+accessibility (axe-core, zero violations on the surfaces checked, layout
+rules honestly excluded) and performance (production build bundle sizes)
+results.
+
+Four Workspace detail pages were added or extended in this pass: Asset
+(existing 360-view kept, three new tabs added), Finding (existing content
+kept, Retests + Cyber AI tabs added), Incident (new — the old route was a
+mislabeled list, not a detail view), and Control (new, and required a
+previously-missing `GET /grc/controls/{id}` endpoint).
+
+**Still not attempted**: SOC/Identity/Cloud/Attack-Graph/Knowledge-Graph/
+Reporting workspace consolidation, and native installer work (explicitly
+out of scope for 10.4.1, deferred to "Phase 10.4.2" per that phase's own
+instructions). This is a genuine scope gap against the full Phase 10.4.1
+brief, not a claim that it's done — see the final report's Domain
+Completion Matrix.
+
 ## Local distribution platform status
 
 | Platform | Status | Evidence |

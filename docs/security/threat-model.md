@@ -192,12 +192,38 @@ New attack surfaces introduced in this phase, per section 66.
   API/web to `127.0.0.1` only (Phase 10.3.8); `docker-compose.remote.yml`
   is an explicit, separately-invoked opt-in, never the default.
 
-## Deferred, not fabricated
+## Diagnostic bundle generator (Phase 10.4.1)
 
-A privacy-safe diagnostic bundle generator (section 49) was **not**
-implemented in this phase — building it correctly requires wiring the
-existing redaction pipeline (`cyberaudit/redaction.py`) into a new export
-path with an explicit allowlist of what may leave the environment, which
-is real, non-trivial work. Attempting a shortcut version risked exactly
-the "no fake implementations" failure mode this phase's brief warns
-against, so it is recorded here as deferred rather than half-built.
+Implemented, closing what Phase 10.4 recorded as deferred. `GET
+/api/v1/diagnostics/bundle` (`cyberaudit/diagnostics.py`) builds an
+operational-metadata-only export: an explicit allowlist of non-secret
+settings fields (never a credential or connection string — see
+`ALLOWLISTED_SETTINGS_FIELDS`), hardware/AI-runtime health, and
+tenant-scoped entity **counts** (never rows). Every value is additionally
+passed through the shared redaction pipeline
+(`cyberaudit/redaction.py::redact`) as a second layer. Gated by a new
+`diagnostics.export` permission and audited on every generation.
+`test_diagnostics.py` proves the bundle stays clean even when
+`jwt_secret`/`encryption_key`/`database_url` are deliberately set to
+detectable values, and `test_offline_mode.py` proves generation needs no
+network. Frontend: `/diagnostics`, a one-click generate-and-download panel
+that also states explicitly what it never includes.
+
+## New Workspace-detail attack surface (Phase 10.4.1)
+
+Four Workspace detail pages (Asset — extended in place, Finding — extended
+in place, Incident — new, replacing a mislabeled list route, Control —
+new) added five backend query filters (`?finding_id=` on `/retests`,
+`?incident_id=` on `/cases` and `/detections/alerts`, `?control_id=` on
+`/grc/control-mappings` and `/grc/control-assessments`,
+`?subject_type=&subject_id=` on `/grc/evidence-links`) and one new
+single-item endpoint (`GET /grc/controls/{id}`). Every filter is layered
+on the existing tenant-scoped `page()`/`_page()` query (the base
+`organization_id` predicate is never removed, only ANDed with the new
+condition), and `test_workspace_filters_tenant_isolation.py` proves a
+caller who knows another tenant's identifier gets an empty result, never
+that tenant's row. The Finding Workspace's "Explicar risco" action calls
+the existing `POST /agents/{code}/ask` endpoint with `source_ids` scoped
+to that one finding — the same AgentToolGateway-mediated path every other
+contextual AI action uses (invariant 39); it introduces no new AI
+execution path.

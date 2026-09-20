@@ -1,5 +1,35 @@
 # Decisões de arquitetura
 
+## ADR-033 — Product Completion: real filters over ResourcePage duplication (Phase 10.4.1)
+
+Accepted. Rather than building a bespoke detail-fetch layer per domain,
+each new Workspace (Asset/Finding/Incident/Control) reuses the existing
+generic `page()`/`_page()` tenant-scoped query helpers with one additional
+`AND`-ed filter condition per related collection, and the pre-existing
+`ResourcePage`'s `rowHref` prop for list→detail navigation. No new
+authorization path is introduced: every new query parameter narrows an
+already-tenant-scoped result set, never widens it, which
+`test_workspace_filters_tenant_isolation.py` verifies directly (a caller
+supplying another tenant's id gets an empty list, never that tenant's
+row). The diagnostic bundle generator follows the same discipline: an
+explicit allowlist of settings fields (never a blanket dump) plus the
+existing `redact()` pipeline as a second layer, per ADR guidance that
+"upload/export is never trusted merely because it happened" applies
+equally to bundle *generation* — the code must positively justify why
+each field is safe to leave, not merely fail to notice it isn't.
+
+A correction is recorded here deliberately: an earlier pass in this same
+phase overwrote two pre-existing, tested pages
+(`apps/web/app/assets/[id]/page.tsx`, `apps/web/app/findings/[id]/page.tsx`)
+outright with `Write` instead of reading them first, which also
+introduced a data bug (wrong Asset field names — `hostname`/`ip_address`
+instead of the schema's actual `fqdn`/`primary_ip`/`lifecycle_status`).
+It was caught by the pre-existing `asset-360.test.tsx` failing immediately
+after the change, both files were restored from git history, and the new
+tabs were re-added around the original content instead of replacing it.
+Documented here as a reminder that "read before write" is not optional
+even under autonomous-milestone instructions.
+
 ## ADR-032 — Native distribution strategy honesty (Phase 10.4)
 
 Accepted. Docker Compose remains the only tested deployment mode. No
@@ -156,3 +186,6 @@ deterministic scores and prevent all external writes. See
 39. **Workspace nunca contorna o AgentToolGateway.** Ações contextuais de Cyber AI (ex.: "Summarize Assessment") chamam sempre endpoints existentes que passam pelo CyberAgentRuntime; nenhum atalho de frontend gera conteúdo de IA diretamente.
 40. **Gestão de modelos nunca executa código.** A UI de Model Management só altera `install_status`/`trust_status` através da API já existente; nunca corre um artefacto descarregado.
 41. **Instalador nunca é reclamado sem prova.** Docker Compose é o único modo de distribuição testado; instaladores nativos Windows/macOS/Linux permanecem arquitetura documentada, não construída.
+42. **Diagnóstico é allowlist, nunca dump.** O gerador de diagnóstico só lê campos de configuração explicitamente listados (nunca `vars(settings)` ou equivalente) e passa tudo pelo `redact()` partilhado antes de sair do processo.
+43. **Filtro nunca alarga o tenant.** Todo `?xxx_id=` novo adicionado a um endpoint de lista é sempre um `AND` sobre o `organization_id` já existente, nunca um `OR` ou uma substituição — verificado por teste de isolamento dedicado por cada filtro novo.
+44. **Acessibilidade medida, não reclamada.** Uma alegação de acessibilidade sem uma execução real de uma ferramenta (axe-core, Lighthouse, leitor de ecrã) documentada não é feita; limitações da ferramenta (ex.: jsdom sem layout real) são registadas explicitamente, nunca omitidas.
