@@ -27,11 +27,87 @@ import {
   TabPanel,
 } from "@cyberaudit/ui";
 import { IncidentWorkspace } from "../incident-workspace";
+import SecurityEventDetail from "@/app/security-events/[id]/page";
+import DetectionAlertDetail from "@/app/detections/[id]/page";
+import CaseDetail from "@/app/cases/[id]/page";
+import HuntDetail from "@/app/hunts/[id]/page";
 
 afterEach(cleanup);
-vi.mock("next/navigation", () => ({ usePathname: () => "/incidents/inc-1" }));
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/incidents/inc-1",
+  useParams: () => ({ id: "obj-1" }),
+}));
+
+const socFixtures: Record<string, unknown> = {
+  "/security-events/obj-1": {
+    event: {
+      id: "obj-1",
+      source: "edr",
+      event_type: "login_failed",
+      severity: "high",
+      occurred_at: "2026-09-20T00:00:00Z",
+      actor_ref: "user@example.invalid",
+      asset_id: "asset-1",
+      source_ip: "10.0.0.1",
+      destination_ip: null,
+      summary: "Repeated failed login",
+      normalized: { attempts: 5 },
+      labels: ["brute-force"],
+      content_hash: "a".repeat(64),
+      trusted: false,
+    },
+    alerts: [{ id: "alert-1", title: "Brute force detected", severity: "high", status: "open" }],
+  },
+  "/detections/alerts/obj-1": {
+    alert: {
+      id: "obj-1",
+      title: "Brute force detected",
+      severity: "high",
+      status: "open",
+      confidence: 0.8,
+      fingerprint: "fp-1",
+      incident_id: "incident-1",
+      event_id: "event-1",
+      reasons: ["5 failed logins in 60s"],
+      mitre_techniques: ["T1110"],
+      occurrence_count: 5,
+      first_seen_at: "2026-09-20T00:00:00Z",
+      last_seen_at: "2026-09-20T00:05:00Z",
+    },
+    rule: { id: "rule-1", name: "Brute force rule", description: "Detects repeated failures", severity: "high" },
+    event: { id: "event-1", summary: "Repeated failed login", source: "edr" },
+  },
+  "/cases/obj-1": {
+    case: {
+      id: "obj-1",
+      reference: "CASE-1",
+      title: "Suspicious authentication activity",
+      status: "open",
+      lead_investigator_id: "analyst-1",
+      members: ["analyst-1"],
+      hypothesis: "Credential stuffing attempt",
+      conclusions: "",
+      legal_hold: true,
+      incident_id: "incident-1",
+    },
+    incident: { id: "incident-1", reference: "INC-1", title: "Anomalous auth activity", status: "investigating" },
+  },
+  "/hunts/obj-1": {
+    id: "obj-1",
+    name: "Brute force hunt",
+    hypothesis: "Repeated login failures may indicate brute force",
+    query: { event_type: "login_failed" },
+    status: "draft",
+    time_from: "2026-09-19T00:00:00Z",
+    time_until: "2026-09-20T00:00:00Z",
+    result_count: 0,
+    findings: [],
+  },
+};
+
 vi.mock("@/lib/api", () => ({
   api: async (path: string) => {
+    if (path in socFixtures) return socFixtures[path];
     if (path.startsWith("/incidents/")) {
       return {
         incident: {
@@ -119,6 +195,22 @@ describe("axe-core automated accessibility audit (jsdom, layout rules excluded)"
     const { container } = render(
       <QueryClientProvider client={new QueryClient()}>
         <IncidentWorkspace id="inc-1" />
+      </QueryClientProvider>,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const violations = await auditedViolations(container);
+    expect(violations, JSON.stringify(violations, null, 2)).toHaveLength(0);
+  });
+
+  test.each([
+    ["Security Event detail", SecurityEventDetail],
+    ["Detection Alert detail", DetectionAlertDetail],
+    ["Case detail", CaseDetail],
+    ["Hunt detail", HuntDetail],
+  ])("SOC Workspace: %s has no automated a11y violations", async (_label, Page) => {
+    const { container } = render(
+      <QueryClientProvider client={new QueryClient()}>
+        <Page />
       </QueryClientProvider>,
     );
     await new Promise((resolve) => setTimeout(resolve, 50));

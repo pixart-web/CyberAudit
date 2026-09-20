@@ -111,6 +111,14 @@ class HuntPayload(StrictModel):
     time_until: datetime
 
 
+class CasePayload(StrictModel):
+    incident_id: str
+    title: str = Field(min_length=3, max_length=300)
+    lead_investigator_id: str | None = None
+    members: list[str] = Field(default_factory=list, max_length=50)
+    hypothesis: str = Field(default="", max_length=10_000)
+
+
 class PlaybookPayload(StrictModel):
     code: str = Field(pattern=r"^[A-Z0-9_.-]+$", max_length=120)
     name: str = Field(min_length=3, max_length=240)
@@ -331,6 +339,32 @@ async def list_events(
     )
 
 
+@router.get("/security-events/{event_id}")
+async def get_event(
+    event_id: str,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permission("events.read")),
+):
+    event = await db.scalar(
+        select(SecurityEvent).where(
+            SecurityEvent.id == event_id, SecurityEvent.organization_id == user.organization_id
+        )
+    )
+    if not event:
+        raise HTTPException(404, "Security event not found")
+    alerts = list(
+        (
+            await db.scalars(
+                select(DetectionAlert).where(
+                    DetectionAlert.organization_id == user.organization_id,
+                    DetectionAlert.event_id == event.id,
+                )
+            )
+        ).all()
+    )
+    return {"event": serialize(event), "alerts": [serialize(alert) for alert in alerts]}
+
+
 @router.post("/security-events", status_code=201)
 async def ingest_event(
     payload: EventPayload,
@@ -424,6 +458,7 @@ async def create_detection_rule(
 async def list_alerts(
     status: str | None = Query(default=None, max_length=30),
     incident_id: str | None = Query(default=None, max_length=36),
+    event_id: str | None = Query(default=None, max_length=36),
     pagination_values: tuple[int, int] = Depends(pagination),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permission("detections.read")),
@@ -433,6 +468,8 @@ async def list_alerts(
         extra_conditions.append(DetectionAlert.status == status)
     if incident_id:
         extra_conditions.append(DetectionAlert.incident_id == incident_id)
+    if event_id:
+        extra_conditions.append(DetectionAlert.event_id == event_id)
     extra = tuple(extra_conditions)
     return await page(
         db,
@@ -442,6 +479,37 @@ async def list_alerts(
         page_size=pagination_values[1],
         extra=extra,
     )
+
+
+@router.get("/detections/alerts/{alert_id}")
+async def get_alert(
+    alert_id: str,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permission("detections.read")),
+):
+    alert = await db.scalar(
+        select(DetectionAlert).where(
+            DetectionAlert.id == alert_id, DetectionAlert.organization_id == user.organization_id
+        )
+    )
+    if not alert:
+        raise HTTPException(404, "Alert not found")
+    rule = await db.scalar(
+        select(DetectionRule).where(
+            DetectionRule.id == alert.rule_id, DetectionRule.organization_id == user.organization_id
+        )
+    )
+    event = await db.scalar(
+        select(SecurityEvent).where(
+            SecurityEvent.id == alert.event_id,
+            SecurityEvent.organization_id == user.organization_id,
+        )
+    )
+    return {
+        "alert": serialize(alert),
+        "rule": serialize(rule) if rule else None,
+        "event": serialize(event) if event else None,
+    }
 
 
 @router.get("/incidents")
@@ -610,6 +678,61 @@ async def list_cases(
     )
 
 
+@router.post("/cases", status_code=201)
+async def create_case(
+    payload: CasePayload,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permission("cases.manage")),
+):
+    incident = await db.scalar(
+        select(Incident).where(
+            Incident.id == payload.incident_id, Incident.organization_id == user.organization_id
+        )
+    )
+    if not incident:
+        raise HTTPException(404, "Incident not found")
+    count = await db.scalar(
+        select(func.count())
+        .select_from(CaseRecord)
+        .where(CaseRecord.organization_id == user.organization_id)
+    )
+    case = CaseRecord(
+        organization_id=user.organization_id,
+        incident_id=incident.id,
+        reference=f"CASE-{(count or 0) + 1:06d}",
+        title=payload.title,
+        lead_investigator_id=payload.lead_investigator_id,
+        members=payload.members,
+        hypothesis=payload.hypothesis,
+    )
+    db.add(case)
+    await db.flush()
+    await write_audit(db, user, "case.created", "case_record", case.id)
+    await db.commit()
+    return serialize(case)
+
+
+@router.get("/cases/{case_id}")
+async def get_case(
+    case_id: str,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permission("cases.read")),
+):
+    case = await db.scalar(
+        select(CaseRecord).where(
+            CaseRecord.id == case_id, CaseRecord.organization_id == user.organization_id
+        )
+    )
+    if not case:
+        raise HTTPException(404, "Case not found")
+    incident = await db.scalar(
+        select(Incident).where(
+            Incident.id == case.incident_id, Incident.organization_id == user.organization_id
+        )
+    )
+    return {"case": serialize(case), "incident": serialize(incident) if incident else None}
+
+
 @router.get("/iocs")
 async def list_iocs(
     pagination_values: tuple[int, int] = Depends(pagination),
@@ -673,6 +796,85 @@ async def create_hunt(
     await db.flush()
     await write_audit(db, user, "hunt.created", "threat_hunt", hunt.id)
     await db.commit()
+    return serialize(hunt)
+
+
+@router.get("/hunts/{hunt_id}")
+async def get_hunt(
+    hunt_id: str,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permission("hunts.read")),
+):
+    hunt = await db.scalar(
+        select(ThreatHunt).where(
+            ThreatHunt.id == hunt_id, ThreatHunt.organization_id == user.organization_id
+        )
+    )
+    if not hunt:
+        raise HTTPException(404, "Hunt not found")
+    return serialize(hunt)
+
+
+@router.post("/hunts/{hunt_id}/execute")
+async def execute_hunt(
+    hunt_id: str,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permission("hunts.manage")),
+):
+    """Runs the hunt's already-validated, field-allowlisted equality query
+
+    against recorded SecurityEvents (invariant 22: declarative only -- no
+    eval, no free-form SQL, no automated response). Bounded to a maximum
+    of 200 matches to keep this a review aid, not a bulk export.
+    """
+    hunt = await db.scalar(
+        select(ThreatHunt).where(
+            ThreatHunt.id == hunt_id, ThreatHunt.organization_id == user.organization_id
+        )
+    )
+    if not hunt:
+        raise HTTPException(404, "Hunt not found")
+    conditions = [
+        SecurityEvent.organization_id == user.organization_id,
+        SecurityEvent.occurred_at >= hunt.time_from,
+        SecurityEvent.occurred_at <= hunt.time_until,
+    ]
+    field_map = {
+        "event_type": SecurityEvent.event_type,
+        "severity": SecurityEvent.severity,
+        "source": SecurityEvent.source,
+        "asset_id": SecurityEvent.asset_id,
+        "actor_ref": SecurityEvent.actor_ref,
+    }
+    for field_name, value in hunt.query.items():
+        column = field_map.get(field_name)
+        if column is not None:
+            conditions.append(column == value)
+    matches = list(
+        (
+            await db.scalars(
+                select(SecurityEvent)
+                .where(*conditions)
+                .order_by(SecurityEvent.occurred_at.desc())
+                .limit(200)
+            )
+        ).all()
+    )
+    hunt.result_count = len(matches)
+    hunt.findings = [
+        {
+            "event_id": event.id,
+            "summary": event.summary,
+            "occurred_at": event.occurred_at.isoformat(),
+        }
+        for event in matches
+    ]
+    hunt.status = "completed"
+    await write_audit(
+        db, user, "hunt.executed", "threat_hunt", hunt.id, metadata={"matches": len(matches)}
+    )
+    await db.commit()
+    await db.refresh(hunt)
     return serialize(hunt)
 
 

@@ -2,6 +2,7 @@
 
 import { Badge, Button, Card, ConfirmationDialog, EmptyState, ErrorState, LoadingState, SeverityBadge, Tabs, TabPanel } from "@cyberaudit/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 import { useState } from "react";
 import { Shell } from "@/components/shell";
 import { api } from "@/lib/api";
@@ -141,9 +142,14 @@ export function IncidentWorkspace({ id }: { id: string }) {
             {cases.data?.items.length === 0 && <EmptyState title="Sem casos associados a este incidente." />}
             <ul className="space-y-2">
               {cases.data?.items.map((row) => (
-                <li key={row.id} className="flex items-center justify-between rounded-lg border border-border p-3 text-sm">
-                  <span>{row.reference} · {row.title}</span>
-                  <Badge tone="neutral">{row.status}</Badge>
+                <li key={row.id}>
+                  <Link
+                    href={`/cases/${row.id}`}
+                    className="flex items-center justify-between rounded-lg border border-border p-3 text-sm hover:border-primary/40"
+                  >
+                    <span>{row.reference} · {row.title}</span>
+                    <Badge tone="neutral">{row.status}</Badge>
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -154,9 +160,14 @@ export function IncidentWorkspace({ id }: { id: string }) {
             {alerts.data?.items.length === 0 && <EmptyState title="Sem deteções associadas a este incidente." />}
             <ul className="space-y-2">
               {alerts.data?.items.map((row) => (
-                <li key={row.id} className="flex items-center justify-between rounded-lg border border-border p-3 text-sm">
-                  <span>{row.title}</span>
-                  <SeverityBadge state={row.severity} />
+                <li key={row.id}>
+                  <Link
+                    href={`/detections/${row.id}`}
+                    className="flex items-center justify-between rounded-lg border border-border p-3 text-sm hover:border-primary/40"
+                  >
+                    <span>{row.title}</span>
+                    <SeverityBadge state={row.severity} />
+                  </Link>
                 </li>
               ))}
             </ul>

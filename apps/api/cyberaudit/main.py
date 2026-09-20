@@ -844,6 +844,22 @@ async def create_user(
     return item
 
 
+@app.get("/api/v1/authorizations", tags=["authorizations"])
+async def list_authorizations(
+    engagement_id: str | None = Query(default=None, max_length=36),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    user: User = Depends(require_permission("authorizations.read")),
+    db: AsyncSession = Depends(get_db),
+):
+    where: list[Any] = [AuthorizationDocument.organization_id == user.organization_id]
+    if engagement_id:
+        where.append(AuthorizationDocument.engagement_id == engagement_id)
+    return await paginated(
+        db, AuthorizationDocument, where, page, page_size, AuthorizationDocument.created_at.desc()
+    )
+
+
 @app.post("/api/v1/authorizations", status_code=201, tags=["authorizations"])
 async def upload_authorization(
     engagement_id: str = Form(),
