@@ -17,7 +17,7 @@ dependencies = [
   "dnspython>=2.7,<3",
   "fastapi>=0.115,<1",
   "httpx>=0.28,<1",
-  "cryptography>=49.0,<50",
+  "cryptography>=50.0,<51",
   "passlib[argon2]>=1.7,<2",
   "pydantic-settings>=2.7,<3",
   "pyjwt>=2.10,<3",
@@ -53,9 +53,15 @@ addopts = "--cov=cyberaudit --cov-report=term-missing"
 [tool.coverage.run]
 # Demo-data CLI loaders are verified by migration/seed smoke tests. The unit
 # coverage gate measures the API, policy, storage and worker runtime.
+#
+# readiness_dlq_validation.py is a CLI entrypoint that drives real Redis
+# queues and a live Dramatiq worker end-to-end (see `make test-network-safety`
+# / README "Laboratorio controlado"); it has no meaningful unit-test double
+# and is verified by that infrastructure job instead of pytest coverage.
 omit = [
   "*/cyberaudit/seed.py",
   "*/cyberaudit/seed_*.py",
+  "*/cyberaudit/readiness_dlq_validation.py",
 ]
 
 [tool.ruff]
