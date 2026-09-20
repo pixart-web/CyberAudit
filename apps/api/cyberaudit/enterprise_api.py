@@ -423,11 +423,17 @@ async def create_detection_rule(
 @router.get("/detections/alerts")
 async def list_alerts(
     status: str | None = Query(default=None, max_length=30),
+    incident_id: str | None = Query(default=None, max_length=36),
     pagination_values: tuple[int, int] = Depends(pagination),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permission("detections.read")),
 ):
-    extra = (DetectionAlert.status == status,) if status else ()
+    extra_conditions = []
+    if status:
+        extra_conditions.append(DetectionAlert.status == status)
+    if incident_id:
+        extra_conditions.append(DetectionAlert.incident_id == incident_id)
+    extra = tuple(extra_conditions)
     return await page(
         db,
         DetectionAlert,
@@ -588,16 +594,19 @@ async def transition_incident(
 
 @router.get("/cases")
 async def list_cases(
+    incident_id: str | None = Query(default=None, max_length=36),
     pagination_values: tuple[int, int] = Depends(pagination),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permission("cases.read")),
 ):
+    extra = (CaseRecord.incident_id == incident_id,) if incident_id else ()
     return await page(
         db,
         CaseRecord,
         user.organization_id,
         page_number=pagination_values[0],
         page_size=pagination_values[1],
+        extra=extra,
     )
 
 
@@ -861,6 +870,23 @@ async def list_controls(
     )
 
 
+@router.get("/grc/controls/{control_id}")
+async def get_control(
+    control_id: str,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permission("controls.read")),
+):
+    control = await db.scalar(
+        select(UnifiedControl).where(
+            UnifiedControl.id == control_id,
+            UnifiedControl.organization_id == user.organization_id,
+        )
+    )
+    if not control:
+        raise HTTPException(404, "Control not found")
+    return serialize(control)
+
+
 @router.post("/grc/controls", status_code=201)
 async def create_control(
     payload: ControlPayload,
@@ -877,16 +903,19 @@ async def create_control(
 
 @router.get("/grc/control-mappings")
 async def list_control_mappings(
+    control_id: str | None = Query(default=None, max_length=36),
     pagination_values: tuple[int, int] = Depends(pagination),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permission("controls.read")),
 ):
+    extra = (FrameworkControlMapping.control_id == control_id,) if control_id else ()
     return await page(
         db,
         FrameworkControlMapping,
         user.organization_id,
         page_number=pagination_values[0],
         page_size=pagination_values[1],
+        extra=extra,
     )
 
 
@@ -920,16 +949,19 @@ async def create_control_mapping(
 
 @router.get("/grc/control-assessments")
 async def list_control_assessments(
+    control_id: str | None = Query(default=None, max_length=36),
     pagination_values: tuple[int, int] = Depends(pagination),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permission("controls.read")),
 ):
+    extra = (ControlAssessment.control_id == control_id,) if control_id else ()
     return await page(
         db,
         ControlAssessment,
         user.organization_id,
         page_number=pagination_values[0],
         page_size=pagination_values[1],
+        extra=extra,
     )
 
 
@@ -1091,16 +1123,24 @@ async def create_policy(
 
 @router.get("/grc/evidence-links")
 async def list_grc_evidence(
+    subject_type: str | None = Query(default=None, max_length=60),
+    subject_id: str | None = Query(default=None, max_length=36),
     pagination_values: tuple[int, int] = Depends(pagination),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permission("grc_evidence.read")),
 ):
+    extra_conditions = []
+    if subject_type:
+        extra_conditions.append(GrcEvidenceLink.subject_type == subject_type)
+    if subject_id:
+        extra_conditions.append(GrcEvidenceLink.subject_id == subject_id)
     return await page(
         db,
         GrcEvidenceLink,
         user.organization_id,
         page_number=pagination_values[0],
         page_size=pagination_values[1],
+        extra=tuple(extra_conditions),
     )
 
 

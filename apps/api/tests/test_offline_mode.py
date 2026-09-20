@@ -200,6 +200,31 @@ async def test_model_registry_works_offline(db, no_network):
     assert manifest.id in {item.id for item in listed}
 
 
+@pytest.mark.asyncio
+async def test_diagnostic_bundle_generation_works_offline(db, no_network):
+    """Phase 10.4.1 section 49: the diagnostic bundle is pure local
+
+    introspection (hardware detection, DB counts, redaction) -- it must
+    never depend on reaching anything outside the host.
+    """
+    from cyberaudit.diagnostics import build_diagnostic_bundle
+
+    organization = Organization(name="Offline Diagnostics Tenant", slug="offline-diag-tenant")
+    db.add(organization)
+    await db.flush()
+    user = User(
+        organization_id=organization.id,
+        name="Offline Diagnostics Admin",
+        email="offline-diag-admin@example.invalid",
+        password_hash="",  # noqa: S106 - authentication is not exercised here
+    )
+    db.add(user)
+    await db.flush()
+
+    bundle = await build_diagnostic_bundle(db, Settings(), user)
+    assert bundle.organization_id == organization.id
+
+
 def test_offline_update_bundle_validation_needs_no_network(no_network):
     """Section 52: signature/checksum verification is pure local cryptography
 
