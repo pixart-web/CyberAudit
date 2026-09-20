@@ -1,5 +1,16 @@
 # Decisões de arquitetura
 
+## ADR-027 — CyberAgentRuntime and AgentToolGateway
+
+Accepted. Ten specialized agents are one shared runtime parameterized by
+configuration (mission, knowledge scope, allowed tools), not ten duplicated
+chatbot classes. Agents never call a tool directly: every tool call passes
+through `AgentToolGateway`, which enforces the agent's own tool allowlist,
+RBAC permission, tenant-scoped data access and input validation, and writes
+an audit event. No tool executes a shell command, SQL, or reaches
+Docker/Kubernetes; each one only reads already-persisted, tenant-scoped
+rows. See `adr-027-cyber-agent-runtime.md`.
+
 ## ADR-026 — Sovereign local AI runtime
 
 Accepted. No core CyberAudit capability may require a commercial AI API; the
@@ -74,3 +85,4 @@ deterministic scores and prevent all external writes. See
 32. **Licença não apaga acesso.** Expiração bloqueia capacidades licenciadas e preserva leitura/extração de dados do cliente.
 33. **Telemetria é opt-in.** Só campos agregados allowlisted podem sair; evidência, identidade, segredos e conteúdo ficam excluídos.
 34. **IA local é opt-in e nunca decide.** Sem modelo instalado o CyberAudit responde de forma determinística; com modelo, este só reformula factos já calculados, nunca substitui o motor de segurança, o RBAC ou o Policy Engine.
+35. **Agentes não têm acesso direto.** Todo o tool call de um agente passa pelo `AgentToolGateway`; nunca há acesso direto a base de dados, socket Docker ou shell a partir de um agente.

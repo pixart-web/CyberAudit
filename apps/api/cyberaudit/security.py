@@ -108,10 +108,13 @@ async def current_user(
     return user
 
 
+def user_has_permission(user: User, code: str) -> bool:
+    return any(code == permission.code for role in user.roles for permission in role.permissions)
+
+
 def require_permission(code: str):
     async def dependency(user: User = Depends(current_user)) -> User:
-        granted = {permission.code for role in user.roles for permission in role.permissions}
-        if code not in granted:
+        if not user_has_permission(user, code):
             raise HTTPException(status_code=403, detail=f"Missing permission: {code}")
         return user
 
