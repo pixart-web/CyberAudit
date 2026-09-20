@@ -32,6 +32,7 @@ from cyberaudit.enterprise_services import (
     DeterministicGroundedProvider,
     GroundedAnswer,
 )
+from cyberaudit.local_retrieval import DisabledEmbeddingBackend, LocalRetrievalService
 from cyberaudit.models import Finding, Scope, User
 from cyberaudit.redaction import redact_text
 from cyberaudit.security import user_has_permission
@@ -294,9 +295,16 @@ AGENT_CATALOG: dict[str, AgentDefinition] = {
 class CyberAgentRuntime:
     """Shared runtime: builds a grounded answer scoped to one agent's mission."""
 
-    def __init__(self, db: AsyncSession, provider: AiProvider | None = None):
+    def __init__(
+        self,
+        db: AsyncSession,
+        provider: AiProvider | None = None,
+        retrieval: LocalRetrievalService | None = None,
+    ):
         self.db = db
         self.provider = provider or DeterministicGroundedProvider()
+        # Offline-safe default: lexical-only ranking, no local model required.
+        self.retrieval = retrieval or LocalRetrievalService(DisabledEmbeddingBackend())
 
     async def ask(
         self,
@@ -316,7 +324,8 @@ class CyberAgentRuntime:
             statement = statement.where(KnowledgeNode.node_type.in_(agent.knowledge_scopes))
         if source_ids:
             statement = statement.where(KnowledgeNode.source_id.in_(source_ids[:100]))
-        sources = list((await self.db.scalars(statement.limit(100))).all())
+        candidate_pool = list((await self.db.scalars(statement.limit(200))).all())
+        sources = await self._most_relevant(question, candidate_pool)
         framed_question = AiQuestion(
             service=agent.service_literal,  # type: ignore[arg-type]
             question=f"[{agent.name}] {question}"[:4000],
@@ -342,3 +351,23 @@ class CyberAgentRuntime:
             reproducibility_key=answer.reproducibility_key,
             required_human_approval=answer.confidence < 0.5 or agent.code == "remediation_advisor",
         )
+
+    async def _most_relevant(
+        self, question: str, candidate_pool: list[KnowledgeNode], *, top_k: int = 20
+    ) -> list[KnowledgeNode]:
+        """Retrieval step (Phase 10.3.3): narrows a large candidate pool.
+
+        ``top_k`` matches the deterministic provider's own citation cap
+        (``DeterministicGroundedProvider`` re-sorts and keeps the first 20):
+        narrowing to any larger number would let that provider's alphabetical
+        re-sort silently override this ranking. Below ``top_k`` there is
+        nothing to narrow. Above it, ranking by relevance to the question --
+        instead of arbitrary database order -- is what actually determines
+        which facts the answer is grounded in.
+        """
+        if len(candidate_pool) <= top_k:
+            return candidate_pool
+        by_id = {node.id: node for node in candidate_pool}
+        candidates = [(node.id, f"{node.label} {node.facts}") for node in candidate_pool]
+        ranked = await self.retrieval.rank(question, candidates, top_k=top_k)
+        return [by_id[item.source_id] for item in ranked]

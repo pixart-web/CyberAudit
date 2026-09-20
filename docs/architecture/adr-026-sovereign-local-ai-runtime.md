@@ -59,6 +59,18 @@ InferenceBackend (Disabled | Ollama)
   `DisabledInferenceBackend` é o padrão sem rede; `OllamaInferenceBackend` é
   um cliente HTTP real para um servidor Ollama local (aceita `transport`
   injetável para testes, tal como `VaultSecretProvider`).
+- **Local embeddings e retrieval** (`cyberaudit/local_retrieval.py`,
+  10.3.3): `EmbeddingBackend` segue o mesmo padrão (`DisabledEmbeddingBackend`
+  por omissão; `OllamaEmbeddingBackend` real via `/api/embeddings`).
+  `LocalRetrievalService.rank()` usa o embedding local quando saudável e
+  configurado (`AI_RUNTIME_EMBEDDING_MODEL`); caso contrário cai para um
+  score lexical determinístico (Jaccard sobre palavras), nunca ficando
+  indisponível. `CyberAgentRuntime` usa este serviço para reduzir um lote
+  de candidatos do Knowledge Graph às 20 fontes mais relevantes para a
+  pergunta — o mesmo limite que `DeterministicGroundedProvider` já aplicava
+  arbitrariamente por ordem alfabética de `source_id`. O ranking nunca lê a
+  base de dados por si próprio: recebe sempre um conjunto já filtrado por
+  `organization_id` pelo chamador, preservando a fronteira de tenant.
 
 ### O modelo nunca inventa factos
 

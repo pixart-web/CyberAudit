@@ -91,6 +91,7 @@ class Settings(BaseSettings):
     ai_runtime_backend: Literal["disabled", "ollama"] = "disabled"
     ai_runtime_base_url: str = "http://127.0.0.1:11434"
     ai_runtime_timeout_seconds: float = Field(default=30.0, ge=1, le=300)
+    ai_runtime_embedding_model: str | None = None
 
     @property
     def production_like(self) -> bool:
