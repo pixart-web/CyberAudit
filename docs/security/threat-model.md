@@ -157,3 +157,47 @@ considerados eficazes após testes nos ambientes de destino.
   substituto; a assinatura keyless exige identidade OIDC do workflow protegido.
 - **Publicação prematura:** o alvo local avalia primeiro o gate e não cria tags;
   controlos externos continuam a exigir revisão humana independente.
+
+# Security OS Experience & Local Distribution (Phase 10.4)
+
+New attack surfaces introduced in this phase, per section 66.
+
+- **GlobalSearch as an authorization bypass:** it queries findings/incidents/
+  engagements through their own existing, already-authorized endpoints
+  (`?q=`), never a new aggregate search index. A tenant/permission a caller
+  lacks simply fails that one request; there is no separate search-index
+  service that could drift out of sync with RBAC/RLS.
+- **CommandPalette as a command-injection surface:** it is a static list of
+  fixed `href`s built from the existing sidebar route table; there is no
+  free-text-to-action mapping, no eval, and no way to name a route that
+  is not already in that table. It cannot become a shell.
+- **Engagement Workspace "Summarize Assessment" as an AI bypass:** the
+  button calls the existing `POST /engagements/{id}/reports` with
+  `include_ai_summary=true` — the same `CyberAgentRuntime`/
+  `AgentToolGateway` path Phase 10.3 already threat-modeled (ADR-027).
+  No new AI invocation path was added; the frontend cannot construct a
+  request that skips tenant/permission checks, because those checks live
+  in the backend route, not in the browser.
+- **Model Management UI as a code-execution vector:** every action
+  (register, activate, deactivate) is a metadata write through the
+  existing `ai_runtime_api` endpoints. There is no "run" or "load" action
+  in the UI, and the backend never executes a model artifact's bundled
+  code (ADR-026's existing invariant, unchanged by this phase).
+- **Update Manager UI as a blind-trust vector:** it only ever calls
+  `POST /updates/validate`; there is no upload path that stages, extracts
+  or applies a bundle. A malicious or malformed bundle can only ever
+  produce a rejection with a reason string — it cannot reach the
+  filesystem or the database.
+- **Local Docker Compose exposure:** the base `docker-compose.yml` binds
+  API/web to `127.0.0.1` only (Phase 10.3.8); `docker-compose.remote.yml`
+  is an explicit, separately-invoked opt-in, never the default.
+
+## Deferred, not fabricated
+
+A privacy-safe diagnostic bundle generator (section 49) was **not**
+implemented in this phase — building it correctly requires wiring the
+existing redaction pipeline (`cyberaudit/redaction.py`) into a new export
+path with an explicit allowlist of what may leave the environment, which
+is real, non-trivial work. Attempting a shortcut version risked exactly
+the "no fake implementations" failure mode this phase's brief warns
+against, so it is recorded here as deferred rather than half-built.

@@ -1,5 +1,32 @@
 # Decisões de arquitetura
 
+## ADR-032 — Native distribution strategy honesty (Phase 10.4)
+
+Accepted. Docker Compose remains the only tested deployment mode. No
+native Windows/macOS/Linux installer was built in Phase 10.4 either —
+building and signing a real per-OS installer is a substantial,
+platform-specific undertaking (service registration, code signing,
+upgrade/uninstall flows, notarization credentials this session does not
+hold) that would only produce something that *looks* like an installer if
+attempted without the real infrastructure. `docs/architecture/
+phase-10.4-security-os-ux.md` records the concrete architecture for each
+platform and marks each one's actual readiness (BLOCKED for all three
+native paths) rather than claiming otherwise.
+
+## ADR-031 — Security OS information architecture and Workspace pattern
+
+Accepted. `CyberShell` (sidebar + header) is extended, not replaced:
+`GlobalSearch` and `CommandPalette` route every query and every navigation
+target through the same authorized, tenant-scoped endpoints and fixed
+hrefs the rest of the app already uses -- neither introduces a new
+authorization path. A `Workspace` is a page that fetches one root object
+by ID plus its related collections as independent, lazily-enabled
+queries, and presents them through the design system's `Tabs`. Only one
+Workspace (Engagement) was fully built in this phase; it is the template
+for Incident/Asset workspaces the brief describes, which remain deferred
+-- see `phase-10.4-security-os-ux.md` for the explicit list of what
+changed vs. what is still the pre-10.4 `ResourcePage` pattern.
+
 ## ADR-030 — Local-first deployment and installer honesty
 
 Accepted. Docker Compose is the one deployment mode that actually exists,
@@ -126,3 +153,6 @@ deterministic scores and prevent all external writes. See
 36. **Relatórios distinguem origem.** Cada `ReportSection` marca `content_type` (evidence/finding/analyst_conclusion/ai_generated); conteúdo gerado por IA nunca se torna evidência ou finding silenciosamente.
 37. **Upload nunca é confiança.** Um bundle de atualização só é aceite com assinatura Ed25519 válida contra uma chave configurada pelo administrador, checksums corretos e versão compatível — nunca por ter sido carregado manualmente.
 38. **Loopback por omissão.** A API e o web só ficam acessíveis em `127.0.0.1`; exposição na LAN exige um override explícito (`docker-compose.remote.yml`), nunca o padrão.
+39. **Workspace nunca contorna o AgentToolGateway.** Ações contextuais de Cyber AI (ex.: "Summarize Assessment") chamam sempre endpoints existentes que passam pelo CyberAgentRuntime; nenhum atalho de frontend gera conteúdo de IA diretamente.
+40. **Gestão de modelos nunca executa código.** A UI de Model Management só altera `install_status`/`trust_status` através da API já existente; nunca corre um artefacto descarregado.
+41. **Instalador nunca é reclamado sem prova.** Docker Compose é o único modo de distribuição testado; instaladores nativos Windows/macOS/Linux permanecem arquitetura documentada, não construída.
