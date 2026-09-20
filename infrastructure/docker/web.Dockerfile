@@ -1,4 +1,4 @@
-FROM node:22.17.1-alpine3.22 AS deps
+FROM node:22.20.0-alpine3.22 AS deps
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN corepack enable
 WORKDIR /app
@@ -12,7 +12,7 @@ ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 COPY . .
 RUN pnpm --filter @cyberaudit/web build
-FROM node:22.17.1-alpine3.22
+FROM node:22.20.0-alpine3.22
 WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1
 COPY --from=build /app/apps/web/.next/standalone ./

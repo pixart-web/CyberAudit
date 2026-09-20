@@ -1,4 +1,4 @@
-FROM python:3.12.13-slim-bookworm
+FROM python:3.12.14-slim-bookworm
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_DISABLE_PIP_VERSION_CHECK=1
 WORKDIR /app
 COPY apps/api/pyproject.toml apps/api/README.md /app/apps/api/

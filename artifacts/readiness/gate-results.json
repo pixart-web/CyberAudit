@@ -11,7 +11,6 @@
     "signing",
     "provenance",
     "vulnerabilities",
-    "coverage",
     "release_validation",
     "upgrade",
     "rollback",
@@ -20,7 +19,7 @@
   "checks": {
     "backup": "blocked",
     "configuration": "passed",
-    "coverage": "failed",
+    "coverage": "passed",
     "cross_tenant_tests": "passed",
     "dlq": "passed",
     "docker_runner": "passed",
@@ -46,7 +45,7 @@
   },
   "database_evidence_required_for_api_gate": true,
   "environment": "staging",
-  "manifest_checksum": "e9e77ad649599ed37fb0531d73c237d58bb6dfdb109c953a5185490d330ab9e6",
+  "manifest_checksum": "5e172d450c25ff7a30359044501522c115a815c9e7c7656cb0bc18a087efe0d0",
   "manifest_errors": [],
   "state": "blocked"
 }
