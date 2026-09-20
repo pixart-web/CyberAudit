@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from cyberaudit.config import get_settings
 from cyberaudit.db import get_db
 from cyberaudit.models import RefreshToken, User
+from cyberaudit.rls import set_tenant_context
 
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 bearer = HTTPBearer(auto_error=False)
@@ -23,7 +24,10 @@ def hash_password(password: str) -> str:
 
 
 def verify_password(password: str, password_hash: str) -> bool:
-    return pwd_context.verify(password, password_hash)
+    try:
+        return pwd_context.verify(password, password_hash)
+    except (TypeError, ValueError):
+        return False
 
 
 def create_access_token(user: User) -> str:
@@ -35,6 +39,23 @@ def create_access_token(user: User) -> str:
         "type": "access",
         "iat": now,
         "exp": now + timedelta(minutes=settings.access_token_minutes),
+        "jti": secrets.token_hex(16),
+    }
+    return jwt.encode(payload, settings.jwt_secret, algorithm="HS256")
+
+
+def create_step_up_token(user: User, method: str, ttl_minutes: int = 5) -> str:
+    if method not in {"webauthn", "phishing_resistant_oidc"}:
+        raise ValueError("Step-up method is not phishing resistant")
+    settings = get_settings()
+    now = datetime.now(timezone.utc)
+    payload = {
+        "sub": user.id,
+        "org": user.organization_id,
+        "type": "step_up",
+        "amr": [method],
+        "iat": now,
+        "exp": now + timedelta(minutes=ttl_minutes),
         "jti": secrets.token_hex(16),
     }
     return jwt.encode(payload, settings.jwt_secret, algorithm="HS256")
@@ -72,6 +93,13 @@ async def current_user(
     if not credentials:
         raise HTTPException(status_code=401, detail="Authentication required")
     payload = decode_token(credentials.credentials)
+    token_organization = payload.get("org")
+    if not isinstance(token_organization, str):
+        raise HTTPException(status_code=401, detail="Tenant claim is missing")
+    try:
+        await set_tenant_context(db, token_organization)
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail="Tenant claim is invalid") from exc
     user = await db.get(User, payload["sub"])
     if not user or user.status != "active" or user.deleted_at:
         raise HTTPException(status_code=401, detail="Inactive user")

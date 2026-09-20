@@ -232,6 +232,40 @@ class Asset(Base, TimestampMixin, SoftDeleteMixin):
     status: Mapped[str] = mapped_column(String(30), default="active")
     first_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Added as indexed identifiers rather than ORM relationships so legacy
+    # Phase 1 migrations can still build the assets table before Phase 4
+    # creates environments and zones.  Revision 0004 adds the DB constraints.
+    environment_id: Mapped[str | None] = mapped_column(String(36), index=True, nullable=True)
+    network_zone_id: Mapped[str | None] = mapped_column(String(36), index=True, nullable=True)
+    parent_asset_id: Mapped[str | None] = mapped_column(
+        ForeignKey("assets.id"), index=True, nullable=True
+    )
+    subtype: Mapped[str | None] = mapped_column(String(80))
+    fqdn: Mapped[str | None] = mapped_column(String(255), index=True)
+    primary_ip: Mapped[str | None] = mapped_column(String(45), index=True)
+    mac_address: Mapped[str | None] = mapped_column(String(32))
+    manufacturer: Mapped[str | None] = mapped_column(String(160))
+    model: Mapped[str | None] = mapped_column(String(160))
+    serial_number: Mapped[str | None] = mapped_column(String(160))
+    operating_system_version: Mapped[str | None] = mapped_column(String(120))
+    kernel_version: Mapped[str | None] = mapped_column(String(120))
+    architecture: Mapped[str | None] = mapped_column(String(80))
+    ownership: Mapped[str] = mapped_column(String(40), default="unknown")
+    lifecycle_status: Mapped[str] = mapped_column(String(40), default="active")
+    internet_exposed: Mapped[bool] = mapped_column(Boolean, default=False)
+    externally_managed: Mapped[bool] = mapped_column(Boolean, default=False)
+    managed: Mapped[bool] = mapped_column(Boolean, default=True)
+    agent_installed: Mapped[bool] = mapped_column(Boolean, default=False)
+    business_criticality: Mapped[str] = mapped_column(String(30), default="medium")
+    data_classification: Mapped[str] = mapped_column(String(40), default="internal")
+    risk_score: Mapped[float] = mapped_column(default=0.0)
+    exposure_score: Mapped[float] = mapped_column(default=0.0)
+    confidence: Mapped[float] = mapped_column(default=0.5)
+    source: Mapped[str] = mapped_column(String(120), default="manual")
+    last_assessed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    retired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    tags: Mapped[list[str]] = mapped_column(JSON, default=list)
+    custom_fields: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
 
 
 class AuditLog(Base):
@@ -447,6 +481,15 @@ class Finding(Base, TimestampMixin):
     organization_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
     engagement_id: Mapped[str] = mapped_column(ForeignKey("engagements.id"), index=True)
     asset_id: Mapped[str | None] = mapped_column(ForeignKey("assets.id"))
+    # Phase-specific foreign keys are installed by their migrations. Keeping the
+    # metadata columns independent lets a fresh database apply older migrations
+    # before the Phase 5 target tables exist.
+    application_id: Mapped[str | None] = mapped_column(String(36), index=True)
+    api_id: Mapped[str | None] = mapped_column(String(36), index=True)
+    endpoint_id: Mapped[str | None] = mapped_column(String(36))
+    repository_id: Mapped[str | None] = mapped_column(String(36))
+    release_id: Mapped[str | None] = mapped_column(String(36))
+    component_id: Mapped[str | None] = mapped_column(String(36))
     job_id: Mapped[str] = mapped_column(ForeignKey("scan_jobs.id"), index=True)
     title: Mapped[str] = mapped_column(String(240))
     description: Mapped[str] = mapped_column(Text)

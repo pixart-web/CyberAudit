@@ -1,0 +1,37 @@
+{
+  "status": "partial",
+  "executed_at": "2026-08-03T22:09:40Z",
+  "synthetic_data_only": true,
+  "scope": [
+    "health",
+    "readiness",
+    "login_page"
+  ],
+  "pending_authenticated_scenarios": [
+    "login ceremony",
+    "dashboard",
+    "assets",
+    "identities",
+    "events",
+    "graph",
+    "reports",
+    "connector jobs"
+  ],
+  "hardware": {
+    "operating_system": "Darwin",
+    "architecture": "arm64",
+    "cpu_count": 10,
+    "memory_bytes": 34359738368
+  },
+  "metrics": {
+    "requests": 2679,
+    "throughput_per_second": 132.68277666037565,
+    "error_rate": 0,
+    "check_rate": 1,
+    "duration_ms": {
+      "p50": 7.567055,
+      "p95": 41.139294899999996,
+      "p99": 48.6431944
+    }
+  }
+}

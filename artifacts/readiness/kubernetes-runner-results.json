@@ -1,0 +1,26 @@
+{
+  "status": "passed",
+  "simulated": false,
+  "image": "python@sha256:a190708a2dec1bd18b1decb539f8e8f5407abaa9bf39cacda583f7f8c11db322",
+  "execution": {
+    "status": "passed",
+    "sha256": "0e96029508433be2b5e70851cdb391151ddad7fcd21964f1ba117919c0c28d37"
+  },
+  "validation": {
+    "pods": 1,
+    "host_network": false,
+    "host_pid": false,
+    "service_account_token": false,
+    "run_as_non_root": true,
+    "seccomp": "RuntimeDefault",
+    "read_only": true,
+    "privilege_escalation": false,
+    "capabilities_dropped": [
+      "ALL"
+    ],
+    "network_policy": "default-deny",
+    "pod_security": "restricted",
+    "active_deadline_seconds": 60,
+    "ttl_cleanup_seconds": 120
+  }
+}

@@ -133,14 +133,46 @@ class HealthCheckResult(BaseModel):
 
 class ExecutionSandboxConfig(BaseModel):
     read_only_filesystem: bool = True
+    container_image: str | None = None
+    container_image_digest: str | None = None
+    read_only_root_filesystem: bool = True
+    drop_all_capabilities: bool = True
+    allowed_capabilities: list[str] = Field(default_factory=list)
+    no_new_privileges: bool = True
+    seccomp_profile: str = "runtime/default"
+    apparmor_profile: str | None = None
+    user_namespace: bool = True
+    run_as_user: int = Field(default=65532, ge=1000)
+    run_as_group: int = Field(default=65532, ge=1000)
     temporary_directory: str = "isolated://ephemeral"
+    tmpfs_size_mb: int = Field(default=64, ge=16, le=512)
     cpu_limit: float = Field(default=1.0, gt=0, le=4)
+    cpu_quota: int = Field(default=100000, ge=1000, le=400000)
+    cpu_shares: int = Field(default=256, ge=2, le=1024)
     memory_limit_mb: int = Field(default=256, ge=64, le=2048)
+    swap_limit_mb: int = Field(default=0, ge=0, le=2048)
     process_limit: int = Field(default=1, ge=1, le=32)
+    maximum_open_files: int = Field(default=256, ge=32, le=4096)
     network_mode: Literal["none", "restricted"] = "none"
+    network_namespace: bool = True
     allowed_destinations: list[str] = Field(default_factory=list)
+    allowed_protocols: list[Literal["tcp", "udp", "icmp"]] = Field(default_factory=list)
+    allowed_ports: list[int] = Field(default_factory=list)
+    dns_policy: Literal["none", "pinned", "internal-only"] = "none"
     timeout: int = Field(default=60, ge=1, le=3600)
     environment_allowlist: list[str] = Field(default_factory=list)
+    mounted_inputs: list[str] = Field(default_factory=list)
+    mounted_outputs: list[str] = Field(default_factory=list)
+    execution_timeout: int = Field(default=60, ge=1, le=3600)
+    termination_grace_period: int = Field(default=5, ge=1, le=30)
+
+    @property
+    def maximum_processes(self) -> int:
+        return self.process_limit
+
+    @property
+    def memory_limit(self) -> int:
+        return self.memory_limit_mb
 
 
 class ToolAdapter(ABC):
@@ -355,9 +387,18 @@ class AdapterRegistry:
     def __init__(self, adapters: list[ToolAdapter] | None = None) -> None:
         self._adapters: dict[str, ToolAdapter] = {}
         if adapters is None:
+            from cyberaudit.domain_expansion_adapters import DOMAIN_EXPANSION_ADAPTERS
             from cyberaudit.phase3_adapters import REAL_ADAPTERS
+            from cyberaudit.phase4_adapters import PHASE4_ADAPTERS
+            from cyberaudit.phase5_adapters import PHASE5_ADAPTERS
 
-            adapters = [DemoAssessmentAdapter(), *REAL_ADAPTERS]
+            adapters = [
+                DemoAssessmentAdapter(),
+                *REAL_ADAPTERS,
+                *PHASE4_ADAPTERS,
+                *PHASE5_ADAPTERS,
+                *DOMAIN_EXPANSION_ADAPTERS,
+            ]
         for adapter in adapters:
             self.register(adapter)
 

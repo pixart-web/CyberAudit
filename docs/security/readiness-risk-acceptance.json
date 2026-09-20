@@ -1,0 +1,5 @@
+{
+  "schema_version": "1.0",
+  "accepted_finding_ids": [],
+  "policy": "HIGH and CRITICAL findings block a release unless explicitly reviewed, time-bounded and versioned here."
+}

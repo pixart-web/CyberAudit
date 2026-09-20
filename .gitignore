@@ -16,4 +16,20 @@ coverage/
 uploads/
 dist/
 *.log
+dump.rdb
+*.tsbuildinfo
 .DS_Store
+.local/
+
+# Phase 10.2 readiness runtime material. Manifests and sanitized reports are
+# selectively re-included below; private keys, tokens and service data never are.
+artifacts/readiness/runtime/
+artifacts/readiness/tls/private/
+infrastructure/readiness/runtime/
+infrastructure/readiness/tls/private/
+artifacts/readiness/backups/
+artifacts/release/sbom/*.json
+artifacts/release/scans/*.json
+artifacts/release/signatures/
+artifacts/readiness/load-tests/k6-summary.json
+artifacts/readiness/backend-coverage.json

@@ -56,8 +56,10 @@ from cyberaudit.observability import (
     structured_event,
 )
 from cyberaudit.orchestrator import approval_is_expired, transition_job, update_progress
+from cyberaudit.phase4_processing import process_phase4_observations
 from cyberaudit.policy import ScopePolicyEngine
 from cyberaudit.queue import broker as _configured_broker  # noqa: F401
+from cyberaudit.rls import set_tenant_context_from_resource
 from cyberaudit.schemas import PolicyRequest
 
 registry = AdapterRegistry()
@@ -71,6 +73,9 @@ def execute_scan_job(job_id: str) -> None:
 
 async def run_job(job_id: str) -> None:
     async with SessionLocal() as db:
+        if db.get_bind().dialect.name == "postgresql":
+            if not await set_tenant_context_from_resource(db, "scan_job", job_id):
+                return
         job = await db.get(ScanJob, job_id)
         if not job or job.status not in {JobStatus.QUEUED, JobStatus.CANCELLING}:
             return
@@ -403,11 +408,13 @@ async def run_job(job_id: str) -> None:
                     )
                 )
             created += 1
+        phase4_inventory = await process_phase4_observations(db, job, persisted_evidence)
         job.result_summary = {
             "simulated": parsed.summary.simulated,
             "findings_created": created,
             "findings_deduplicated": deduplicated,
             "evidence_created": len(persisted_evidence),
+            "inventory_updates": phase4_inventory,
             "warnings": [warning.model_dump() for warning in parsed.warnings],
             "network": (
                 {

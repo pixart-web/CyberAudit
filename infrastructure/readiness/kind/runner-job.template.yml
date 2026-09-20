@@ -1,0 +1,38 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: readiness-fixed-runner
+  namespace: cyberaudit-runners
+spec:
+  ttlSecondsAfterFinished: 120
+  activeDeadlineSeconds: 60
+  backoffLimit: 0
+  template:
+    metadata:
+      labels: {app: readiness-fixed-runner}
+    spec:
+      restartPolicy: Never
+      serviceAccountName: runner
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: validate
+          image: __RUNNER_IMAGE__
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-c", "import hashlib,json; print(json.dumps({'status':'passed','sha256':hashlib.sha256(b'cyberaudit-readiness').hexdigest()}))"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+          resources:
+            requests: {cpu: 10m, memory: 16Mi}
+            limits: {cpu: 250m, memory: 64Mi}
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: tmp
+          emptyDir: {medium: Memory, sizeLimit: 16Mi}

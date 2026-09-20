@@ -1,0 +1,251 @@
+name: cyberaudit-readiness
+
+x-app-security: &app-security
+  read_only: true
+  cap_drop: ["ALL"]
+  security_opt: ["no-new-privileges:true"]
+
+services:
+  postgres:
+    image: postgres:16.9-alpine3.22
+    env_file: runtime/readiness.env
+    environment:
+      POSTGRES_DB: cyberaudit
+      POSTGRES_USER: cyberaudit_migration
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres:/readiness:ro
+    ports: ["127.0.0.1:55442:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cyberaudit_migration -d cyberaudit"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [data]
+
+  redis:
+    image: redis:7.4.5-alpine
+    command: ["redis-server", "--port", "0", "--tls-port", "6379", "--tls-cert-file", "/run/tls/service.crt", "--tls-key-file", "/run/tls/private/service.key", "--tls-ca-cert-file", "/run/tls/ca.crt", "--tls-auth-clients", "no", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+      - ./runtime/tls:/run/tls:ro
+    ports: ["127.0.0.1:56389:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "--tls", "--cacert", "/run/tls/ca.crt", "-h", "redis", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [data]
+
+  vault-permissions:
+    image: busybox:1.37.0
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["if [ ! -e /vault/data/.permissions-ready ]; then touch /vault/data/.permissions-ready && chown -R 100:1000 /vault/data; fi"]
+    user: "0:0"
+    cap_drop: ["ALL"]
+    cap_add: ["CHOWN"]
+    security_opt: ["no-new-privileges:true"]
+    volumes: ["vault_data:/vault/data"]
+    networks: [data]
+
+  vault:
+    image: hashicorp/vault:1.20.1
+    command: ["vault", "server", "-config=/vault/config/config.hcl"]
+    cap_add: ["IPC_LOCK"]
+    volumes:
+      - vault_data:/vault/data
+      - ./vault:/vault/config:ro
+      - ./runtime/tls:/run/tls:ro
+    ports: ["127.0.0.1:18200:8200"]
+    healthcheck:
+      test: ["CMD", "vault", "status", "-address=https://127.0.0.1:8200", "-ca-cert=/run/tls/ca.crt"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    depends_on:
+      vault-permissions: {condition: service_completed_successfully}
+    networks: [data]
+
+  minio:
+    image: quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z
+    command: ["server", "/data", "--console-address", ":9001", "--certs-dir", "/root/.minio/certs"]
+    env_file: runtime/readiness.env
+    volumes:
+      - minio_data:/data
+      - ./runtime/minio-certs:/root/.minio/certs:ro
+    ports: ["127.0.0.1:19000:9000", "127.0.0.1:19001:9001"]
+    healthcheck:
+      test: ["CMD", "curl", "-fk", "https://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    networks: [data]
+
+  minio-client:
+    image: minio/mc:RELEASE.2025-04-16T18-13-26Z
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["sleep infinity"]
+    env_file: runtime/readiness.env
+    volumes:
+      - ./runtime/minio-certs/CAs:/root/.mc/certs/CAs:ro
+    depends_on:
+      minio: {condition: service_healthy}
+    networks: [data]
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.3.2
+    command: ["start", "--http-enabled=true", "--hostname=https://idp.localhost:18444", "--proxy-headers=xforwarded", "--import-realm"]
+    env_file: runtime/readiness.env
+    volumes:
+      - ./runtime/keycloak:/opt/keycloak/data/import:ro
+      - keycloak_data:/opt/keycloak/data
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000; printf 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3; grep -q '200 OK' <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    networks: [identity]
+
+  keycloak-proxy:
+    image: nginx:1.29.0-alpine
+    <<: *app-security
+    user: "101:101"
+    volumes:
+      - ./nginx/keycloak.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./runtime/tls:/run/tls:ro
+    tmpfs: ["/var/cache/nginx:uid=101,gid=101,mode=0700", "/var/run:uid=101,gid=101,mode=0700"]
+    ports: ["127.0.0.1:18444:8444"]
+    depends_on:
+      keycloak: {condition: service_healthy}
+    networks: [identity, edge]
+
+  migrate:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/api.Dockerfile
+    command: ["alembic", "upgrade", "head"]
+    env_file: runtime/readiness.env
+    environment:
+      ENVIRONMENT: development
+      DATABASE_URL: postgresql+asyncpg://cyberaudit_migration:${POSTGRES_PASSWORD}@postgres:5432/cyberaudit
+    depends_on:
+      postgres: {condition: service_healthy}
+    networks: [data]
+
+  api:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/api.Dockerfile
+    <<: *app-security
+    env_file: runtime/readiness.env
+    volumes:
+      - ./runtime/tls:/run/tls:ro
+      - ./runtime/vault:/run/secrets/vault:ro
+      - ../../artifacts/readiness:/app/artifacts/readiness:ro
+      - uploads:/data/uploads
+    tmpfs: ["/tmp"]
+    extra_hosts: ["idp.localhost:host-gateway"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+      vault: {condition: service_healthy}
+      minio: {condition: service_healthy}
+      keycloak-proxy: {condition: service_started}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/ready')"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    networks: [data, identity, edge]
+
+  worker:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/api.Dockerfile
+    command: ["dramatiq", "cyberaudit.worker", "cyberaudit.phase4_worker", "cyberaudit.enterprise_worker", "cyberaudit.domain_expansion_worker", "cyberaudit.readiness_dlq", "--processes", "1", "--threads", "2"]
+    <<: *app-security
+    env_file: runtime/readiness.env
+    environment:
+      DATABASE_USE_NULL_POOL: "true"
+    volumes:
+      - ./runtime/tls:/run/tls:ro
+      - ./runtime/vault:/run/secrets/vault:ro
+    tmpfs: ["/tmp"]
+    depends_on:
+      api: {condition: service_healthy}
+    networks: [data]
+
+  web:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/web.Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: https://cyberaudit.localhost:18443/api/v1
+    <<: *app-security
+    environment:
+      NEXT_PUBLIC_API_URL: https://cyberaudit.localhost:18443/api/v1
+    tmpfs: ["/tmp"]
+    depends_on:
+      api: {condition: service_healthy}
+    networks: [edge]
+
+  edge:
+    image: nginx:1.29.0-alpine
+    <<: *app-security
+    user: "101:101"
+    volumes:
+      - ./nginx/edge.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./runtime/tls:/run/tls:ro
+    tmpfs: ["/var/cache/nginx:uid=101,gid=101,mode=0700", "/var/run:uid=101,gid=101,mode=0700"]
+    ports: ["127.0.0.1:18443:8443"]
+    depends_on:
+      api: {condition: service_healthy}
+      web: {condition: service_started}
+    networks: [edge]
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    <<: *app-security
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.path=/prometheus"]
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports: ["127.0.0.1:19090:9090"]
+    networks: [edge]
+
+  grafana:
+    image: grafana/grafana:12.1.0
+    env_file: runtime/readiness.env
+    volumes: ["grafana_data:/var/lib/grafana"]
+    ports: ["127.0.0.1:13001:3000"]
+    networks: [edge]
+
+  otel:
+    image: otel/opentelemetry-collector-contrib:0.130.0
+    command: ["--config=/etc/otel/config.yml"]
+    volumes:
+      - ./otel/config.yml:/etc/otel/config.yml:ro
+    networks: [edge]
+
+  k6:
+    image: grafana/k6:2.1.0
+    profiles: [readiness-tools]
+    entrypoint: ["k6"]
+    networks: [edge]
+
+volumes:
+  postgres_data:
+  redis_data:
+  vault_data:
+  minio_data:
+  keycloak_data:
+  uploads:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  data: {internal: true}
+  identity: {internal: true}
+  edge: {}

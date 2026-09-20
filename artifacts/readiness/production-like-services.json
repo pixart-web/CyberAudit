@@ -1,0 +1,128 @@
+[
+  {
+    "name": "cyberaudit-readiness-api-2",
+    "service": "api",
+    "image": "cyberaudit-readiness-api",
+    "state": "running",
+    "health": "healthy",
+    "status": "Up 6 minutes (healthy)",
+    "ports": ""
+  },
+  {
+    "name": "cyberaudit-readiness-edge-1",
+    "service": "edge",
+    "image": "nginx:1.29.0-alpine",
+    "state": "running",
+    "health": "",
+    "status": "Up 12 minutes",
+    "ports": "80/tcp, 127.0.0.1:18443->8443/tcp"
+  },
+  {
+    "name": "cyberaudit-readiness-grafana-1",
+    "service": "grafana",
+    "image": "grafana/grafana:12.1.0",
+    "state": "running",
+    "health": "",
+    "status": "Up 32 minutes",
+    "ports": "127.0.0.1:13001->3000/tcp"
+  },
+  {
+    "name": "cyberaudit-readiness-keycloak-1",
+    "service": "keycloak",
+    "image": "quay.io/keycloak/keycloak:26.3.2",
+    "state": "running",
+    "health": "healthy",
+    "status": "Up 33 minutes (healthy)",
+    "ports": "8080/tcp, 8443/tcp, 9000/tcp"
+  },
+  {
+    "name": "cyberaudit-readiness-keycloak-proxy-1",
+    "service": "keycloak-proxy",
+    "image": "nginx:1.29.0-alpine",
+    "state": "running",
+    "health": "",
+    "status": "Up About an hour",
+    "ports": "80/tcp, 127.0.0.1:18444->8444/tcp"
+  },
+  {
+    "name": "cyberaudit-readiness-minio-1",
+    "service": "minio",
+    "image": "quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z",
+    "state": "running",
+    "health": "healthy",
+    "status": "Up 33 minutes (healthy)",
+    "ports": "9000-9001/tcp"
+  },
+  {
+    "name": "cyberaudit-readiness-minio-client-1",
+    "service": "minio-client",
+    "image": "minio/mc:RELEASE.2025-04-16T18-13-26Z",
+    "state": "running",
+    "health": "",
+    "status": "Up 33 minutes",
+    "ports": ""
+  },
+  {
+    "name": "cyberaudit-readiness-otel-1",
+    "service": "otel",
+    "image": "otel/opentelemetry-collector-contrib:0.130.0",
+    "state": "running",
+    "health": "",
+    "status": "Up 55 minutes",
+    "ports": "4317-4318/tcp, 55678-55679/tcp"
+  },
+  {
+    "name": "cyberaudit-readiness-postgres-1",
+    "service": "postgres",
+    "image": "postgres:16.9-alpine3.22",
+    "state": "running",
+    "health": "healthy",
+    "status": "Up 33 minutes (healthy)",
+    "ports": "5432/tcp"
+  },
+  {
+    "name": "cyberaudit-readiness-prometheus-1",
+    "service": "prometheus",
+    "image": "prom/prometheus:v3.5.0",
+    "state": "running",
+    "health": "",
+    "status": "Up 55 minutes",
+    "ports": "127.0.0.1:19090->9090/tcp"
+  },
+  {
+    "name": "cyberaudit-readiness-redis-1",
+    "service": "redis",
+    "image": "redis:7.4.5-alpine",
+    "state": "running",
+    "health": "healthy",
+    "status": "Up About an hour (healthy)",
+    "ports": "6379/tcp"
+  },
+  {
+    "name": "cyberaudit-readiness-vault-1",
+    "service": "vault",
+    "image": "hashicorp/vault:1.20.1",
+    "state": "running",
+    "health": "healthy",
+    "status": "Up About an hour (healthy)",
+    "ports": "8200/tcp"
+  },
+  {
+    "name": "cyberaudit-readiness-web-1",
+    "service": "web",
+    "image": "cyberaudit-readiness-web",
+    "state": "running",
+    "health": "",
+    "status": "Up 6 minutes",
+    "ports": ""
+  },
+  {
+    "name": "cyberaudit-readiness-worker-2",
+    "service": "worker",
+    "image": "cyberaudit-readiness-worker",
+    "state": "running",
+    "health": "",
+    "status": "Up 6 minutes",
+    "ports": ""
+  }
+]

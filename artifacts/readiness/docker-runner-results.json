@@ -1,0 +1,22 @@
+{
+  "status": "passed",
+  "simulated": false,
+  "image": "python@sha256:a190708a2dec1bd18b1decb539f8e8f5407abaa9bf39cacda583f7f8c11db322",
+  "isolation": {
+    "new_container": true,
+    "run_as_non_root": true,
+    "read_only": true,
+    "tmpfs": true,
+    "capabilities": "drop_all",
+    "no_new_privileges": true,
+    "memory_mb": 64,
+    "cpu": 0.25,
+    "pids": 16,
+    "network": "none",
+    "docker_socket": false
+  },
+  "execution": {
+    "status": "passed",
+    "sha256": "0e96029508433be2b5e70851cdb391151ddad7fcd21964f1ba117919c0c28d37"
+  }
+}
