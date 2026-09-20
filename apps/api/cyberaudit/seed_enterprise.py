@@ -65,6 +65,8 @@ ENTERPRISE_PERMISSIONS = [
     "knowledge_graph.manage",
     "ai_assistant.read",
     "ai_assistant.use",
+    "ai_runtime.read",
+    "ai_runtime.manage",
 ]
 
 

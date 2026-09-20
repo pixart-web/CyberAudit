@@ -25,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.responses import Response
 
+from cyberaudit.ai_runtime_api import router as ai_runtime_router
 from cyberaudit.audit import write_audit
 from cyberaudit.config import get_settings
 from cyberaudit.db import Base, engine, get_db
@@ -121,6 +122,7 @@ app.include_router(phase5_router)
 app.include_router(enterprise_router)
 app.include_router(domain_expansion_router)
 app.include_router(hardening_router)
+app.include_router(ai_runtime_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.app_origin],

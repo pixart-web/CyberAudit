@@ -1,5 +1,15 @@
 # Decisões de arquitetura
 
+## ADR-026 — Sovereign local AI runtime
+
+Accepted. No core CyberAudit capability may require a commercial AI API; the
+default `ai_runtime_backend=disabled` keeps the existing deterministic,
+evidence-grounded `AiProvider` fully offline. A second, local-first provider
+routes by *capability* (never by model brand) through a host-scoped model
+registry and hardware profile, and only ever uses a local model to phrase
+already-deterministic facts — never to invent findings, citations or
+confidence. See `adr-026-sovereign-local-ai-runtime.md`.
+
 ## ADR-025 — Infrastructure evidence and release gating
 
 Accepted. Production-like validation uses version-pinned local infrastructure
@@ -63,3 +73,4 @@ deterministic scores and prevent all external writes. See
 31. **Sem contentor genérico.** O runner recebe operações internas tipadas; descritores Docker/Kubernetes permanecem indisponíveis sem controlador de isolamento.
 32. **Licença não apaga acesso.** Expiração bloqueia capacidades licenciadas e preserva leitura/extração de dados do cliente.
 33. **Telemetria é opt-in.** Só campos agregados allowlisted podem sair; evidência, identidade, segredos e conteúdo ficam excluídos.
+34. **IA local é opt-in e nunca decide.** Sem modelo instalado o CyberAudit responde de forma determinística; com modelo, este só reformula factos já calculados, nunca substitui o motor de segurança, o RBAC ou o Policy Engine.

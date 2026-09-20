@@ -85,6 +85,12 @@ class Settings(BaseSettings):
     database_runtime_role: str | None = None
     request_max_bytes: int = Field(default=12 * 1024 * 1024, ge=1024)
     readiness_evidence_manifest: Path | None = None
+    # Sovereign AI runtime: disabled by default so core functionality never
+    # depends on a running local model. An administrator opts in to a
+    # specific local, self-hosted backend; no commercial AI API is supported.
+    ai_runtime_backend: Literal["disabled", "ollama"] = "disabled"
+    ai_runtime_base_url: str = "http://127.0.0.1:11434"
+    ai_runtime_timeout_seconds: float = Field(default=30.0, ge=1, le=300)
 
     @property
     def production_like(self) -> bool:

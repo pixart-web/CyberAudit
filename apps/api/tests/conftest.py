@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.pool import StaticPool
 
 from cyberaudit import (
+    ai_runtime_models,  # noqa: F401
     domain_expansion_models,  # noqa: F401
     enterprise_models,  # noqa: F401
     hardening_models,  # noqa: F401
