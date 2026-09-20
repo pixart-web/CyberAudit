@@ -1,6 +1,6 @@
 "use client";
 
-import { Badge, Button, Card, EmptyState, ErrorState, LoadingState, SeverityBadge, Tabs, TabPanel } from "@cyberaudit/ui";
+import { Badge, Button, Card, ConfirmationDialog, EmptyState, ErrorState, LoadingState, SeverityBadge, Tabs, TabPanel } from "@cyberaudit/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Shell } from "@/components/shell";
@@ -42,6 +42,7 @@ const TRANSITIONS: Record<string, string[]> = {
 
 export function IncidentWorkspace({ id }: { id: string }) {
   const [tab, setTab] = useState("overview");
+  const [pendingCancel, setPendingCancel] = useState(false);
   const queryClient = useQueryClient();
 
   const detail = useQuery({
@@ -89,7 +90,7 @@ export function IncidentWorkspace({ id }: { id: string }) {
             <Button
               key={status}
               className="text-xs"
-              onClick={() => transition.mutate(status)}
+              onClick={() => (status === "cancelled" ? setPendingCancel(true) : transition.mutate(status))}
               disabled={transition.isPending}
             >
               → {status}
@@ -97,6 +98,18 @@ export function IncidentWorkspace({ id }: { id: string }) {
           ))}
         </div>
       </div>
+      <ConfirmationDialog
+        open={pendingCancel}
+        title="Cancelar este incidente?"
+        description="O incidente passa a estado 'cancelled', que é terminal e não pode ser revertido."
+        confirmLabel="Cancelar incidente"
+        destructive
+        onConfirm={() => {
+          transition.mutate("cancelled");
+          setPendingCancel(false);
+        }}
+        onCancel={() => setPendingCancel(false)}
+      />
       <Card className="overflow-hidden">
         <Tabs items={TABS} active={tab} onChange={setTab} />
         <div className="p-5">

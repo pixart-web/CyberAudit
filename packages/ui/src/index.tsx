@@ -289,4 +289,102 @@ export function Drawer({
   );
 }
 
+// ---------------------------------------------------------------------------
+// MetricCard: the single stat-tile pattern repeated ad hoc across every
+// Workspace (Engagement/Asset/Finding/Incident all hand-rolled their own).
+// One shared component so a metric always looks the same and future
+// Workspaces don't reinvent it.
+// ---------------------------------------------------------------------------
+
+export function MetricCard({
+  label,
+  value,
+  tone,
+  icon: Icon,
+}: {
+  label: string;
+  value: string | number;
+  tone?: SecurityState;
+  icon?: React.ElementType;
+}) {
+  return (
+    <div className="rounded-lg border border-border p-4">
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-muted">{label}</p>
+        {Icon && <Icon size={14} className="text-muted" aria-hidden />}
+      </div>
+      <p className="mt-1 text-lg font-semibold">{value}</p>
+      {tone && <SeverityBadge state={tone} className="mt-2" />}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ConfirmationDialog: an accessible confirm/cancel modal for any
+// irreversible or state-changing action (e.g. an incident transition to a
+// terminal state). Reuses Drawer's Escape/focus-restore behavior via the
+// same pattern rather than a second implementation.
+// ---------------------------------------------------------------------------
+
+export function ConfirmationDialog({
+  open,
+  title,
+  description,
+  confirmLabel = "Confirmar",
+  cancelLabel = "Cancelar",
+  destructive = false,
+  onConfirm,
+  onCancel,
+}: {
+  open: boolean;
+  title: string;
+  description?: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  destructive?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const triggerRef = React.useRef<Element | null>(null);
+
+  React.useEffect(() => {
+    if (!open) return;
+    triggerRef.current = document.activeElement;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") onCancel();
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      if (triggerRef.current instanceof HTMLElement) triggerRef.current.focus();
+    };
+  }, [open, onCancel]);
+
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center" role="presentation">
+      <button aria-label="Fechar" className="absolute inset-0 bg-black/50" onClick={onCancel} />
+      <div
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="confirmation-dialog-title"
+        className="relative w-full max-w-sm rounded-xl border border-border bg-surface p-5 shadow-panel"
+      >
+        <h2 id="confirmation-dialog-title" className="font-semibold">
+          {title}
+        </h2>
+        {description && <p className="mt-2 text-sm text-muted">{description}</p>}
+        <div className="mt-5 flex justify-end gap-2">
+          <Button className="bg-transparent" onClick={onCancel}>
+            {cancelLabel}
+          </Button>
+          <Button className={destructive ? "bg-critical text-white" : ""} onClick={onConfirm}>
+            {confirmLabel}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export { HelpCircle as UnknownIcon };

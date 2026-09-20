@@ -1,7 +1,16 @@
 import { cleanup, render, screen, fireEvent } from "@testing-library/react";
 import { useState } from "react";
-import { afterEach, expect, test } from "vitest";
-import { EmptyState, ErrorState, SeverityBadge, Tabs, TabPanel, toSecurityState } from "@cyberaudit/ui";
+import { afterEach, expect, test, vi } from "vitest";
+import {
+  ConfirmationDialog,
+  EmptyState,
+  ErrorState,
+  MetricCard,
+  SeverityBadge,
+  Tabs,
+  TabPanel,
+  toSecurityState,
+} from "@cyberaudit/ui";
 
 afterEach(cleanup);
 
@@ -68,4 +77,43 @@ test("Tabs supports arrow-key navigation between tabs", () => {
   first.focus();
   fireEvent.keyDown(first, { key: "ArrowRight" });
   expect(screen.getByText("Scope content")).toBeInTheDocument();
+});
+
+test("MetricCard renders a label, value and optional severity tone", () => {
+  render(<MetricCard label="Findings abertos" value={3} tone="high" />);
+  expect(screen.getByText("Findings abertos")).toBeInTheDocument();
+  expect(screen.getByText("3")).toBeInTheDocument();
+  expect(screen.getByText("Elevado")).toBeInTheDocument();
+});
+
+test("ConfirmationDialog only fires onConfirm on explicit confirmation, and Escape cancels", () => {
+  const onConfirm = vi.fn();
+  const onCancel = vi.fn();
+  const { rerender } = render(
+    <ConfirmationDialog
+      open={true}
+      title="Cancelar este incidente?"
+      confirmLabel="Cancelar incidente"
+      onConfirm={onConfirm}
+      onCancel={onCancel}
+    />,
+  );
+  expect(screen.getByRole("alertdialog")).toHaveTextContent("Cancelar este incidente?");
+  expect(onConfirm).not.toHaveBeenCalled();
+
+  fireEvent.keyDown(document, { key: "Escape" });
+  expect(onCancel).toHaveBeenCalledTimes(1);
+
+  fireEvent.click(screen.getByRole("button", { name: "Cancelar incidente" }));
+  expect(onConfirm).toHaveBeenCalledTimes(1);
+
+  rerender(
+    <ConfirmationDialog
+      open={false}
+      title="Cancelar este incidente?"
+      onConfirm={onConfirm}
+      onCancel={onCancel}
+    />,
+  );
+  expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
 });
