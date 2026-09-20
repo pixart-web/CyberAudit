@@ -56,6 +56,8 @@ PERMISSIONS = [
     "approvals.read",
     "approvals.request",
     "approvals.review",
+    "updates.read",
+    "updates.manage",
 ]
 
 ROLE_CODES = {

@@ -97,6 +97,7 @@ from cyberaudit.security import (
 )
 from cyberaudit.storage import LocalStorage
 from cyberaudit.tracing import trace_context
+from cyberaudit.update_api import router as update_router
 
 settings = get_settings()
 policy_engine = ScopePolicyEngine()
@@ -129,6 +130,7 @@ app.include_router(ai_runtime_router)
 app.include_router(agent_router)
 app.include_router(engagement_domain_router)
 app.include_router(engagement_reports_router)
+app.include_router(update_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.app_origin],

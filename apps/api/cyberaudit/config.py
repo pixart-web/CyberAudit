@@ -92,6 +92,11 @@ class Settings(BaseSettings):
     ai_runtime_base_url: str = "http://127.0.0.1:11434"
     ai_runtime_timeout_seconds: float = Field(default=30.0, ge=1, le=300)
     ai_runtime_embedding_model: str | None = None
+    app_version: str = "0.1.0"
+    # PEM-encoded Ed25519 public keys trusted to sign offline update bundles.
+    # A bundle's signature must verify against one of these; it is never
+    # trusted merely because it was uploaded (see cyberaudit.update_bundle).
+    update_trusted_public_keys_pem: list[str] = []
 
     @property
     def production_like(self) -> bool:

@@ -1,5 +1,16 @@
 # Decisões de arquitetura
 
+## ADR-029 — Offline update bundle format and signing
+
+Accepted. A `.caup` bundle is a signed JSON manifest (Ed25519) plus a
+checksum per file it carries; `UpdateBundleService.validate()` verifies the
+signature against an administrator-configured `TrustedKeyStore`, checks
+every file's SHA-256, and checks app-version compatibility — a bundle is
+never trusted merely because it was manually uploaded. Validation only:
+this phase does not stage, extract or apply a bundle, which are installer/
+runtime concerns left to Phase 10.3.8 packaging work. See
+`adr-029-offline-update-bundles.md`.
+
 ## ADR-028 — Engagement domain completion and reporting
 
 Accepted. The Client → Engagement → Scope/Assets/Evidence/Findings chain
@@ -102,3 +113,4 @@ deterministic scores and prevent all external writes. See
 34. **IA local é opt-in e nunca decide.** Sem modelo instalado o CyberAudit responde de forma determinística; com modelo, este só reformula factos já calculados, nunca substitui o motor de segurança, o RBAC ou o Policy Engine.
 35. **Agentes não têm acesso direto.** Todo o tool call de um agente passa pelo `AgentToolGateway`; nunca há acesso direto a base de dados, socket Docker ou shell a partir de um agente.
 36. **Relatórios distinguem origem.** Cada `ReportSection` marca `content_type` (evidence/finding/analyst_conclusion/ai_generated); conteúdo gerado por IA nunca se torna evidência ou finding silenciosamente.
+37. **Upload nunca é confiança.** Um bundle de atualização só é aceite com assinatura Ed25519 válida contra uma chave configurada pelo administrador, checksums corretos e versão compatível — nunca por ter sido carregado manualmente.
