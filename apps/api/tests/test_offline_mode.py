@@ -244,3 +244,84 @@ def test_offline_update_bundle_validation_needs_no_network(no_network):
     service = UpdateBundleService(TrustedKeyStore([public_pem]), current_app_version="0.1.0")
     result = service.validate(manifest.model_dump_json().encode(), signature, {})
     assert result.accepted is True
+
+
+@pytest.mark.asyncio
+async def test_hunt_execution_works_offline(db, no_network):
+    """Phase 10.4.1 section 36: Threat Hunting is a pure local-database
+
+    query (a bounded, field-allowlisted equality filter) -- it must never
+    depend on reaching a threat-intel feed or any other outside service.
+    Calls the real endpoint function directly (not over HTTP), the same
+    way this file already exercises ReportService.generate().
+    """
+    from cyberaudit.enterprise_api import execute_hunt
+    from cyberaudit.enterprise_models import SecurityEvent, ThreatHunt
+
+    organization = Organization(name="Offline Hunt Tenant", slug="offline-hunt-tenant")
+    db.add(organization)
+    await db.flush()
+    user = User(
+        organization_id=organization.id,
+        name="Offline Hunter",
+        email="offline-hunter@example.invalid",
+        password_hash="",  # noqa: S106 - authentication is not exercised here
+    )
+    db.add(user)
+    event = SecurityEvent(
+        organization_id=organization.id,
+        source="test",
+        external_id="offline-ext-1",
+        event_type="login_failed",
+        occurred_at=datetime.now(timezone.utc),
+        summary="offline event",
+        content_hash="a" * 64,
+    )
+    db.add(event)
+    await db.flush()
+    hunt = ThreatHunt(
+        organization_id=organization.id,
+        name="offline hunt",
+        hypothesis="test",
+        query={"event_type": "login_failed"},
+        owner_id=user.id,
+        time_from=datetime.now(timezone.utc).replace(year=2000),
+        time_until=datetime.now(timezone.utc),
+    )
+    db.add(hunt)
+    await db.flush()
+
+    result = await execute_hunt(hunt.id, db=db, user=user)
+    assert result["result_count"] == 1
+
+
+def test_identity_risk_scoring_works_offline(no_network):
+    """Phase 10.4.1 section 36: identity risk scoring is a pure
+
+    deterministic function over already-recorded fields -- no directory
+    sync, no external identity provider call.
+    """
+    from cyberaudit.domain_expansion_services import identity_risk_factors
+
+    score, reasons = identity_risk_factors(
+        privileged=True,
+        mfa_enforced="false",
+        enabled=True,
+        stale_days=200,
+        guest=False,
+        owner=None,
+    )
+    assert score > 0
+    assert "privileged_identity" in reasons
+
+
+def test_enterprise_risk_scoring_works_offline(no_network):
+    """Phase 10.4.1 section 36: Risk Register inherent/residual scoring is
+
+    pure arithmetic -- no external risk-feed dependency.
+    """
+    from cyberaudit.enterprise_services import calculate_residual_risk
+
+    inherent, residual = calculate_residual_risk(4, 4, 0.25)
+    assert inherent == 16.0
+    assert residual == 12.0
