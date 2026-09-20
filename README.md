@@ -23,8 +23,13 @@ make seed-phase5
 make seed-enterprise
 ```
 
-Web: `http://localhost:3000`  
-API/OpenAPI: `http://localhost:8000/docs`
+Web: `http://127.0.0.1:3000`  
+API/OpenAPI: `http://127.0.0.1:8000/docs`
+
+Alternativa com diagnóstico e supervisão (arranque, `status`, `logs`, `restart`, `down`):
+`./infrastructure/scripts/cyberaudit_launcher.sh up`. Por omissão, a API e o web só ficam
+acessíveis em loopback; ver `docs/architecture/local-installation.md` e `docker-compose.remote.yml`
+para expor explicitamente na LAN.
 
 Credenciais de desenvolvimento:
 

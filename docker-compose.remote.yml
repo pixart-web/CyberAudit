@@ -1,0 +1,17 @@
+# Explicit opt-in override to expose CyberAudit beyond loopback.
+#
+# The base docker-compose.yml binds the API and web ports to 127.0.0.1
+# only (see docs/architecture/local-installation.md, section 25 of the
+# Phase 10.3 brief: "default workstation binding should be loopback unless
+# the administrator explicitly enables remote access"). An administrator
+# who understands the exposure can opt in with:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.remote.yml up -d
+#
+# This does not add TLS or authentication beyond what CyberAudit already
+# enforces; put a reverse proxy in front for anything beyond a trusted LAN.
+services:
+  api:
+    ports: ["0.0.0.0:8000:8000"]
+  web:
+    ports: ["0.0.0.0:3000:3000"]

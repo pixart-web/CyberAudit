@@ -1,5 +1,16 @@
 # Decisões de arquitetura
 
+## ADR-030 — Local-first deployment and installer honesty
+
+Accepted. Docker Compose is the one deployment mode that actually exists,
+is tested, and is loopback-bound by default (`127.0.0.1`, with an explicit
+`docker-compose.remote.yml` opt-in for LAN exposure). Native Windows/macOS/
+Linux installers are documented as an architecture sketch, not built —
+`docs/architecture/local-installation.md` states this plainly rather than
+claiming installer readiness that does not exist, per section 24 of the
+implementation brief ("do not claim installers are production-ready unless
+they are actually built and tested").
+
 ## ADR-029 — Offline update bundle format and signing
 
 Accepted. A `.caup` bundle is a signed JSON manifest (Ed25519) plus a
@@ -114,3 +125,4 @@ deterministic scores and prevent all external writes. See
 35. **Agentes não têm acesso direto.** Todo o tool call de um agente passa pelo `AgentToolGateway`; nunca há acesso direto a base de dados, socket Docker ou shell a partir de um agente.
 36. **Relatórios distinguem origem.** Cada `ReportSection` marca `content_type` (evidence/finding/analyst_conclusion/ai_generated); conteúdo gerado por IA nunca se torna evidência ou finding silenciosamente.
 37. **Upload nunca é confiança.** Um bundle de atualização só é aceite com assinatura Ed25519 válida contra uma chave configurada pelo administrador, checksums corretos e versão compatível — nunca por ter sido carregado manualmente.
+38. **Loopback por omissão.** A API e o web só ficam acessíveis em `127.0.0.1`; exposição na LAN exige um override explícito (`docker-compose.remote.yml`), nunca o padrão.
