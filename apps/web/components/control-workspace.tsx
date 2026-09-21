@@ -21,7 +21,9 @@ type Control = {
   next_review_at: string | null;
 };
 type Mapping = { id: string; framework_id: string; external_control_id: string; external_title: string };
-type Assessment = { id: string; status: string; result: string; effectiveness: number; tested_at: string | null };
+type Assessment = { id: string; status: string; result: string; effectiveness: number; tested_at: string | null; notes: string };
+
+const GAP_RESULTS = new Set(["partially_effective", "ineffective"]);
 type GrcException = {
   id: string;
   reason: string;
@@ -129,14 +131,23 @@ export function ControlWorkspace({ id }: { id: string }) {
             {assessments.isLoading && <LoadingState />}
             {assessments.data?.items.length === 0 && <EmptyState title="Ainda não existem avaliações." />}
             <ul className="space-y-2">
-              {assessments.data?.items.map((row) => (
-                <li key={row.id} className="flex items-center justify-between rounded-lg border border-border p-3 text-sm">
-                  <SeverityBadge state={row.result === "effective" ? "healthy" : "warning"} />
-                  <span className="text-xs text-muted">
-                    Efetividade: {(row.effectiveness * 100).toFixed(0)}%
-                  </span>
-                </li>
-              ))}
+              {assessments.data?.items.map((row) => {
+                const isGap = GAP_RESULTS.has(row.result);
+                return (
+                  <li key={row.id} className="rounded-lg border border-border p-3 text-sm">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <SeverityBadge state={row.result === "effective" ? "healthy" : isGap ? "warning" : "neutral"} />
+                        {isGap && <Badge tone="warning">Gap de conformidade</Badge>}
+                      </div>
+                      <span className="text-xs text-muted">
+                        Efetividade: {(row.effectiveness * 100).toFixed(0)}%
+                      </span>
+                    </div>
+                    {isGap && row.notes && <p className="mt-2 text-xs text-muted">{row.notes}</p>}
+                  </li>
+                );
+              })}
             </ul>
           </TabPanel>
 

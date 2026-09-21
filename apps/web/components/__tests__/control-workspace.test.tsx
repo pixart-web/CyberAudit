@@ -19,6 +19,18 @@ const fixtures: Record<string, unknown> = {
     implementation_status: "partially_implemented",
     next_review_at: null,
   },
+  "/grc/control-assessments?control_id=ctl-1": {
+    items: [
+      {
+        id: "assess-1",
+        status: "completed",
+        result: "partially_effective",
+        effectiveness: 0.4,
+        tested_at: "2026-09-01T00:00:00Z",
+        notes: "Service accounts not covered by MFA enrollment.",
+      },
+    ],
+  },
   "/grc/exceptions?subject_type=control&subject_id=ctl-1": {
     items: [
       {
@@ -52,6 +64,13 @@ test("Control Workspace shows exceptions as an accepted-risk, not a compliance c
   fireEvent.click(await screen.findByRole("tab", { name: "Exceções" }));
   expect(await screen.findByText(/Vendor cannot support MFA/)).toBeInTheDocument();
   expect(screen.getByText(/network_segmentation/)).toBeInTheDocument();
+});
+
+test("Control Workspace surfaces a partially-effective assessment as a distinct compliance gap", async () => {
+  wrapper(<ControlWorkspace id="ctl-1" />);
+  fireEvent.click(await screen.findByRole("tab", { name: "Avaliações" }));
+  expect(await screen.findByText("Gap de conformidade")).toBeInTheDocument();
+  expect(screen.getByText(/Service accounts not covered/)).toBeInTheDocument();
 });
 
 test("Control Workspace's Cyber AI tab explains the compliance gap via the real grc_analyst agent", async () => {
