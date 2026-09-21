@@ -28,6 +28,7 @@ import {
 } from "@cyberaudit/ui";
 import { IncidentWorkspace } from "../incident-workspace";
 import { IdentityWorkspace } from "../identity-workspace";
+import { ControlWorkspace } from "../control-workspace";
 import SecurityEventDetail from "@/app/security-events/[id]/page";
 import DetectionAlertDetail from "@/app/detections/[id]/page";
 import CaseDetail from "@/app/cases/[id]/page";
@@ -225,6 +226,18 @@ const socFixtures: Record<string, unknown> = {
     outgoing_edges: [],
     incoming_edges: [],
   },
+  "/grc/controls/obj-1": {
+    id: "obj-1",
+    code: "CTL-1",
+    title: "MFA everywhere",
+    description: "test",
+    domain: "identity",
+    objective: "",
+    status: "approved",
+    maturity_level: 3,
+    implementation_status: "partially_implemented",
+    next_review_at: null,
+  },
 };
 
 vi.mock("@/lib/api", () => ({
@@ -317,6 +330,17 @@ describe("axe-core automated accessibility audit (jsdom, layout rules excluded)"
     const { container } = render(
       <QueryClientProvider client={new QueryClient()}>
         <IdentityWorkspace id="obj-1" />
+      </QueryClientProvider>,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const violations = await auditedViolations(container);
+    expect(violations, JSON.stringify(violations, null, 2)).toHaveLength(0);
+  });
+
+  test("ControlWorkspace has no automated a11y violations", async () => {
+    const { container } = render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ControlWorkspace id="obj-1" />
       </QueryClientProvider>,
     );
     await new Promise((resolve) => setTimeout(resolve, 50));

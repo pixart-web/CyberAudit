@@ -4,6 +4,7 @@ import { Badge, Card, ErrorState, LoadingState } from "@cyberaudit/ui";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { EvidenceLinksPanel } from "@/components/evidence-links-panel";
 import { Shell } from "@/components/shell";
 import { api } from "@/lib/api";
 
@@ -68,6 +69,10 @@ export default function CaseDetail() {
           <p className="mt-1 text-sm">{item.conclusions || "Investigação em curso, sem conclusões registadas."}</p>
         </Card>
       </div>
+      <Card className="mt-4 p-6">
+        <h2 className="mb-3 font-semibold">Evidência</h2>
+        <EvidenceLinksPanel subjectType="case" subjectId={id} enabled={true} />
+      </Card>
     </Shell>
   );
 }

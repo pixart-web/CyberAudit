@@ -50,7 +50,7 @@ from cyberaudit.enterprise_services import (
     sanitize_text,
     validate_incident_transition,
 )
-from cyberaudit.models import Evidence, User
+from cyberaudit.models import Asset, Engagement, Evidence, Finding, User
 from cyberaudit.security import require_permission
 
 router = APIRouter(prefix="/api/v1", tags=["enterprise"])
@@ -196,12 +196,21 @@ class ControlAssessmentPayload(StrictModel):
 
 class EvidenceLinkPayload(StrictModel):
     evidence_id: str
-    subject_type: Literal[
-        "control", "risk", "engagement", "finding", "asset", "application", "incident"
-    ]
+    subject_type: Literal["control", "risk", "engagement", "finding", "asset", "incident", "case"]
     subject_id: str
     purpose: str = Field(min_length=3, max_length=200)
     valid_until: datetime | None = None
+
+
+EVIDENCE_LINK_SUBJECT_MODELS: dict[str, Any] = {
+    "control": UnifiedControl,
+    "risk": EnterpriseRisk,
+    "engagement": Engagement,
+    "finding": Finding,
+    "asset": Asset,
+    "incident": Incident,
+    "case": CaseRecord,
+}
 
 
 class GrcExceptionPayload(StrictModel):
@@ -1390,7 +1399,7 @@ async def list_grc_evidence(
         extra_conditions.append(GrcEvidenceLink.subject_type == subject_type)
     if subject_id:
         extra_conditions.append(GrcEvidenceLink.subject_id == subject_id)
-    return await page(
+    result = await page(
         db,
         GrcEvidenceLink,
         user.organization_id,
@@ -1398,6 +1407,24 @@ async def list_grc_evidence(
         page_size=pagination_values[1],
         extra=tuple(extra_conditions),
     )
+    evidence_by_id: dict[str, Any] = {}
+    evidence_ids = {item["evidence_id"] for item in result["items"]}
+    if evidence_ids:
+        rows = list(
+            (
+                await db.scalars(
+                    select(Evidence).where(
+                        Evidence.organization_id == user.organization_id,
+                        Evidence.id.in_(evidence_ids),
+                    )
+                )
+            ).all()
+        )
+        evidence_by_id = {row.id: serialize(row) for row in rows}
+    result["items"] = [
+        {**item, "evidence": evidence_by_id.get(item["evidence_id"])} for item in result["items"]
+    ]
+    return result
 
 
 @router.post("/grc/evidence-links", status_code=201)
@@ -1414,29 +1441,78 @@ async def create_grc_evidence_link(
     )
     if not evidence:
         raise HTTPException(404, "Evidence not found")
+    subject_model = EVIDENCE_LINK_SUBJECT_MODELS[payload.subject_type]
+    subject = await db.scalar(
+        select(subject_model).where(
+            subject_model.id == payload.subject_id,
+            subject_model.organization_id == user.organization_id,
+        )
+    )
+    if not subject:
+        raise HTTPException(404, f"{payload.subject_type.capitalize()} not found")
     link = GrcEvidenceLink(
         organization_id=user.organization_id,
         **payload.model_dump(),
     )
     db.add(link)
     await db.flush()
-    await write_audit(db, user, "grc_evidence.linked", "grc_evidence_link", link.id)
+    await write_audit(
+        db,
+        user,
+        "grc_evidence.linked",
+        "grc_evidence_link",
+        link.id,
+        metadata={"subject_type": payload.subject_type, "subject_id": payload.subject_id},
+    )
     await db.commit()
     return serialize(link)
 
 
+@router.delete("/grc/evidence-links/{link_id}", status_code=204)
+async def delete_grc_evidence_link(
+    link_id: str,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permission("grc_evidence.manage")),
+):
+    link = await db.scalar(
+        select(GrcEvidenceLink).where(
+            GrcEvidenceLink.id == link_id, GrcEvidenceLink.organization_id == user.organization_id
+        )
+    )
+    if not link:
+        raise HTTPException(404, "Evidence link not found")
+    await db.delete(link)
+    await write_audit(
+        db,
+        user,
+        "grc_evidence.unlinked",
+        "grc_evidence_link",
+        link_id,
+        metadata={"subject_type": link.subject_type, "subject_id": link.subject_id},
+    )
+    await db.commit()
+
+
 @router.get("/grc/exceptions")
 async def list_grc_exceptions(
+    subject_type: str | None = Query(default=None, max_length=60),
+    subject_id: str | None = Query(default=None, max_length=36),
     pagination_values: tuple[int, int] = Depends(pagination),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permission("grc_exceptions.read")),
 ):
+    extra_conditions = []
+    if subject_type:
+        extra_conditions.append(GrcException.subject_type == subject_type)
+    if subject_id:
+        extra_conditions.append(GrcException.subject_id == subject_id)
     return await page(
         db,
         GrcException,
         user.organization_id,
         page_number=pagination_values[0],
         page_size=pagination_values[1],
+        extra=tuple(extra_conditions),
     )
 
 

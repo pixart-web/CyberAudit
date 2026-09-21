@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BrainCircuit } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { EvidenceLinksPanel } from "@/components/evidence-links-panel";
 import { Shell } from "@/components/shell";
 import { api } from "@/lib/api";
 
@@ -36,6 +37,7 @@ const TABS = [
   { id: "timeline", label: "Cronologia" },
   { id: "cases", label: "Casos" },
   { id: "alerts", label: "Deteções" },
+  { id: "evidence", label: "Evidência" },
   { id: "ai", label: "Cyber AI" },
 ];
 
@@ -190,6 +192,10 @@ export function IncidentWorkspace({ id }: { id: string }) {
                 </li>
               ))}
             </ul>
+          </TabPanel>
+
+          <TabPanel id="evidence" active={tab}>
+            <EvidenceLinksPanel subjectType="incident" subjectId={id} enabled={tab === "evidence"} />
           </TabPanel>
 
           <TabPanel id="ai" active={tab}>
