@@ -29,6 +29,8 @@ import {
 import { IncidentWorkspace } from "../incident-workspace";
 import { IdentityWorkspace } from "../identity-workspace";
 import { ControlWorkspace } from "../control-workspace";
+import { EngagementWorkspace } from "../engagement-workspace";
+import { SocCommandCenter } from "../enterprise-command-center";
 import SecurityEventDetail from "@/app/security-events/[id]/page";
 import DetectionAlertDetail from "@/app/detections/[id]/page";
 import CaseDetail from "@/app/cases/[id]/page";
@@ -39,6 +41,10 @@ import CloudAccountDetail from "@/app/cloud-security/accounts/[id]/page";
 import KubernetesWorkloadDetail from "@/app/kubernetes/workloads/[id]/page";
 import IocDetail from "@/app/threat-intelligence/[id]/page";
 import KnowledgeNodeDetail from "@/app/knowledge-graph/[id]/page";
+import CommandCenterPage from "@/app/command-center/page";
+import AssetGraphPage from "@/app/asset-graph/page";
+import KnowledgeGraphPage from "@/app/knowledge-graph/page";
+import ReportsPage from "@/app/reports/page";
 
 afterEach(cleanup);
 vi.mock("next/navigation", () => ({
@@ -238,6 +244,50 @@ const socFixtures: Record<string, unknown> = {
     implementation_status: "partially_implemented",
     next_review_at: null,
   },
+  "/engagements/obj-1": {
+    id: "obj-1",
+    code: "ENG-1",
+    name: "Avaliação de segurança",
+    mode: "client",
+    status: "active",
+    risk_level: "medium",
+  },
+  "/command-center": {
+    security_posture: 60,
+    exposure_score: 35,
+    assets: 1,
+    new_assets: 0,
+    unmanaged_assets: 0,
+    internet_exposed_assets: 0,
+    open_services: 1,
+    critical_findings: 0,
+    known_exploited: 0,
+    coverage: 90,
+    running_jobs: 0,
+    open_incidents: 0,
+    active_engagements: 1,
+    failing_controls: 0,
+    high_risk_identities: 0,
+    top_assets: [{ id: "asset-1", name: "Demo Asset", risk: 42 }],
+  },
+  "/asset-graph?max_nodes=100": {
+    nodes: [
+      { id: "asset-1", label: "Demo Asset", type: "host", criticality: "medium", exposure: "internal", risk_score: 42, confidence: 0.9 },
+    ],
+    edges: [],
+    limit: 100,
+    progressive: false,
+  },
+  "/knowledge-graph": {
+    nodes: [{ id: "node-1", node_type: "incident", label: "Demo node", confidence: 0.9 }],
+    edges: [],
+  },
+  "/findings?page_size=100": {
+    items: [
+      { id: "finding-1", title: "Demo finding", category: "network", technical_severity: "medium", affected_component: "demo", simulated: true, imported: false },
+    ],
+    total: 1,
+  },
 };
 
 vi.mock("@/lib/api", () => ({
@@ -348,6 +398,28 @@ describe("axe-core automated accessibility audit (jsdom, layout rules excluded)"
     expect(violations, JSON.stringify(violations, null, 2)).toHaveLength(0);
   });
 
+  test("EngagementWorkspace has no automated a11y violations", async () => {
+    const { container } = render(
+      <QueryClientProvider client={new QueryClient()}>
+        <EngagementWorkspace id="obj-1" />
+      </QueryClientProvider>,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const violations = await auditedViolations(container);
+    expect(violations, JSON.stringify(violations, null, 2)).toHaveLength(0);
+  });
+
+  test("SocCommandCenter (SOC dashboard) has no automated a11y violations", async () => {
+    const { container } = render(
+      <QueryClientProvider client={new QueryClient()}>
+        <SocCommandCenter />
+      </QueryClientProvider>,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const violations = await auditedViolations(container);
+    expect(violations, JSON.stringify(violations, null, 2)).toHaveLength(0);
+  });
+
   test("IncidentWorkspace (a full Workspace page) has no automated a11y violations", async () => {
     const { container } = render(
       <QueryClientProvider client={new QueryClient()}>
@@ -370,6 +442,10 @@ describe("axe-core automated accessibility audit (jsdom, layout rules excluded)"
     ["Kubernetes Workload detail", KubernetesWorkloadDetail],
     ["IOC detail", IocDetail],
     ["Knowledge Node detail", KnowledgeNodeDetail],
+    ["Command Center", CommandCenterPage],
+    ["Cyber Asset Graph (incl. table-view fallback)", AssetGraphPage],
+    ["Knowledge Graph (list)", KnowledgeGraphPage],
+    ["Reports (executive summary)", ReportsPage],
   ])("SOC/Risk Workspace: %s has no automated a11y violations", async (_label, Page) => {
     const { container } = render(
       <QueryClientProvider client={new QueryClient()}>
