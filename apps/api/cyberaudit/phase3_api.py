@@ -82,6 +82,7 @@ async def _page(
 async def list_evidence(
     job_id: str | None = None,
     finding_id: str | None = None,
+    engagement_id: str | None = None,
     page_number: int = Query(1, ge=1, alias="page"),
     page_size: int = Query(20, ge=1, le=100),
     user: User = Depends(require_permission("evidence.read")),
@@ -90,6 +91,8 @@ async def list_evidence(
     where = [Evidence.organization_id == user.organization_id]
     if job_id:
         where.append(Evidence.job_id == job_id)
+    if engagement_id:
+        where.append(Evidence.engagement_id == engagement_id)
     if finding_id:
         linked_ids = select(FindingEvidence.evidence_id).where(
             FindingEvidence.finding_id == finding_id
@@ -447,15 +450,19 @@ async def cancel_import(
 
 @router.get("/retests")
 async def list_retests(
+    finding_id: str | None = None,
     page_number: int = Query(1, ge=1, alias="page"),
     page_size: int = Query(20, ge=1, le=100),
     user: User = Depends(require_permission("retests.read")),
     db: AsyncSession = Depends(get_db),
 ):
+    conditions = [Retest.organization_id == user.organization_id]
+    if finding_id:
+        conditions.append(Retest.finding_id == finding_id)
     return await _page(
         db,
         Retest,
-        [Retest.organization_id == user.organization_id],
+        conditions,
         page_number,
         page_size,
         Retest.created_at.desc(),

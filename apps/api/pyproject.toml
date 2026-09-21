@@ -10,32 +10,37 @@ dependencies = [
   "alembic>=1.14,<2",
   "aiosqlite>=0.20,<1",
   "asyncpg>=0.30,<1",
+  "boto3>=1.43.59,<2",
   "email-validator>=2.2,<3",
   "dramatiq[redis]>=1.17,<2",
   "defusedxml>=0.7,<1",
   "dnspython>=2.7,<3",
   "fastapi>=0.115,<1",
   "httpx>=0.28,<1",
-  "cryptography>=46,<47",
+  "cryptography>=50.0,<51",
   "passlib[argon2]>=1.7,<2",
   "pydantic-settings>=2.7,<3",
   "pyjwt>=2.10,<3",
+  "psutil>=6.1,<8",
   "python-multipart>=0.0.20,<1",
   "redis>=5.2,<6",
   "sqlalchemy[asyncio]>=2.0,<3",
-  "uvicorn[standard]>=0.34,<1"
+  "uvicorn[standard]>=0.34,<1",
+  "webauthn>=3.0,<4"
 ]
 
 [project.optional-dependencies]
 dev = [
-  "black>=24.10,<26",
+  "black>=26.3.1,<27",
+  "boto3-stubs[s3]>=1.43.59,<2",
   "coverage>=7.6,<8",
   "mypy>=1.14,<2",
-  "pytest>=8.3,<9",
-  "pytest-asyncio>=0.25,<1",
+  "pytest>=9.0.3,<10",
+  "pytest-asyncio>=1.3,<2",
   "pytest-cov>=6,<8",
   "ruff>=0.9,<1",
-  "types-defusedxml>=0.7,<1"
+  "types-defusedxml>=0.7,<1",
+  "types-psutil>=6.1,<8"
 ]
 
 [tool.setuptools.packages.find]
@@ -46,6 +51,20 @@ include = ["cyberaudit*"]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 addopts = "--cov=cyberaudit --cov-report=term-missing"
+
+[tool.coverage.run]
+# Demo-data CLI loaders are verified by migration/seed smoke tests. The unit
+# coverage gate measures the API, policy, storage and worker runtime.
+#
+# readiness_dlq_validation.py is a CLI entrypoint that drives real Redis
+# queues and a live Dramatiq worker end-to-end (see `make test-network-safety`
+# / README "Laboratorio controlado"); it has no meaningful unit-test double
+# and is verified by that infrastructure job instead of pytest coverage.
+omit = [
+  "*/cyberaudit/seed.py",
+  "*/cyberaudit/seed_*.py",
+  "*/cyberaudit/readiness_dlq_validation.py",
+]
 
 [tool.ruff]
 line-length = 100
@@ -66,5 +85,13 @@ plugins = ["pydantic.mypy", "sqlalchemy.ext.mypy.plugin"]
 exclude = ["alembic"]
 
 [[tool.mypy.overrides]]
-module = ["passlib.*", "dns.*", "defusedxml.*"]
+module = [
+  "passlib.*",
+  "dns.*",
+  "defusedxml.*",
+  "boto3",
+  "boto3.*",
+  "botocore",
+  "botocore.*"
+]
 ignore_missing_imports = true

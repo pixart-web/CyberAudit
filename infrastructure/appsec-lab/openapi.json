@@ -1,0 +1,48 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "CyberAudit Synthetic AppSec API",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:8090"
+    }
+  ],
+  "paths": {
+    "/api/demo-assets/{assetId}": {
+      "get": {
+        "operationId": "getSyntheticAsset",
+        "summary": "Return a synthetic asset",
+        "security": [
+          {
+            "demoBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "assetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Synthetic response"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "demoBearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  }
+}

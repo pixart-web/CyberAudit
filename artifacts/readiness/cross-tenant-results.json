@@ -1,0 +1,18 @@
+{
+  "status": "passed",
+  "executed_at": "2026-09-20T14:31:30Z",
+  "test_count": 13,
+  "layers": [
+    "policy",
+    "orchestrator",
+    "graph",
+    "connector",
+    "worker",
+    "evidence",
+    "dlq",
+    "execution_api",
+    "ai_agents",
+    "engagement_reporting"
+  ],
+  "synthetic_data_only": true
+}

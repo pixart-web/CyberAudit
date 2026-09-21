@@ -1,0 +1,47 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: {{ include "cyberaudit.fullname" . }}-default-deny }
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: {{ include "cyberaudit.fullname" . }}-application }
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: cyberaudit }
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector: { matchLabels: { app.kubernetes.io/name: cyberaudit } }
+    - ports:
+        - { protocol: TCP, port: 3000 }
+  egress:
+    - ports:
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }
+        - { protocol: TCP, port: 443 }
+        - { protocol: TCP, port: 5432 }
+        - { protocol: TCP, port: 6379 }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: { name: {{ include "cyberaudit.fullname" . }}-api }
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: cyberaudit, app.kubernetes.io/component: api }
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: { name: {{ include "cyberaudit.fullname" . }}-api }
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: {{ include "cyberaudit.fullname" . }}-api }
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: 70 }

@@ -1,0 +1,73 @@
+{
+  "status": "partial",
+  "generated_at": "2026-08-03T21:43:02Z",
+  "formats": [
+    "CycloneDX JSON",
+    "SPDX JSON"
+  ],
+  "syft_version": "      1.50.0",
+  "files": [
+    {
+      "path": "artifacts/release/sbom/api-source.cyclonedx.json",
+      "sha256": "c08653d5eac7ffd8963bde5ffae80ade3a8c71c62a319f83923938d4e3ed6259",
+      "size_bytes": 4726
+    },
+    {
+      "path": "artifacts/release/sbom/api-source.spdx.json",
+      "sha256": "b2204d660ee074dc50ae736adb9a90466ce507301f256709ebd21bc3aa49f6eb",
+      "size_bytes": 7893
+    },
+    {
+      "path": "artifacts/release/sbom/web-source.cyclonedx.json",
+      "sha256": "767a677e28b047e694bda4bda0368f42397b84c2d8bdb05ebb2856f7682efc62",
+      "size_bytes": 447
+    },
+    {
+      "path": "artifacts/release/sbom/web-source.spdx.json",
+      "sha256": "1c2f7b581cf75be26870ed66423b7c439847c6ddb950acfd0454fa3b75b0ad04",
+      "size_bytes": 1829
+    },
+    {
+      "path": "artifacts/release/sbom/api-image.cyclonedx.json",
+      "sha256": "58100681c258a9b01f86f1901527a5906fbecbdd4fbfa0c23a6c8c85194929ab",
+      "size_bytes": 1391018
+    },
+    {
+      "path": "artifacts/release/sbom/api-image.spdx.json",
+      "sha256": "546a8f5b87d7771ec8b1023e1fa8e15d1f2f39560660c8a8669ad533cb2cbbb0",
+      "size_bytes": 3133500
+    },
+    {
+      "path": "artifacts/release/sbom/web-image.cyclonedx.json",
+      "sha256": "e1c1757f022e81df5abbd437cd73860570b3cfbec951daa1133ad342371e154a",
+      "size_bytes": 650409
+    },
+    {
+      "path": "artifacts/release/sbom/web-image.spdx.json",
+      "sha256": "d1e5938b9c59a6ff11428b928ca4a5b14cd44079c8f028c03f0e18d75bf60772",
+      "size_bytes": 989570
+    },
+    {
+      "path": "artifacts/release/sbom/worker-image.cyclonedx.json",
+      "sha256": "494ca8b495c2f1658c77e556a66c609c0706ebdeb0e1807cf3bcf9cdd446572b",
+      "size_bytes": 1391021
+    },
+    {
+      "path": "artifacts/release/sbom/worker-image.spdx.json",
+      "sha256": "914e46dd7798001845a68fa59bd2d80c49257690c71d1f2ce2cffc3c8a97e1cc",
+      "size_bytes": 3134031
+    },
+    {
+      "path": "artifacts/release/sbom/runner-image.cyclonedx.json",
+      "sha256": "aace0efd26fc2c8f99d4dfb5a02987ebbde6cdbea2683ef6bbd7bf2afcd96ecc",
+      "size_bytes": 272169
+    },
+    {
+      "path": "artifacts/release/sbom/runner-image.spdx.json",
+      "sha256": "47cd37a2f42c08ff1a2d0296b7fb6bd0a66d073871f6842a09760f12dda4cbaa",
+      "size_bytes": 623792
+    }
+  ],
+  "release_bundle_pending": true,
+  "notes": "Component SBOMs generated. Release bundle SBOM requires a frozen clean commit."
+}

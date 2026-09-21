@@ -451,6 +451,7 @@ async def reject(
 @router.get("/findings", tags=["execution"])
 async def list_findings(
     q: str = "",
+    engagement_id: str | None = None,
     page_number: int = Query(1, ge=1, alias="page"),
     page_size: int = Query(20, ge=1, le=100),
     user: User = Depends(require_permission("findings.read")),
@@ -459,6 +460,8 @@ async def list_findings(
     where = [Finding.organization_id == user.organization_id]
     if q:
         where.append(or_(Finding.title.ilike(f"%{q}%"), Finding.category.ilike(f"%{q}%")))
+    if engagement_id:
+        where.append(Finding.engagement_id == engagement_id)
     return await page(db, Finding, where, page_number, page_size, Finding.last_seen_at.desc())
 
 

@@ -1,0 +1,46 @@
+{{- $root := . -}}
+{{- range $component := list "api" "web" "worker" }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "cyberaudit.fullname" $root }}-{{ $component }}
+  labels: { app.kubernetes.io/name: cyberaudit, app.kubernetes.io/component: {{ $component }} }
+spec:
+  replicas: {{ index $root.Values.replicaCount $component }}
+  selector:
+    matchLabels: { app.kubernetes.io/name: cyberaudit, app.kubernetes.io/component: {{ $component }} }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: cyberaudit, app.kubernetes.io/component: {{ $component }} }
+    spec:
+      automountServiceAccountToken: false
+      securityContext: { runAsNonRoot: true, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: {{ $component }}
+          {{- $imageKey := ternary "api" $component (eq $component "worker") }}
+          image: "{{ (index $root.Values.image $imageKey).repository }}@{{ required "image digest is required" (index $root.Values.image $imageKey).digest }}"
+          imagePullPolicy: {{ (index $root.Values.image $imageKey).pullPolicy }}
+          {{- if eq $component "worker" }}
+          command: ["dramatiq", "cyberaudit.worker", "--processes", "2", "--threads", "4"]
+          {{- end }}
+          envFrom: [{ secretRef: { name: {{ $root.Values.existingSecret }} } }]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources: {{ toYaml (index $root.Values.resources $component) | nindent 12 }}
+          volumeMounts: [{ name: tmp, mountPath: /tmp }]
+          {{- if ne $component "worker" }}
+          ports:
+            - name: http
+              containerPort: {{ if eq $component "api" }}8000{{ else }}3000{{ end }}
+          readinessProbe:
+            httpGet: { path: {{ if eq $component "api" }}/ready{{ else }}/{{ end }}, port: http }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: {{ if eq $component "api" }}/health{{ else }}/{{ end }}, port: http }
+            periodSeconds: 20
+          {{- end }}
+      volumes: [{ name: tmp, emptyDir: { sizeLimit: 512Mi } }]
+{{- end }}

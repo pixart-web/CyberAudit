@@ -29,9 +29,22 @@ FINDING_COLUMNS = [
 
 
 def upgrade() -> None:
+    inspector = sa.inspect(op.get_bind())
+    existing = {column["name"] for column in inspector.get_columns("findings")}
     for column in FINDING_COLUMNS:
-        op.add_column("findings", column)
-    Base.metadata.create_all(bind=op.get_bind())
+        if column.name not in existing:
+            op.add_column("findings", column)
+    table_names = [
+        "evidence",
+        "retests",
+        "asset_observations",
+        "asset_suggestions",
+        "external_imports",
+        "finding_evidence",
+    ]
+    Base.metadata.create_all(
+        bind=op.get_bind(), tables=[Base.metadata.tables[name] for name in table_names]
+    )
 
 
 def downgrade() -> None:
@@ -44,5 +57,8 @@ def downgrade() -> None:
         "evidence",
     ]:
         op.drop_table(table_name)
+    inspector = sa.inspect(op.get_bind())
+    existing = {column["name"] for column in inspector.get_columns("findings")}
     for column in reversed(FINDING_COLUMNS):
-        op.drop_column("findings", column.name)
+        if column.name in existing:
+            op.drop_column("findings", column.name)
