@@ -1673,10 +1673,34 @@ async def get_knowledge_node(
             )
         ).all()
     )
+    other_node_ids = {edge.target_node_id for edge in outgoing} | {
+        edge.source_node_id for edge in incoming
+    }
+    other_nodes_by_id: dict[str, Any] = {}
+    if other_node_ids:
+        rows = list(
+            (
+                await db.scalars(
+                    select(KnowledgeNode).where(
+                        KnowledgeNode.organization_id == user.organization_id,
+                        KnowledgeNode.id.in_(other_node_ids),
+                    )
+                )
+            ).all()
+        )
+        other_nodes_by_id = {
+            row.id: {"label": row.label, "source_id": row.source_id} for row in rows
+        }
     return {
         "node": serialize(node),
-        "outgoing_edges": [serialize(edge) for edge in outgoing],
-        "incoming_edges": [serialize(edge) for edge in incoming],
+        "outgoing_edges": [
+            {**serialize(edge), "other_node": other_nodes_by_id.get(edge.target_node_id)}
+            for edge in outgoing
+        ],
+        "incoming_edges": [
+            {**serialize(edge), "other_node": other_nodes_by_id.get(edge.source_node_id)}
+            for edge in incoming
+        ],
     }
 
 

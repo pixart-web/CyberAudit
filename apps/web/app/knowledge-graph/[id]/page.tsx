@@ -5,6 +5,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { BrainCircuit } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useState } from "react";
 import { Shell } from "@/components/shell";
 import { api } from "@/lib/api";
 
@@ -18,7 +19,15 @@ type Node = {
   confidence: number;
   indexed_at: string;
 };
-type Edge = { id: string; source_node_id: string; target_node_id: string; edge_type: string; confidence: number; inferred: boolean };
+type Edge = {
+  id: string;
+  source_node_id: string;
+  target_node_id: string;
+  edge_type: string;
+  confidence: number;
+  inferred: boolean;
+  other_node: { label: string; source_id: string } | null;
+};
 type NodeDetail = { node: Node; outgoing_edges: Edge[]; incoming_edges: Edge[] };
 type AgentAnswer = {
   response: string;
@@ -44,6 +53,19 @@ export default function KnowledgeNodeDetail() {
           source_ids: data ? [data.node.source_id] : [],
         }),
       }),
+  });
+
+  const [explainedEdgeId, setExplainedEdgeId] = useState<string | null>(null);
+  const explainRelation = useMutation({
+    mutationFn: (edge: Edge) =>
+      api<AgentAnswer>("/agents/knowledge_analyst/ask", {
+        method: "POST",
+        body: JSON.stringify({
+          question: `Explica a relação "${edge.edge_type}" entre estas entidades com base na evidência registada.`,
+          source_ids: [data?.node.source_id, edge.other_node?.source_id].filter(Boolean),
+        }),
+      }),
+    onSuccess: (_result, edge) => setExplainedEdgeId(edge.id),
   });
 
   if (isLoading) return <Shell title="Nó do Knowledge Graph"><LoadingState /></Shell>;
@@ -96,12 +118,13 @@ export default function KnowledgeNodeDetail() {
           {outgoing_edges.length === 0 && <EmptyState title="Sem relações de saída." />}
           <ul className="space-y-2">
             {outgoing_edges.map((edge) => (
-              <li key={edge.id}>
-                <Link href={`/knowledge-graph/${edge.target_node_id}`} className="flex items-center justify-between rounded-lg border border-border p-3 text-sm hover:border-primary/40">
-                  <span>{edge.edge_type}</span>
-                  {edge.inferred && <Badge tone="warning">inferido</Badge>}
-                </Link>
-              </li>
+              <RelationRow
+                key={edge.id}
+                edge={edge}
+                targetId={edge.target_node_id}
+                explainRelation={explainRelation}
+                explainedEdgeId={explainedEdgeId}
+              />
             ))}
           </ul>
         </Card>
@@ -110,16 +133,59 @@ export default function KnowledgeNodeDetail() {
           {incoming_edges.length === 0 && <EmptyState title="Sem relações de entrada." />}
           <ul className="space-y-2">
             {incoming_edges.map((edge) => (
-              <li key={edge.id}>
-                <Link href={`/knowledge-graph/${edge.source_node_id}`} className="flex items-center justify-between rounded-lg border border-border p-3 text-sm hover:border-primary/40">
-                  <span>{edge.edge_type}</span>
-                  {edge.inferred && <Badge tone="warning">inferido</Badge>}
-                </Link>
-              </li>
+              <RelationRow
+                key={edge.id}
+                edge={edge}
+                targetId={edge.source_node_id}
+                explainRelation={explainRelation}
+                explainedEdgeId={explainedEdgeId}
+              />
             ))}
           </ul>
         </Card>
       </div>
     </Shell>
+  );
+}
+
+function RelationRow({
+  edge,
+  targetId,
+  explainRelation,
+  explainedEdgeId,
+}: {
+  edge: Edge;
+  targetId: string;
+  explainRelation: ReturnType<typeof useMutation<AgentAnswer, Error, Edge>>;
+  explainedEdgeId: string | null;
+}) {
+  const isPending = explainRelation.isPending && explainRelation.variables?.id === edge.id;
+  return (
+    <li>
+      <div className="flex items-center justify-between rounded-lg border border-border p-3 text-sm">
+        <Link href={`/knowledge-graph/${targetId}`} className="hover:text-primary">
+          {edge.edge_type} {edge.other_node ? `→ ${edge.other_node.label}` : ""}
+        </Link>
+        <div className="flex items-center gap-2">
+          {edge.inferred && <Badge tone="warning">inferido</Badge>}
+          <button
+            type="button"
+            aria-label={`Explicar relação ${edge.edge_type}`}
+            className="rounded-md border border-border px-2 py-1 text-xs hover:border-primary disabled:opacity-50"
+            onClick={() => explainRelation.mutate(edge)}
+            disabled={isPending}
+          >
+            <BrainCircuit size={12} className="mr-1 inline text-primary" />
+            {isPending ? "A explicar…" : "Explicar"}
+          </button>
+        </div>
+      </div>
+      {explainedEdgeId === edge.id && explainRelation.data && (
+        <div className="mt-2 rounded-lg border border-border bg-surface p-3 text-xs">
+          <p>{explainRelation.data.response}</p>
+          <p className="mt-1 text-muted">Confiança: {(explainRelation.data.confidence * 100).toFixed(0)}%</p>
+        </div>
+      )}
+    </li>
   );
 }

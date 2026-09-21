@@ -83,7 +83,17 @@ export function IncidentWorkspace({ id }: { id: string }) {
       api<AgentAnswer>("/agents/incident_analyst/ask", {
         method: "POST",
         body: JSON.stringify({
-          question: "Reconstrói a cronologia deste incidente a partir da evidência registada.",
+          question: "Analisa este incidente: impacto, categoria e o que está confirmado por evidência.",
+          source_ids: [id],
+        }),
+      }),
+  });
+  const summarizeTimeline = useMutation({
+    mutationFn: () =>
+      api<AgentAnswer>("/agents/incident_analyst/ask", {
+        method: "POST",
+        body: JSON.stringify({
+          question: "Resume a cronologia deste incidente em ordem, estritamente a partir da evidência registada.",
           source_ids: [id],
         }),
       }),
@@ -220,6 +230,34 @@ export function IncidentWorkspace({ id }: { id: string }) {
                 {analyze.data.limitations.length > 0 && (
                   <ul className="list-disc pl-4 text-xs text-muted">
                     {analyze.data.limitations.map((limitation, index) => (
+                      <li key={index}>{limitation}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+
+            <button
+              type="button"
+              className="mb-4 mt-4 inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-4 py-2 text-sm font-medium hover:border-primary disabled:opacity-50"
+              onClick={() => summarizeTimeline.mutate()}
+              disabled={summarizeTimeline.isPending}
+            >
+              <BrainCircuit size={16} className="text-primary" />
+              {summarizeTimeline.isPending ? "A resumir…" : "Resumir cronologia"}
+            </button>
+            {summarizeTimeline.data && (
+              <div className="space-y-3 rounded-lg border border-border bg-surface p-4 text-sm">
+                <p>{summarizeTimeline.data.response}</p>
+                {summarizeTimeline.data.citations.length > 0 && (
+                  <p className="text-xs text-muted">
+                    Fontes: {summarizeTimeline.data.citations.map((citation) => citation.source_id ?? citation.node_id).join(", ")}
+                  </p>
+                )}
+                <p className="text-xs text-muted">Confiança: {(summarizeTimeline.data.confidence * 100).toFixed(0)}%</p>
+                {summarizeTimeline.data.limitations.length > 0 && (
+                  <ul className="list-disc pl-4 text-xs text-muted">
+                    {summarizeTimeline.data.limitations.map((limitation, index) => (
                       <li key={index}>{limitation}</li>
                     ))}
                   </ul>

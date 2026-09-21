@@ -18,6 +18,7 @@ type AgentAnswer = {
   citations: { node_id: string; source_type: string; source_id: string }[];
   confidence: number;
   limitations: string[];
+  required_human_approval: boolean;
 };
 
 const TABS = [
@@ -43,6 +44,16 @@ export default function FindingDetail(){
         method: "POST",
         body: JSON.stringify({
           question: "Explica o risco associado a este finding e o que está confirmado por evidência.",
+          source_ids: [id],
+        }),
+      }),
+  });
+  const recommend = useMutation({
+    mutationFn: () =>
+      api<AgentAnswer>("/agents/remediation_advisor/ask", {
+        method: "POST",
+        body: JSON.stringify({
+          question: "Propõe passos de remediação para este finding com base na evidência registada.",
           source_ids: [id],
         }),
       }),
@@ -110,6 +121,37 @@ export default function FindingDetail(){
               {explain.data.limitations.length > 0 && (
                 <ul className="list-disc pl-4 text-xs text-muted">
                   {explain.data.limitations.map((limitation, index) => (
+                    <li key={index}>{limitation}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
+          <button
+            type="button"
+            className="mb-4 mt-4 inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-4 py-2 text-sm font-medium hover:border-primary disabled:opacity-50"
+            onClick={() => recommend.mutate()}
+            disabled={recommend.isPending}
+          >
+            <BrainCircuit size={16} className="text-primary" />
+            {recommend.isPending ? "A propor…" : "Recomendar remediação"}
+          </button>
+          {recommend.data && (
+            <div className="space-y-3 rounded-lg border border-border bg-surface p-4 text-sm">
+              <p>{recommend.data.response}</p>
+              {recommend.data.required_human_approval && (
+                <Badge tone="warning">Requer aprovação humana antes de qualquer ação</Badge>
+              )}
+              {recommend.data.citations.length > 0 && (
+                <p className="text-xs text-muted">
+                  Fontes: {recommend.data.citations.map((citation) => citation.source_id).join(", ")}
+                </p>
+              )}
+              <p className="text-xs text-muted">Confiança: {(recommend.data.confidence * 100).toFixed(0)}%</p>
+              {recommend.data.limitations.length > 0 && (
+                <ul className="list-disc pl-4 text-xs text-muted">
+                  {recommend.data.limitations.map((limitation, index) => (
                     <li key={index}>{limitation}</li>
                   ))}
                 </ul>

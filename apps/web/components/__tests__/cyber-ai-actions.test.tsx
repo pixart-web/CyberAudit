@@ -76,6 +76,13 @@ test("Incident Workspace's Cyber AI tab calls the real incident_analyst agent, n
   expect(await screen.findByText(/Cronologia reconstruída/)).toBeInTheDocument();
 });
 
+test("Incident Workspace's Cyber AI tab can also summarize the timeline, distinct from the broader analysis", async () => {
+  wrapper(<IncidentWorkspace id="inc-1" />);
+  fireEvent.click(await screen.findByRole("tab", { name: "Cyber AI" }));
+  fireEvent.click(screen.getByRole("button", { name: /Resumir cronologia/ }));
+  expect(await screen.findByText(/Cronologia reconstruída/)).toBeInTheDocument();
+});
+
 test("Identity Workspace's Risk tab can explain risk via the real identity_analyst agent", async () => {
   wrapper(<IdentityWorkspace id="identity-1" />);
   fireEvent.click(await screen.findByRole("tab", { name: "Risco" }));
