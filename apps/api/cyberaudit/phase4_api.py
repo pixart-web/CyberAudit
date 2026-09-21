@@ -9,7 +9,7 @@ from typing import Any, Literal, cast
 import redis.asyncio as redis
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from sqlalchemy import func, or_, select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from cyberaudit.asset_graph import (
@@ -25,6 +25,7 @@ from cyberaudit.enterprise_models import Incident, UnifiedControl
 from cyberaudit.models import (
     Asset,
     Client,
+    Criticality,
     Engagement,
     Finding,
     JobStatus,
@@ -1540,35 +1541,66 @@ async def command_center(
     user: User = Depends(require_permission("risk.read")),
     db: AsyncSession = Depends(get_db),
 ):
-    assets = list(
+    # Aggregated in SQL rather than loading every Asset/Service/Finding row
+    # into memory: a command-center dashboard is requested far more often
+    # than the underlying tables change, and those tables are unbounded in
+    # a real deployment.
+    asset_row = (
+        await db.execute(
+            select(
+                func.count(Asset.id),
+                func.coalesce(func.avg(Asset.risk_score), 0.0),
+                func.coalesce(func.avg(Asset.exposure_score), 0.0),
+                func.sum(case((Asset.lifecycle_status == "discovered", 1), else_=0)),
+                func.sum(case((Asset.managed.is_(False), 1), else_=0)),
+                func.sum(case((Asset.internet_exposed.is_(True), 1), else_=0)),
+            ).where(
+                Asset.organization_id == user.organization_id,
+                Asset.deleted_at.is_(None),
+            )
+        )
+    ).one()
+    (
+        asset_count,
+        avg_risk_score,
+        avg_exposure_score,
+        new_assets,
+        unmanaged_assets,
+        internet_exposed_assets,
+    ) = asset_row
+    top_assets = list(
         (
             await db.scalars(
-                select(Asset).where(
-                    Asset.organization_id == user.organization_id,
-                    Asset.deleted_at.is_(None),
-                )
+                select(Asset)
+                .where(Asset.organization_id == user.organization_id, Asset.deleted_at.is_(None))
+                .order_by(Asset.risk_score.desc())
+                .limit(5)
             )
         ).all()
     )
-    services = list(
-        (
-            await db.scalars(select(Service).where(Service.organization_id == user.organization_id))
-        ).all()
+    open_services = await db.scalar(
+        select(func.count())
+        .select_from(Service)
+        .where(Service.organization_id == user.organization_id, Service.state == "open")
     )
-    findings = list(
-        (
-            await db.scalars(select(Finding).where(Finding.organization_id == user.organization_id))
-        ).all()
+    critical_open_findings = await db.scalar(
+        select(func.count())
+        .select_from(Finding)
+        .where(
+            Finding.organization_id == user.organization_id,
+            Finding.technical_severity == Criticality.CRITICAL,
+            Finding.status == "open",
+        )
     )
-    vulnerabilities = list((await db.scalars(select(Vulnerability))).all())
-    coverage = list(
-        (
-            await db.scalars(
-                select(AssessmentCoverage).where(
-                    AssessmentCoverage.organization_id == user.organization_id
-                )
-            )
-        ).all()
+    known_exploited = await db.scalar(
+        select(func.count())
+        .select_from(Vulnerability)
+        .where(Vulnerability.known_exploited.is_(True))
+    )
+    coverage_avg = await db.scalar(
+        select(func.avg(AssessmentCoverage.coverage_score)).where(
+            AssessmentCoverage.organization_id == user.organization_id
+        )
     )
     running_jobs = await db.scalar(
         select(func.count())
@@ -1618,33 +1650,24 @@ async def command_center(
         )
     )
     return {
-        "security_posture": max(
-            0, round(100 - sum(asset.risk_score for asset in assets) / max(1, len(assets)), 1)
-        ),
-        "exposure_score": round(
-            sum(asset.exposure_score for asset in assets) / max(1, len(assets)), 1
-        ),
-        "assets": len(assets),
-        "new_assets": sum(asset.lifecycle_status == "discovered" for asset in assets),
-        "unmanaged_assets": sum(not asset.managed for asset in assets),
-        "internet_exposed_assets": sum(asset.internet_exposed for asset in assets),
-        "open_services": sum(service.state == "open" for service in services),
-        "critical_findings": sum(
-            str(finding.technical_severity) == "critical" and finding.status == "open"
-            for finding in findings
-        ),
-        "known_exploited": sum(item.known_exploited for item in vulnerabilities),
-        "coverage": round(sum(item.coverage_score for item in coverage) / max(1, len(coverage)), 1),
+        "security_posture": max(0, round(100 - avg_risk_score, 1)),
+        "exposure_score": round(avg_exposure_score, 1),
+        "assets": asset_count,
+        "new_assets": new_assets or 0,
+        "unmanaged_assets": unmanaged_assets or 0,
+        "internet_exposed_assets": internet_exposed_assets or 0,
+        "open_services": open_services or 0,
+        "critical_findings": critical_open_findings or 0,
+        "known_exploited": known_exploited or 0,
+        "coverage": round(coverage_avg or 0.0, 1),
         "running_jobs": running_jobs or 0,
         "open_incidents": open_incidents or 0,
         "active_engagements": active_engagements or 0,
         "failing_controls": failing_controls or 0,
         "high_risk_identities": high_risk_identities or 0,
-        "top_assets": sorted(
-            [{"id": asset.id, "name": asset.name, "risk": asset.risk_score} for asset in assets],
-            key=lambda item: cast(float, item["risk"]),
-            reverse=True,
-        )[:5],
+        "top_assets": [
+            {"id": asset.id, "name": asset.name, "risk": asset.risk_score} for asset in top_assets
+        ],
     }
 
 
