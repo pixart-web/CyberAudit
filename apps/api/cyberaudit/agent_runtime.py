@@ -265,6 +265,18 @@ AGENT_CATALOG: dict[str, AgentDefinition] = {
         knowledge_scopes=("control",),
         allowed_tools=(),
     ),
+    "attack_path_analyst": AgentDefinition(
+        code="attack_path_analyst",
+        name="Attack Path Analyst Agent",
+        mission=(
+            "Explain a recorded attack path in plain language; the path's steps, "
+            "confidence and mitigations are graph facts computed by deterministic "
+            "rules and never altered or re-derived by this agent."
+        ),
+        service_literal="attack_path",
+        knowledge_scopes=("risk", "asset"),
+        allowed_tools=(),
+    ),
     "knowledge_analyst": AgentDefinition(
         code="knowledge_analyst",
         name="Knowledge Analyst Agent",

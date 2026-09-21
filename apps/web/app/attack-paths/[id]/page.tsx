@@ -8,6 +8,13 @@ import { useState } from "react";
 import { Shell } from "@/components/shell";
 import { api } from "@/lib/api";
 
+type AgentAnswer = {
+  response: string;
+  citations: { source_id: string }[];
+  confidence: number;
+  limitations: string[];
+};
+
 type AttackPath = {
   id: string;
   name: string;
@@ -48,6 +55,17 @@ export default function AttackPathDetail() {
   const review = useMutation({
     mutationFn: (action: "validate" | "reject") => api(`/attack-paths/${id}/${action}`, { method: "POST" }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["attack-path", id] }),
+  });
+
+  const explain = useMutation({
+    mutationFn: () =>
+      api<AgentAnswer>("/agents/attack_path_analyst/ask", {
+        method: "POST",
+        body: JSON.stringify({
+          question: "Explica este caminho de ataque em linguagem simples para um analista.",
+          source_ids: [id],
+        }),
+      }),
   });
 
   if (isLoading) return <Shell title="Attack Path"><LoadingState /></Shell>;
@@ -148,6 +166,35 @@ export default function AttackPathDetail() {
             ))}
           </tbody>
         </table>
+      </Card>
+
+      <Card className="mt-4 p-6">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="font-semibold">Cyber AI — Explicar Attack Path</h2>
+          <Button className="text-xs" onClick={() => explain.mutate()} disabled={explain.isPending}>
+            {explain.isPending ? "A explicar…" : "Explicar caminho de ataque"}
+          </Button>
+        </div>
+        <p className="mb-3 text-xs text-muted">
+          Os passos, condições e mitigações acima são factos do grafo, calculados por regras determinísticas. A
+          explicação abaixo é gerada por IA a partir dessas fontes internas e nunca altera ou substitui esses factos.
+        </p>
+        {explain.data && (
+          <div className="rounded-lg border border-border bg-card/60 p-4 text-sm">
+            <p className="mb-2">{explain.data.response}</p>
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
+              <Badge tone="info">Confiança: {Math.round(explain.data.confidence * 100)}%</Badge>
+              <span>{explain.data.citations.length} citação(ões) interna(s)</span>
+            </div>
+            {explain.data.limitations.length > 0 && (
+              <ul className="mt-2 list-disc pl-4 text-xs text-muted">
+                {explain.data.limitations.map((limitation) => (
+                  <li key={limitation}>{limitation}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
       </Card>
     </Shell>
   );
