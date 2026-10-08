@@ -114,12 +114,14 @@ async def lifespan(_: FastAPI):
     yield
 
 
+hide_api_docs = settings.production_like or not settings.api_docs_enabled
 app = FastAPI(
     title="CyberAudit API",
     version="0.2.0",
     lifespan=lifespan,
-    docs_url=None if settings.production_like else "/docs",
-    redoc_url=None if settings.production_like else "/redoc",
+    docs_url=None if hide_api_docs else "/docs",
+    redoc_url=None if hide_api_docs else "/redoc",
+    openapi_url=None if hide_api_docs else "/openapi.json",
 )
 app.include_router(execution_router)
 app.include_router(phase3_router)

@@ -1,8 +1,10 @@
 import asyncio
+import os
 from datetime import date, datetime, time, timedelta, timezone
 
 from sqlalchemy import select
 
+from cyberaudit.config import get_settings
 from cyberaudit.db import Base, SessionLocal, engine
 from cyberaudit.models import (
     Asset,
@@ -93,6 +95,18 @@ ROLE_CODES = {
 }
 
 
+def _demo_admin_password() -> str:
+    """Demo admin password: explicit secret, or the documented default ONLY in development."""
+    configured = os.environ.get("DEMO_ADMIN_PASSWORD")
+    if configured:
+        return configured
+    if get_settings().environment in {"development", "test"}:
+        return "ChangeMe123!"
+    raise SystemExit(
+        "Set DEMO_ADMIN_PASSWORD: the default demo password is only allowed in development."
+    )
+
+
 async def seed() -> None:
     async with engine.begin() as connection:
         await connection.run_sync(Base.metadata.create_all)
@@ -124,7 +138,7 @@ async def seed() -> None:
             organization_id=org.id,
             name="Administrador Demo",
             email="admin@cyberaudit.local",
-            password_hash=hash_password("ChangeMe123!"),
+            password_hash=hash_password(_demo_admin_password()),
             roles=[roles["Administrator"]],
         )
         db.add(admin)

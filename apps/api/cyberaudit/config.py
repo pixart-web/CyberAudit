@@ -86,6 +86,7 @@ class Settings(BaseSettings):
     request_max_bytes: int = Field(default=12 * 1024 * 1024, ge=1024)
     readiness_evidence_manifest: Path | None = None
     # One-time secret enabling POST /setup/initialize while no user exists.
+    api_docs_enabled: bool = True
     bootstrap_token: str | None = Field(default=None, min_length=16)
     # Sovereign AI runtime: disabled by default so core functionality never
     # depends on a running local model. An administrator opts in to a
