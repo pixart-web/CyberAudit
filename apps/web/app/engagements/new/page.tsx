@@ -25,7 +25,7 @@ export default function NewEngagement(){
   return <Shell title="Criar Auditoria"><form onSubmit={handleSubmit(submit)}><Card className="grid gap-5 p-6 md:grid-cols-2">
     <Field label="Cliente" error={errors.client_id?.message}><select className="field" {...register("client_id")}><option value="">Selecionar…</option>{clients.data?.items.map(i=><option key={i.id} value={i.id}>{i.name}</option>)}</select></Field>
     <Field label="Nome" error={errors.name?.message}><input className="field" {...register("name")}/></Field>
-    <Field label="Código" error={errors.code?.message}><input className="field font-mono uppercase" placeholder="ACME-2026-03" {...register("code")}/></Field>
+    <Field label="Código" error={errors.code?.message}><input className="field font-mono uppercase" placeholder="CLIENTE-2026-01" {...register("code")}/></Field>
     <Field label="Modo"><select className="field" {...register("mode")}><option value="client">Cliente</option><option value="laboratory">Laboratório</option></select></Field>
     <Field label="Data inicial"><input className="field" type="date" {...register("start_date")}/></Field>
     <Field label="Data final" error={errors.end_date?.message}><input className="field" type="date" {...register("end_date")}/></Field>

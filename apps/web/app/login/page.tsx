@@ -27,17 +27,14 @@ export default function LoginPage() {
   const router = useRouter();
   const [error, setError] = useState("");
   const [oidcLoading, setOidcLoading] = useState(false);
-  const [organizationSlug, setOrganizationSlug] = useState("cyberaudit-demo");
+  const [organizationSlug, setOrganizationSlug] = useState("");
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: {
-      email: "admin@cyberaudit.local",
-      password: "ChangeMe123!",
-    },
+    defaultValues: { email: "", password: "" },
   });
 
   const submit = async (values: FormData) => {

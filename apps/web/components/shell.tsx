@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import {
-  Activity, Bell, Boxes, BrainCircuit, BriefcaseBusiness, Building2, ChevronDown, CircleUserRound,
+  Activity, Bell, Boxes, BrainCircuit, BriefcaseBusiness, Building2, CircleUserRound,
   Cloud, Code2, Cpu, FileCheck2, FileDown, FileSearch, Fingerprint, FlaskConical, Gauge, GitBranch, Globe2, HeartPulse,
   KeyRound, Layers3, Menu, Network, PackageSearch, Radar, RefreshCw, RotateCcw, Search, Settings,
   Scale, ShieldAlert, ShieldCheck, Smartphone, TimerReset, Users, Webhook,
@@ -59,8 +59,18 @@ function SystemHealthIndicator() {
   );
 }
 
-export function Shell({ children, title, eyebrow = "CyberAudit Demo" }: { children: React.ReactNode; title: string; eyebrow?: string }) {
+type Me = { name: string; email: string; roles: string[] };
+
+export function Shell({ children, title, eyebrow }: { children: React.ReactNode; title: string; eyebrow?: string }) {
   const pathname = usePathname();
+  const me = useQuery({ queryKey: ["me"], queryFn: () => api<Me>("/auth/me"), staleTime: 60_000, retry: false });
+  const organization = useQuery({
+    queryKey: ["current-organization"],
+    queryFn: () => api<{ items: { name: string }[] }>("/organizations?page_size=1"),
+    staleTime: 300_000,
+    retry: false,
+  });
+  const organizationName = organization.data?.items?.[0]?.name ?? "CyberAudit";
   const commandItems: CommandItem[] = groups.flatMap((group) =>
     group.items.map(([label, href, Icon]) => ({ label, href, group: group.label, icon: Icon })),
   );
@@ -80,16 +90,15 @@ export function Shell({ children, title, eyebrow = "CyberAudit Demo" }: { childr
     <main className="app-main min-h-screen ml-[252px]">
       <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-border bg-background/90 px-5 backdrop-blur-xl">
         <button className="lg:hidden text-muted" aria-label="Abrir menu"><Menu /></button>
-        <button className="hidden min-w-36 items-center justify-between gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm lg:flex"><span>ACME-2026-01</span><ChevronDown size={14}/></button>
+        <span className="hidden min-w-36 items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm lg:flex" title="Organização ativa"><span className="truncate">{organizationName}</span></span>
         <GlobalSearch />
         <CommandPalette items={commandItems} />
         <SystemHealthIndicator />
-        <span className="badge badge-success"><span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-primary"/>Modo Cliente</span>
         <button className="relative rounded-lg border border-border p-2 text-muted" aria-label="Notificações"><Bell size={18}/><span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-critical"/></button>
-        <button className="flex items-center gap-2 rounded-lg border border-border px-2 py-1.5 text-left"><CircleUserRound size={22} className="text-primary"/><span className="hidden text-xs sm:block"><b className="block">Administrador</b><span className="text-muted">Administrator</span></span></button>
+        <button className="flex items-center gap-2 rounded-lg border border-border px-2 py-1.5 text-left"><CircleUserRound size={22} className="text-primary"/><span className="hidden text-xs sm:block"><b className="block">{me.data?.name ?? "—"}</b><span className="text-muted">{me.data?.roles?.[0] ?? ""}</span></span></button>
       </header>
       <div className="p-4 md:p-6 xl:p-8">
-        <p className="mb-1 text-xs text-muted">{eyebrow} <span className="mx-1">/</span> {title}</p>
+        <p className="mb-1 text-xs text-muted">{eyebrow ?? organizationName} <span className="mx-1">/</span> {title}</p>
         <div className="mb-6 flex items-center justify-between"><h1 className="text-2xl font-semibold tracking-tight">{title}</h1></div>
         {children}
       </div>
