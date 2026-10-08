@@ -316,7 +316,7 @@ async def _page(
     order: Any,
 ) -> dict[str, Any]:
     total = await db.scalar(select(func.count()).select_from(model).where(*where))
-    items = list(
+    items: list[Any] = list(
         (
             await db.scalars(
                 select(model)

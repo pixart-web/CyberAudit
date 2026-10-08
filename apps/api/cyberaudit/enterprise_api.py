@@ -278,7 +278,7 @@ async def page(
     if q and search_fields:
         where.append(or_(*(field.ilike(f"%{q}%") for field in search_fields)))
     total = await db.scalar(select(func.count()).select_from(model).where(*where))
-    rows = list(
+    rows: list[Any] = list(
         (
             await db.scalars(
                 select(model)

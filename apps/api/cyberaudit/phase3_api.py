@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import Response
@@ -64,7 +65,7 @@ async def _page(
     order,
 ):
     total = await db.scalar(select(func.count()).select_from(model).where(*where))
-    items = list(
+    items: list[Any] = list(
         (
             await db.scalars(
                 select(model)

@@ -300,10 +300,11 @@ async def create_organization(
 ):
     caller_org, caller_id, caller_email = caller.organization_id, caller.id, caller.email
     organization, admin = await _create_tenant(db, payload, "Administrator")
+    organization_id, organization_slug = organization.id, organization.slug
     result = {
-        "id": organization.id,
+        "id": organization_id,
         "name": organization.name,
-        "slug": organization.slug,
+        "slug": organization_slug,
         "administrator": {"id": admin.id, "email": admin.email},
     }
     await db.commit()
@@ -315,8 +316,8 @@ async def create_organization(
         caller,
         "organization.created",
         "organization",
-        result["id"],
-        metadata={"slug": result["slug"], "caller_email": caller_email},
+        organization_id,
+        metadata={"slug": organization_slug, "caller_email": caller_email},
     )
     await db.commit()
     return result

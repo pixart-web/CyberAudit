@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from io import BytesIO
+from typing import Any
 from xml.sax.saxutils import escape
 
 from reportlab.lib import colors
@@ -144,19 +145,16 @@ def render_report_pdf(data: ReportData, *, compress: bool = True) -> bytes:
             [["Severidade", "Findings"], *[[s.capitalize(), str(counts[s])] for s in SEVERITIES]],
             colWidths=[50 * mm, 30 * mm],
         )
-        sev_table.setStyle(
-            TableStyle(
-                [
-                    ("BACKGROUND", (0, 0), (-1, 0), BRAND),
-                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                    ("GRID", (0, 0), (-1, -1), 0.25, colors.lightgrey),
-                ]
-                + [
-                    ("TEXTCOLOR", (0, i + 1), (0, i + 1), _SEVERITY_COLORS[s])
-                    for i, s in enumerate(SEVERITIES)
-                ]
-            )
-        )
+        sev_style: list[Any] = [
+            ("BACKGROUND", (0, 0), (-1, 0), BRAND),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("GRID", (0, 0), (-1, -1), 0.25, colors.lightgrey),
+        ]
+        sev_style += [
+            ("TEXTCOLOR", (0, i + 1), (0, i + 1), _SEVERITY_COLORS[s])
+            for i, s in enumerate(SEVERITIES)
+        ]
+        sev_table.setStyle(TableStyle(sev_style))
         story += [Spacer(1, 4 * mm), sev_table]
     else:
         story.append(
