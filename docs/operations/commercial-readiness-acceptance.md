@@ -28,10 +28,10 @@ Environment: local, **real PostgreSQL 16** (docker, disposable), Alembic `upgrad
 | Organizations | ✔ | ✔ | – | N/A (lifecycle not implemented) | ✔ (form) | partial |
 | Users | ✔ | ✔ | ✔ (role/status/name) | disable | ✔ | done |
 | Roles | built-in catalog | ✔ | N/A | N/A | ✔ | done |
-| Clients | ✔ | ✔ | ✗ no PATCH | API `DELETE` only, no UI | ✔ create/list | partial |
+| Clients | ✔ | ✔ | ✔ PATCH (API, no UI) | API `DELETE` (soft), no UI | ✔ create/list | partial |
 | Engagements | ✔ (UI pre-existing) | ✔ | status only | – | not re-run | partial |
 | Scope / targets | ✔ | ✔ | ✗ | ✗ | form added, API ✔ | partial |
-| Assets | ✔ | ✔ | ✗ no PATCH in main API | ✗ | form added, API ✔ | partial |
+| Assets | ✔ | ✔ | ✔ PATCH (pre-existing, no UI) | ✔ archive (API, no UI) | form added, API ✔ | partial |
 | Jobs / imports | ✔ (API) | ✔ | cancel/retry (API) | – | import UI missing | partial |
 | Findings | via import/job only | ✔ | ✗ | ✗ | list ✔ | partial |
 | Evidence | adapter-collected only | ✔ | link/unlink | – | – | partial |
