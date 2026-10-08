@@ -42,3 +42,8 @@ Environment: local, **real PostgreSQL 16** (docker, disposable), Alembic `upgrad
 ## Automated
 Backend 319 passed, 1 skipped, coverage 76 % (gate 75 %); frontend 95 passed (axe a11y suite included); ruff, black, tsc, eslint clean;
 `pnpm audit --prod` and `pip-audit`: no known vulnerabilities; `alembic check` shows 8 foreign keys present in the migrated DB but not declared on the ORM models (DB stricter than models; no data risk, tracked).
+
+## Northstar demo tenant (item 59–61)
+`python -m cyberaudit.admin_cli seed-northstar` (requires `DEMO_ADMIN_PASSWORD`; refuses databases not named `*_demo`; idempotent).
+Verified on PostgreSQL 16: 3 users (Administrator / Security Analyst / Read-only Viewer), 8 assets with relationships, 9 synthetic findings (all `simulated`, `unverified`, `[DEMO]`-labelled), 1 incident with timeline, 2 risks, 2 controls with assessments (gaps), evidence links, knowledge-graph nodes, report. Verified live: dashboard posture 51 % from real asset risk, Command Center, graph (7 nodes / 5 edges), analyst can read but not administer (403), viewer cannot create (403), Cyber AI incident analysis grounded (degraded deterministic mode, no model installed).
+Demo reset = drop and recreate the dedicated demo database (never a customer database).

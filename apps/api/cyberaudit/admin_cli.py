@@ -4,6 +4,7 @@
     python -m cyberaudit.admin_cli provision-catalog --org <slug>
     python -m cyberaudit.admin_cli rotate-password --email <address>
     DEMO_ADMIN_PASSWORD=... python -m cyberaudit.admin_cli seed-demo
+    DEMO_ADMIN_PASSWORD=... python -m cyberaudit.admin_cli seed-northstar
 
 ``seed-demo`` loads the synthetic, labelled demonstration tenant ("cyberaudit-demo").
 It refuses to run unless the database NAME ends in ``_demo`` / ``-demo`` (a dedicated
@@ -73,6 +74,17 @@ async def _rotate(email: str) -> None:
     print("Password rotated; all sessions revoked; change required at next login.")
 
 
+async def _seed_northstar() -> None:
+    from cyberaudit.config import get_settings
+    from cyberaudit.db import SessionLocal
+    from cyberaudit.seed_northstar import seed_northstar
+
+    demo_database_guard(get_settings().database_url)
+    async with SessionLocal() as db:
+        org_id = await seed_northstar(db, os.environ["DEMO_ADMIN_PASSWORD"])
+    print(f"Northstar demo tenant ready (organization {org_id}). All records are synthetic.")
+
+
 def demo_database_guard(database_url: str) -> None:
     name = database_url.rsplit("/", 1)[-1].split("?", 1)[0]
     if not (name.endswith("_demo") or name.endswith("-demo")):
@@ -117,11 +129,14 @@ def main() -> None:
     rotate = sub.add_parser("rotate-password")
     rotate.add_argument("--email", required=True)
     sub.add_parser("seed-demo")
+    sub.add_parser("seed-northstar")
     args = parser.parse_args()
     if args.command == "ensure-rbac":
         asyncio.run(_ensure_rbac())
     elif args.command == "provision-catalog":
         asyncio.run(_provision(args.org))
+    elif args.command == "seed-northstar":
+        asyncio.run(_seed_northstar())
     elif args.command == "seed-demo":
         asyncio.run(_seed_demo())
     else:
