@@ -3,6 +3,11 @@
     python -m cyberaudit.admin_cli ensure-rbac
     python -m cyberaudit.admin_cli provision-catalog --org <slug>
     python -m cyberaudit.admin_cli rotate-password --email <address>
+    DEMO_ADMIN_PASSWORD=... python -m cyberaudit.admin_cli seed-demo
+
+``seed-demo`` loads the synthetic, labelled demonstration tenant ("cyberaudit-demo").
+It refuses to run unless the database NAME ends in ``_demo`` / ``-demo`` (a dedicated
+demo database), so demo data and demo resets can never touch a customer database.
 
 ``rotate-password`` reads the new password from a hidden prompt (or the
 ``NEW_PASSWORD`` environment variable for automation) and never prints it.
@@ -68,6 +73,41 @@ async def _rotate(email: str) -> None:
     print("Password rotated; all sessions revoked; change required at next login.")
 
 
+def demo_database_guard(database_url: str) -> None:
+    name = database_url.rsplit("/", 1)[-1].split("?", 1)[0]
+    if not (name.endswith("_demo") or name.endswith("-demo")):
+        raise SystemExit(
+            f"Refusing to seed demo data into database '{name}': use a dedicated database "
+            "whose name ends with '_demo'."
+        )
+    if not os.environ.get("DEMO_ADMIN_PASSWORD"):
+        raise SystemExit("Set DEMO_ADMIN_PASSWORD (no default password is used).")
+
+
+async def _seed_demo() -> None:
+    from cyberaudit.config import get_settings
+    from cyberaudit.seed import seed
+    from cyberaudit.seed_domain_expansion import seed as seed_domain
+    from cyberaudit.seed_enterprise import seed as seed_enterprise
+    from cyberaudit.seed_jobs import seed_jobs
+    from cyberaudit.seed_phase3 import seed_phase3
+    from cyberaudit.seed_phase4 import seed_phase4
+    from cyberaudit.seed_phase5 import seed_phase5
+
+    demo_database_guard(get_settings().database_url)
+    for step in (
+        seed,
+        seed_phase3,
+        seed_jobs,
+        seed_phase4,
+        seed_phase5,
+        seed_enterprise,
+        seed_domain,
+    ):
+        await step()
+    print("Demo tenant 'cyberaudit-demo' loaded (all records are synthetic and labelled).")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="cyberaudit.admin_cli")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -76,11 +116,14 @@ def main() -> None:
     provision.add_argument("--org", required=True)
     rotate = sub.add_parser("rotate-password")
     rotate.add_argument("--email", required=True)
+    sub.add_parser("seed-demo")
     args = parser.parse_args()
     if args.command == "ensure-rbac":
         asyncio.run(_ensure_rbac())
     elif args.command == "provision-catalog":
         asyncio.run(_provision(args.org))
+    elif args.command == "seed-demo":
+        asyncio.run(_seed_demo())
     else:
         asyncio.run(_rotate(args.email))
 

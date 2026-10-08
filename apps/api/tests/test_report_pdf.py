@@ -144,7 +144,8 @@ async def test_export_endpoint_is_tenant_isolated_and_audited(db: AsyncSession):
     app.dependency_overrides[current_user] = override_user
     try:
         async with httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app, raise_app_exceptions=False), base_url="http://testserver"
+            transport=httpx.ASGITransport(app=app, raise_app_exceptions=False),
+            base_url="http://testserver",
         ) as c:
             ok = await c.get(f"/api/v1/reports/{report_a.id}/export.pdf")
             foreign = await c.get(f"/api/v1/reports/{report_b.id}/export.pdf")

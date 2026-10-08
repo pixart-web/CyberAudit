@@ -78,3 +78,16 @@ async def test_catalog_provisioning_is_idempotent_and_excludes_demo_adapter(db: 
     assert await provision_assessment_catalog(db, org.id, user.id) == 0
     profiles = (await db.scalars(select(ScanProfile))).all()
     assert profiles and all(p.adapter_code != "cyberaudit.demo_assessment" for p in profiles)
+
+
+def test_demo_seed_refuses_non_demo_databases(monkeypatch: pytest.MonkeyPatch):
+    from cyberaudit.admin_cli import demo_database_guard
+
+    monkeypatch.setenv("DEMO_ADMIN_PASSWORD", "Some-Long-Demo-Pass-1")
+    with pytest.raises(SystemExit):
+        demo_database_guard("postgresql+asyncpg://u:p@db:5432/cyberaudit")
+    monkeypatch.delenv("DEMO_ADMIN_PASSWORD")
+    with pytest.raises(SystemExit):
+        demo_database_guard("postgresql+asyncpg://u:p@db:5432/cyberaudit_demo")
+    monkeypatch.setenv("DEMO_ADMIN_PASSWORD", "Some-Long-Demo-Pass-1")
+    demo_database_guard("postgresql+asyncpg://u:p@db:5432/cyberaudit_demo?ssl=false")

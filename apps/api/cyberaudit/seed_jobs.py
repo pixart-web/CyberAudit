@@ -28,6 +28,7 @@ from cyberaudit.models import (
     User,
 )
 from cyberaudit.security import hash_password
+from cyberaudit.seed import _demo_admin_password
 
 EXECUTION_PERMISSIONS = [
     "scan_profiles.read",
@@ -122,7 +123,7 @@ async def seed_jobs() -> None:
                     organization_id=organization.id,
                     name="Auditor Demo",
                     email="auditor@cyberaudit.local",
-                    password_hash=hash_password("ChangeMe123!"),
+                    password_hash=hash_password(_demo_admin_password()),
                     roles=[roles["Auditor"]],
                 )
             )
