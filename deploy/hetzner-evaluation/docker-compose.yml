@@ -63,6 +63,8 @@ services:
   api:
     image: ${CYBERAUDIT_API_IMAGE:?}
     restart: unless-stopped
+    # One uvicorn process saturates at ~80 req/s (measured); 2 workers for evaluation load.
+    command: ["uvicorn", "cyberaudit.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
     environment: *api-env
     volumes: [uploads:/data/uploads]
     depends_on:
