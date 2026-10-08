@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import inspect, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,7 +23,16 @@ from cyberaudit.engagement_services import (
     ReportService,
     record_timeline_event,
 )
-from cyberaudit.models import User
+from cyberaudit.models import (
+    Client,
+    Engagement,
+    Finding,
+    Organization,
+    Scope,
+    ScopeTarget,
+    User,
+)
+from cyberaudit.report_pdf import ReportData, ReportFinding, render_report_pdf
 from cyberaudit.security import require_permission
 
 router = APIRouter(prefix="/api/v1/engagements", tags=["engagement-domain"])
@@ -211,3 +221,104 @@ async def get_report(
         "report": _serialize(report),
         "sections": [_serialize(section) for section in sections],
     }
+
+
+@reports_router.get("/{report_id}/export.pdf")
+async def export_report_pdf(
+    report_id: str,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permission("reports.read")),
+):
+    report = await db.get(Report, report_id)
+    if not report or report.organization_id != user.organization_id:
+        raise HTTPException(404, "Report not found")
+    org_id = user.organization_id
+    engagement = await db.scalar(
+        select(Engagement).where(
+            Engagement.id == report.engagement_id, Engagement.organization_id == org_id
+        )
+    )
+    if not engagement:
+        raise HTTPException(404, "Engagement not found")
+    organization = await db.get(Organization, org_id)
+    client = await db.scalar(
+        select(Client).where(Client.id == engagement.client_id, Client.organization_id == org_id)
+    )
+    author = await db.get(User, report.generated_by)
+    targets = [
+        f"{t.target_type.value}: {t.target_value}"
+        for t in (
+            await db.scalars(
+                select(ScopeTarget)
+                .join(Scope, Scope.id == ScopeTarget.scope_id)
+                .where(
+                    Scope.engagement_id == engagement.id,
+                    Scope.organization_id == org_id,
+                    ScopeTarget.allowed.is_(True),
+                )
+            )
+        ).all()
+    ]
+    findings = list(
+        (
+            await db.scalars(
+                select(Finding).where(
+                    Finding.organization_id == org_id, Finding.engagement_id == engagement.id
+                )
+            )
+        ).all()
+    )
+    sections = list(
+        (
+            await db.scalars(
+                select(ReportSection)
+                .where(ReportSection.report_id == report.id)
+                .order_by(ReportSection.position)
+            )
+        ).all()
+    )
+    data = ReportData(
+        title=report.title,
+        report_type=report.report_type,
+        status=report.status,
+        organization=organization.name if organization else "—",
+        client=client.name if client else None,
+        engagement_name=engagement.name,
+        engagement_code=engagement.code,
+        engagement_mode=str(
+            engagement.mode.value if hasattr(engagement.mode, "value") else engagement.mode
+        ),
+        period=f"{engagement.start_date or '—'} → {engagement.end_date or '—'}",
+        generated_by=author.name if author else "—",
+        generated_at=datetime.now(timezone.utc),
+        scope_targets=targets,
+        findings=[
+            ReportFinding(
+                title=f.title,
+                severity=str(f.technical_severity.value),
+                status=f.status,
+                verification=f.verification_status,
+                component=f.affected_component,
+                description=f.description,
+                remediation=f.remediation_summary or "",
+                imported=bool(getattr(f, "imported", False)),
+            )
+            for f in findings
+        ],
+        evidence=[(x.heading, x.body) for x in sections if x.content_type == "evidence"],
+        conclusions=[
+            (x.heading, x.body) for x in sections if x.content_type == "analyst_conclusion"
+        ],
+        ai_sections=[(x.heading, x.body) for x in sections if x.content_type == "ai_generated"],
+    )
+    await write_audit(db, user, "report.exported", "report", report.id, metadata={"format": "pdf"})
+    await db.commit()
+    pdf = render_report_pdf(data)
+    return Response(
+        pdf,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{engagement.code}-{report.report_type}.pdf"',
+            "Cache-Control": "no-store",
+        },
+    )
