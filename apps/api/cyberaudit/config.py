@@ -85,6 +85,8 @@ class Settings(BaseSettings):
     database_runtime_role: str | None = None
     request_max_bytes: int = Field(default=12 * 1024 * 1024, ge=1024)
     readiness_evidence_manifest: Path | None = None
+    # One-time secret enabling POST /setup/initialize while no user exists.
+    bootstrap_token: str | None = Field(default=None, min_length=16)
     # Sovereign AI runtime: disabled by default so core functionality never
     # depends on a running local model. An administrator opts in to a
     # specific local, self-hosted backend; no commercial AI API is supported.

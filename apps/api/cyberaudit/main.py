@@ -21,10 +21,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from sqlalchemy import func, or_, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.responses import Response
 
+from cyberaudit.admin_api import router as admin_router
 from cyberaudit.agent_api import router as agent_router
 from cyberaudit.ai_runtime_api import router as ai_runtime_router
 from cyberaudit.audit import write_audit
@@ -74,7 +76,6 @@ from cyberaudit.schemas import (
     EngagementCreate,
     EngagementRead,
     LoginRequest,
-    OrganizationCreate,
     OrganizationRead,
     Page,
     PolicyRequest,
@@ -132,6 +133,7 @@ app.include_router(agent_router)
 app.include_router(engagement_domain_router)
 app.include_router(engagement_reports_router)
 app.include_router(update_router)
+app.include_router(admin_router)
 app.include_router(diagnostics_router)
 app.add_middleware(
     CORSMiddleware,
@@ -434,20 +436,6 @@ async def organizations(
         page_size,
         Organization.name,
     )
-
-
-@app.post("/api/v1/organizations", response_model=OrganizationRead, tags=["organizations"])
-async def create_organization(
-    payload: OrganizationCreate,
-    user: User = Depends(require_permission("organizations.manage")),
-    db: AsyncSession = Depends(get_db),
-):
-    organization = await db.get(Organization, user.organization_id)
-    if not organization:
-        raise HTTPException(404, "Organization not found")
-    if payload.slug != organization.slug:
-        raise HTTPException(403, "Cross-tenant organization creation is not allowed")
-    return organization
 
 
 @app.get("/api/v1/clients", response_model=Page[ClientRead], tags=["clients"])
@@ -837,7 +825,11 @@ async def create_user(
         roles=[role],
     )
     db.add(item)
-    await db.flush()
+    try:
+        await db.flush()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(409, "A user with this e-mail already exists") from exc
     await write_audit(db, user, "user.created", "user", item.id)
     await db.commit()
     await db.refresh(item)
