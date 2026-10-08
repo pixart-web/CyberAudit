@@ -59,6 +59,15 @@ class UserRead(ORMModel):
     email: str = Field(pattern=r"^[^@\s]+@[^@\s]+$", max_length=254)
     status: str
     mfa_enabled: bool
+    roles: list[str] = Field(default_factory=list)
+    last_login_at: datetime | None = None
+
+    @field_validator("roles", mode="before")
+    @classmethod
+    def role_names(cls, value: object) -> object:
+        if isinstance(value, list):
+            return [getattr(item, "name", item) for item in value]
+        return value
 
 
 class UserCreate(BaseModel):

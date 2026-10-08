@@ -27,14 +27,20 @@ from cyberaudit.db import get_db
 from cyberaudit.enterprise_auth import SessionService
 from cyberaudit.models import Organization, Permission, RefreshToken, Role, User
 from cyberaudit.password_policy import validate_password_policy
+from cyberaudit.provisioning import provision_assessment_catalog
+from cyberaudit.rbac_catalog import (
+    ALL_PERMISSIONS,
+    PLATFORM_PERMISSION,
+    PLATFORM_ROLE,
+    ROLE_DEFINITIONS,
+)
 from cyberaudit.rls import set_tenant_context
 from cyberaudit.security import hash_password, require_permission
-from cyberaudit.seed import PERMISSIONS, ROLE_CODES
+from cyberaudit.seed import ROLE_CODES
+from cyberaudit.seed_phase3 import ROLE_PERMISSIONS as PHASE3_ROLE_PERMISSIONS
 
 router = APIRouter(prefix="/api/v1", tags=["administration"])
 
-PLATFORM_PERMISSION = "platform.manage"
-PLATFORM_ROLE = "Platform Administrator"
 USER_STATUSES = {"active", "disabled"}
 
 
@@ -48,12 +54,17 @@ def _password(value: str, email: str) -> str:
 async def ensure_rbac(db: AsyncSession) -> None:
     """Idempotently make sure every known permission and role exists."""
     existing = {p.code: p for p in (await db.scalars(select(Permission))).all()}
-    for code in [*PERMISSIONS, PLATFORM_PERMISSION]:
+    for code in (*ALL_PERMISSIONS, PLATFORM_PERMISSION):
         if code not in existing:
             existing[code] = Permission(code=code, description=code.replace(".", " ").title())
             db.add(existing[code])
     await db.flush()
-    definitions = {**ROLE_CODES, PLATFORM_ROLE: [*PERMISSIONS, PLATFORM_PERMISSION]}
+    definitions: dict[str, set[str]] = {n: set(c) for n, c in ROLE_DEFINITIONS.items()}
+    # Legacy built-in roles keep their historical permission sets (plus phase-3 additions).
+    for legacy in ("Auditor", "Reviewer", "Client"):
+        definitions[legacy] = set(ROLE_CODES.get(legacy, [])) | set(
+            PHASE3_ROLE_PERMISSIONS.get(legacy, [])
+        )
     roles = {r.name: r for r in (await db.scalars(select(Role))).all()}
     for name, codes in definitions.items():
         role = roles.get(name)
@@ -62,8 +73,8 @@ async def ensure_rbac(db: AsyncSession) -> None:
             db.add(role)
             roles[name] = role
         have = {p.code for p in role.permissions}
-        for code in codes:
-            if code not in have:
+        for code in sorted(codes - have):
+            if code in existing:
                 role.permissions.append(existing[code])
     await db.flush()
 
@@ -272,6 +283,7 @@ async def _create_tenant(
         await db.flush()
         db.add(admin)
         await db.flush()
+        await provision_assessment_catalog(db, organization.id, admin.id)
     except IntegrityError as exc:
         await db.rollback()
         raise HTTPException(

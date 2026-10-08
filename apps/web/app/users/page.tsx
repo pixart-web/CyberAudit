@@ -1,2 +1,5 @@
-import { ResourcePage } from "@/components/resource-page";
-export default function Page(){return <ResourcePage title="Utilizadores" endpoint="/users" columns={[["name","Nome"],["email","Email"],["status","Estado"]]}/>}
+import { UsersAdmin } from "@/components/users-admin";
+
+export default function Page() {
+  return <UsersAdmin />;
+}
