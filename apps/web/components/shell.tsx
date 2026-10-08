@@ -70,6 +70,13 @@ export function Shell({ children, title, eyebrow }: { children: React.ReactNode;
     staleTime: 300_000,
     retry: false,
   });
+  const notifications = useQuery({
+    queryKey: ["unread-notifications"],
+    queryFn: () => api<{ items: unknown[] }>("/notifications?unread_only=true"),
+    refetchInterval: 60_000,
+    retry: false,
+  });
+  const unread = notifications.data?.items?.length ?? 0;
   const organizationName = organization.data?.items?.[0]?.name ?? "CyberAudit";
   const commandItems: CommandItem[] = groups.flatMap((group) =>
     group.items.map(([label, href, Icon]) => ({ label, href, group: group.label, icon: Icon })),
@@ -94,7 +101,7 @@ export function Shell({ children, title, eyebrow }: { children: React.ReactNode;
         <GlobalSearch />
         <CommandPalette items={commandItems} />
         <SystemHealthIndicator />
-        <button className="relative rounded-lg border border-border p-2 text-muted" aria-label="Notificações"><Bell size={18}/><span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-critical"/></button>
+        <Link href="/notifications" className="relative rounded-lg border border-border p-2 text-muted" aria-label={unread ? `Notificações (${unread} por ler)` : "Notificações"}><Bell size={18}/>{unread > 0 && <span className="absolute -right-1 -top-1 grid min-w-4 place-items-center rounded-full bg-critical px-1 text-[10px] font-bold text-white">{unread > 9 ? "9+" : unread}</span>}</Link>
         <button className="flex items-center gap-2 rounded-lg border border-border px-2 py-1.5 text-left"><CircleUserRound size={22} className="text-primary"/><span className="hidden text-xs sm:block"><b className="block">{me.data?.name ?? "—"}</b><span className="text-muted">{me.data?.roles?.[0] ?? ""}</span></span></button>
       </header>
       <div className="p-4 md:p-6 xl:p-8">

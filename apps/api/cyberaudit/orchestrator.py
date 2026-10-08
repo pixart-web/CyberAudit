@@ -23,6 +23,7 @@ from cyberaudit.models import (
     User,
     utcnow,
 )
+from cyberaudit.notifications import notify
 from cyberaudit.observability import approvals, jobs_created, policy_denials, structured_event
 from cyberaudit.policy import INTENSITY_ORDER, ScopePolicyEngine, normalized_target
 from cyberaudit.schemas import PolicyRequest
@@ -131,6 +132,29 @@ async def transition_job(
             event_metadata={"from": previous.value, "to": new_status.value, **(metadata or {})},
         )
     )
+    terminal = {
+        JobStatus.COMPLETED: ("job.completed", "info", "Avaliação concluída"),
+        JobStatus.COMPLETED_WITH_WARNINGS: (
+            "job.completed",
+            "warning",
+            "Avaliação concluída com avisos",
+        ),
+        JobStatus.FAILED: ("job.failed", "error", "Avaliação falhou"),
+        JobStatus.TIMED_OUT: ("job.failed", "error", "Avaliação excedeu o tempo limite"),
+    }
+    if new_status in terminal:
+        event_type, severity, title = terminal[new_status]
+        notify(
+            db,
+            organization_id=job.organization_id,
+            user_id=job.requested_by,
+            event_type=event_type,
+            severity=severity,
+            title=title,
+            message=message[:500],
+            resource_type="scan_job",
+            resource_id=job.id,
+        )
     if actor:
         await write_audit(
             db,

@@ -44,6 +44,7 @@ from cyberaudit.models import (
     utcnow,
 )
 from cyberaudit.network_security import build_network_policy
+from cyberaudit.notifications import notify
 from cyberaudit.observability import asset_suggestions, imports_total, retests_total
 from cyberaudit.policy import ScopePolicyEngine
 from cyberaudit.schemas import PolicyRequest
@@ -428,6 +429,17 @@ async def confirm_import(
         "correlation": correlation_result,
     }
     await write_audit(db, user, "import.confirmed", "external_import", item.id)
+    notify(
+        db,
+        organization_id=user.organization_id,
+        user_id=user.id,
+        event_type="import.completed",
+        severity="info",
+        title="Importação concluída",
+        message=f"{item.filename}: {created} finding(s) criados, {deduplicated} deduplicados.",
+        resource_type="external_import",
+        resource_id=item.id,
+    )
     await db.commit()
     imports_total.labels(result="confirmed").inc()
     return {"import_id": item.id, "job_id": job.id, **job.result_summary}

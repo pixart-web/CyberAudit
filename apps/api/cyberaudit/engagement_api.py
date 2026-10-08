@@ -32,6 +32,7 @@ from cyberaudit.models import (
     ScopeTarget,
     User,
 )
+from cyberaudit.notifications import notify
 from cyberaudit.report_pdf import ReportData, ReportFinding, render_report_pdf
 from cyberaudit.security import require_permission
 
@@ -173,6 +174,17 @@ async def generate_report(
         raise HTTPException(422, str(exc)) from exc
     await write_audit(
         db, user, "report.generated", "report", report.id, metadata={"type": report.report_type}
+    )
+    notify(
+        db,
+        organization_id=user.organization_id,
+        user_id=user.id,
+        event_type="report.ready",
+        severity="info",
+        title="Relatório pronto",
+        message=report.title,
+        resource_type="report",
+        resource_id=report.id,
     )
     await db.commit()
     return _serialize(report)
