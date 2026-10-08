@@ -478,16 +478,16 @@ def _license_view(record: LicenseRecord | None, organization_id: str) -> dict[st
 
 @router.get("/license/summary")
 async def license_summary(
-    caller: User = Depends(require_permission("license.read")),
+    user: User = Depends(require_permission("license.read")),
     db: AsyncSession = Depends(get_db),
 ):
     record = await db.scalar(
         select(LicenseRecord)
-        .where(LicenseRecord.organization_id == caller.organization_id)
+        .where(LicenseRecord.organization_id == user.organization_id)
         .order_by(LicenseRecord.created_at.desc())
         .limit(1)
     )
-    return _license_view(record, caller.organization_id)
+    return _license_view(record, user.organization_id)
 
 
 class LicenseImport(BaseModel):
