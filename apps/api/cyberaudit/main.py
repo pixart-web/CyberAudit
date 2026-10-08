@@ -20,7 +20,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
-from sqlalchemy import func, or_, select, update
+from sqlalchemy import case, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.middleware.trustedhost import TrustedHostMiddleware
@@ -38,6 +38,7 @@ from cyberaudit.engagement_api import reports_router as engagement_reports_route
 from cyberaudit.engagement_api import router as engagement_domain_router
 from cyberaudit.enterprise_api import router as enterprise_router
 from cyberaudit.enterprise_auth import SessionService
+from cyberaudit.enterprise_models import Incident
 from cyberaudit.execution_api import router as execution_router
 from cyberaudit.hardening_api import router as hardening_router
 from cyberaudit.models import (
@@ -1065,13 +1066,64 @@ async def dashboard(
             Retest.status.in_([RetestStatus.REQUESTED, RetestStatus.QUEUED, RetestStatus.RUNNING]),
         )
     )
+    avg_risk = await db.scalar(
+        select(func.avg(Asset.risk_score)).where(
+            Asset.organization_id == user.organization_id, Asset.deleted_at.is_(None)
+        )
+    )
+    posture = None if not assets_count else max(0, round(100 - float(avg_risk or 0)))
+    retests_passed = await db.scalar(
+        select(func.count())
+        .select_from(Retest)
+        .where(Retest.organization_id == user.organization_id, Retest.status == RetestStatus.PASSED)
+    )
+    retests_failed = await db.scalar(
+        select(func.count())
+        .select_from(Retest)
+        .where(Retest.organization_id == user.organization_id, Retest.status == RetestStatus.FAILED)
+    )
+    retest_total = (retests_passed or 0) + (retests_failed or 0)
+    retest_rate = round((retests_passed or 0) * 100 / retest_total) if retest_total else None
+    severity_rank = case(
+        (Finding.technical_severity == "CRITICAL", 0),
+        (Finding.technical_severity == "HIGH", 1),
+        (Finding.technical_severity == "MEDIUM", 2),
+        else_=3,
+    )
+    top_findings = list(
+        (
+            await db.scalars(
+                select(Finding)
+                .where(Finding.organization_id == user.organization_id, Finding.status == "open")
+                .order_by(severity_rank, Finding.last_seen_at.desc())
+                .limit(5)
+            )
+        ).all()
+    )
+    recent_incidents = list(
+        (
+            await db.scalars(
+                select(Incident)
+                .where(Incident.organization_id == user.organization_id)
+                .order_by(Incident.detected_at.desc())
+                .limit(5)
+            )
+        ).all()
+    )
+    redis_client = redis.from_url(settings.redis_url, socket_timeout=1, decode_responses=True)
+    try:
+        redis_status = "online" if await redis_client.ping() else "offline"
+    except (OSError, redis.RedisError):
+        redis_status = "offline"
+    finally:
+        await redis_client.aclose()
     return {
         "metrics": {
-            "posture": 78,
+            "posture": posture,
             "assets": assets_count or 0,
             "findings": findings_total,
             "active_engagements": active_count or 0,
-            "retest_rate": 84,
+            "retest_rate": retest_rate,
         },
         "severity": [
             {
@@ -1085,26 +1137,11 @@ async def dashboard(
         ],
         "top_risks": [
             {
-                "title": "Autenticação sem MFA",
-                "severity": "critical",
-                "asset": "Identity Gateway",
-            },
-            {"title": "TLS desatualizado", "severity": "high", "asset": "api.internal"},
-            {
-                "title": "Privilégios excessivos",
-                "severity": "high",
-                "asset": "Cloud Account",
-            },
-            {
-                "title": "Headers incompletos",
-                "severity": "medium",
-                "asset": "Web Portal",
-            },
-            {
-                "title": "Inventário divergente",
-                "severity": "medium",
-                "asset": "Network",
-            },
+                "title": f.title,
+                "severity": str(f.technical_severity.value),
+                "asset": f.affected_component,
+            }
+            for f in top_findings
         ],
         "engagements": [
             {
@@ -1139,17 +1176,15 @@ async def dashboard(
         ],
         "incidents": [
             {
-                "time": "09:14",
-                "title": "Tentativa de acesso bloqueada",
-                "tone": "danger",
-            },
-            {"time": "11:42", "title": "Âmbito atualizado", "tone": "info"},
-            {"time": "14:20", "title": "Autorização validada", "tone": "success"},
+                "time": i.detected_at.strftime("%d/%m %H:%M"),
+                "title": i.title,
+                "tone": "danger" if i.severity in {"critical", "high"} else "info",
+            }
+            for i in recent_incidents
         ],
         "adapters": [
             {"name": "PostgreSQL", "status": "online"},
-            {"name": "Redis", "status": "online"},
-            {"name": "Local Storage", "status": "online"},
+            {"name": "Redis", "status": redis_status},
             {
                 "name": "Adaptadores",
                 "status": "online" if adapters_online else "disabled",

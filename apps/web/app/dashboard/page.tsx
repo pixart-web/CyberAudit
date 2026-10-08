@@ -4,11 +4,12 @@ import { Card, Badge } from "@cyberaudit/ui";
 import { useQuery } from "@tanstack/react-query";
 import { Activity, Boxes, CheckCircle2, FileSearch, Gauge, ShieldAlert } from "lucide-react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
+import { OnboardingChecklist } from "@/components/onboarding-checklist";
 import { Shell } from "@/components/shell";
 import { api } from "@/lib/api";
 
 type Dashboard = {
-  metrics: { posture: number; assets: number; findings: number; active_engagements: number; retest_rate: number };
+  metrics: { posture: number | null; assets: number; findings: number; active_engagements: number; retest_rate: number | null };
   severity: { name: string; value: number; color: string }[];
   top_risks: { title: string; severity: string; asset: string }[];
   engagements: { id: string; name: string; code: string; status: string; risk: string }[];
@@ -26,11 +27,12 @@ const metricConfig = [
 export default function DashboardPage() {
   const { data, isLoading, error } = useQuery({ queryKey: ["dashboard"], queryFn: () => api<Dashboard>("/dashboard") });
   return <Shell title="Centro de Operações">
+    <OnboardingChecklist />
     {error && <Card className="mb-5 border-critical/30 p-4 text-red-300">Não foi possível carregar o dashboard. Confirme que iniciou sessão e que a API está disponível.</Card>}
     <div className="metric-grid grid grid-cols-5 gap-3">
       {metricConfig.map(([label, key, Icon, suffix]) => <Card key={key} className="p-4">
         <div className="flex items-start justify-between"><span className="text-xs text-muted">{label}</span><Icon size={17} className="text-primary"/></div>
-        <strong className="mt-3 block text-2xl">{isLoading ? "—" : `${data?.metrics[key] ?? 0}${suffix}`}</strong>
+        <strong className="mt-3 block text-2xl">{isLoading || data?.metrics[key] == null ? "—" : `${data.metrics[key]}${suffix}`}</strong>
         <span className="mt-2 block text-[11px] text-primary">● dentro do objetivo</span>
       </Card>)}
     </div>
