@@ -11,8 +11,10 @@ Security properties:
 
 from __future__ import annotations
 
+import hashlib
 import hmac
-from datetime import datetime, timezone
+import json
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -25,6 +27,7 @@ from cyberaudit.audit import write_audit
 from cyberaudit.config import get_settings
 from cyberaudit.db import get_db
 from cyberaudit.enterprise_auth import SessionService
+from cyberaudit.hardening_models import LicenseRecord
 from cyberaudit.models import (
     Asset,
     Client,
@@ -35,6 +38,7 @@ from cyberaudit.models import (
     User,
 )
 from cyberaudit.password_policy import validate_password_policy
+from cyberaudit.product_services import EDITIONS, LicenseService
 from cyberaudit.provisioning import provision_assessment_catalog
 from cyberaudit.rbac_catalog import (
     ALL_PERMISSIONS,
@@ -442,3 +446,115 @@ async def archive_asset(
     item.deleted_at = datetime.now(timezone.utc)
     await write_audit(db, caller, "asset.archived", "asset", item.id)
     await db.commit()
+
+
+def _license_view(record: LicenseRecord | None, organization_id: str) -> dict[str, object]:
+    record = record or LicenseService.community(organization_id)
+    now = datetime.now(timezone.utc)
+
+    def aware(value: datetime | None) -> datetime | None:
+        return value if value is None or value.tzinfo else value.replace(tzinfo=timezone.utc)
+
+    expires, grace = aware(record.expires_at), aware(record.grace_until)
+    if expires and expires <= now:
+        state = "grace" if grace and grace > now else "expired"
+    else:
+        state = "community" if record.edition == "community" else "active"
+    return {
+        "edition": record.edition,
+        "state": state,
+        "license_id": record.license_id,
+        "capabilities": sorted(record.capabilities),
+        "limits": record.limits or {},
+        "issued_at": record.issued_at,
+        "expires_at": expires,
+        "grace_until": grace,
+        "days_remaining": None if not expires else (expires - now).days,
+        "verified_at": record.verified_at,
+        "read_only": state in {"grace", "expired"},
+        "trusted_keys_configured": bool(get_settings().license_trusted_public_keys),
+    }
+
+
+@router.get("/license/summary")
+async def license_summary(
+    caller: User = Depends(require_permission("license.read")),
+    db: AsyncSession = Depends(get_db),
+):
+    record = await db.scalar(
+        select(LicenseRecord)
+        .where(LicenseRecord.organization_id == caller.organization_id)
+        .order_by(LicenseRecord.created_at.desc())
+        .limit(1)
+    )
+    return _license_view(record, caller.organization_id)
+
+
+class LicenseImport(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    payload: str = Field(min_length=10, max_length=20_000)
+    signature: str = Field(min_length=10, max_length=2_000)
+
+
+def _parse_time(value: object) -> datetime | None:
+    if value in (None, ""):
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise HTTPException(422, "License contains an invalid date") from exc
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+@router.post("/license/import", status_code=201)
+async def import_license(
+    body: LicenseImport,
+    caller: User = Depends(require_permission("license.manage")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Verify an offline license against the vendor keys configured on THIS server."""
+    keys = get_settings().license_trusted_public_keys
+    if not keys:
+        raise HTTPException(409, "No trusted license keys are configured on this server")
+    document = None
+    for key in keys:
+        try:
+            document = LicenseService.verify_offline(body.payload, body.signature, key)
+            break
+        except ValueError:
+            continue
+    if document is None:
+        await write_audit(db, caller, "license.import_rejected", "license", None, result="failure")
+        await db.commit()
+        raise HTTPException(422, "License signature is invalid")
+    if document.get("organization_id") != caller.organization_id:
+        await write_audit(db, caller, "license.import_rejected", "license", None, result="failure")
+        await db.commit()
+        raise HTTPException(422, "License was issued for a different organization")
+    edition = str(document["edition"])
+    expires = _parse_time(document.get("expires_at"))
+    if expires and expires <= datetime.now(timezone.utc):
+        raise HTTPException(422, "License is already expired")
+    grace_days = int(document.get("grace_days", 0) or 0)
+    record = LicenseRecord(
+        organization_id=caller.organization_id,
+        edition=edition,
+        provider="signed_offline",
+        license_id=str(document.get("license_id", "unknown"))[:160],
+        signed_payload=body.payload,
+        payload_hash=hashlib.sha256(json.dumps(document, sort_keys=True).encode()).hexdigest(),
+        status="active",
+        capabilities=sorted(set(document.get("capabilities") or EDITIONS[edition])),
+        limits={str(k): int(v) for k, v in dict(document.get("limits") or {}).items()},
+        issued_at=_parse_time(document.get("issued_at")),
+        expires_at=expires,
+        grace_until=expires + timedelta(days=grace_days) if expires and grace_days else None,
+        verified_at=datetime.now(timezone.utc),
+    )
+    db.add(record)
+    await db.flush()
+    await write_audit(
+        db, caller, "license.imported", "license", record.id, metadata={"edition": edition}
+    )
+    await db.commit()
+    return _license_view(record, caller.organization_id)

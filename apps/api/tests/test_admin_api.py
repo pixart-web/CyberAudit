@@ -268,3 +268,77 @@ async def test_client_and_asset_update_archive_are_tenant_scoped(rbac: AsyncSess
         assert (await c.delete(f"/api/v1/assets/{asset_a.id}")).status_code == 404
     actions = {x for (x,) in (await rbac.execute(select(AuditLog.action))).all()}
     assert {"client.updated", "asset.archived"} <= actions
+
+
+def _signed(private_key, document: dict) -> tuple[str, str]:
+    import base64
+    import json
+
+    raw = json.dumps(document).encode()
+    enc = lambda b: base64.urlsafe_b64encode(b).decode().rstrip("=")  # noqa: E731
+    return enc(raw), enc(private_key.sign(raw))
+
+
+@pytest.mark.asyncio
+async def test_license_import_requires_trusted_key_matching_org_and_valid_dates(
+    rbac: AsyncSession, monkeypatch: pytest.MonkeyPatch
+):
+    import base64
+
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    key, rogue = Ed25519PrivateKey.generate(), Ed25519PrivateKey.generate()
+    pub = base64.urlsafe_b64encode(key.public_key().public_bytes_raw()).decode()
+    admin = await _tenant(rbac, "a")
+    other = await _tenant(rbac, "b")
+    valid = {
+        "edition": "professional",
+        "license_id": "EVAL-001",
+        "organization_id": admin.organization_id,
+        "issued_at": "2026-10-01T00:00:00Z",
+        "expires_at": "2099-01-01T00:00:00Z",
+    }
+
+    class _S:
+        license_trusted_public_keys: list[str] = []
+
+    monkeypatch.setattr(admin_api, "get_settings", lambda: _S())
+    p, s = _signed(key, valid)
+    async with _Client(rbac, admin) as c:
+        # No trusted keys configured: refuse (never trust by default).
+        assert (
+            await c.post("/api/v1/license/import", json={"payload": p, "signature": s})
+        ).status_code == 409
+        _S.license_trusted_public_keys = [pub]
+        assert (await c.get("/api/v1/license/summary")).json()["edition"] == "community"
+        # Signed by an untrusted key.
+        rp, rs = _signed(rogue, valid)
+        assert (
+            await c.post("/api/v1/license/import", json={"payload": rp, "signature": rs})
+        ).status_code == 422
+        # Tampered payload.
+        assert (
+            await c.post("/api/v1/license/import", json={"payload": p, "signature": rs})
+        ).status_code == 422
+        # Issued for another organization.
+        op, os_ = _signed(key, {**valid, "organization_id": other.organization_id})
+        assert (
+            await c.post("/api/v1/license/import", json={"payload": op, "signature": os_})
+        ).status_code == 422
+        # Already expired.
+        ep, es = _signed(key, {**valid, "expires_at": "2020-01-01T00:00:00Z"})
+        assert (
+            await c.post("/api/v1/license/import", json={"payload": ep, "signature": es})
+        ).status_code == 422
+        ok = await c.post("/api/v1/license/import", json={"payload": p, "signature": s})
+        assert ok.status_code == 201, ok.text
+        summary = (await c.get("/api/v1/license/summary")).json()
+        assert (
+            summary["edition"] == "professional"
+            and summary["state"] == "active"
+            and "soc" in summary["capabilities"]
+        )
+    async with _Client(rbac, other) as c:
+        assert (await c.get("/api/v1/license/summary")).json()["edition"] == "community"
+    actions = {x for (x,) in (await rbac.execute(select(AuditLog.action))).all()}
+    assert {"license.imported", "license.import_rejected"} <= actions

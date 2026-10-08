@@ -28,7 +28,7 @@ const groups = [
   { label: "Resultados", items: [["Findings", "/findings", ShieldAlert], ["Evidências", "/evidence", FileCheck2], ["Retestes", "/retests", RotateCcw], ["Observações de Ativos", "/asset-observations", Boxes], ["Sugestões de Ativos", "/asset-suggestions", Bell], ["Incidentes", "/incidents", Bell], ["Relatórios", "/reports", FileSearch]] },
   { label: "Laboratório", items: [["Laboratório", "/laboratory", FlaskConical], ["Cenários", "/laboratory/scenarios", Boxes], ["Ferramentas", "/laboratory/tools", Settings]] },
   { label: "Automação", items: [["Agendamentos", "/assessment-schedules", TimerReset], ["Discovery Policies", "/discovery-policies", Radar]] },
-  { label: "Sistema", items: [["Utilizadores", "/users", Users], ["Registos de Auditoria", "/audit-logs", Activity], ["Health Center", "/system-health", HeartPulse], ["Diagnostic Bundle", "/diagnostics", FileDown], ["Definições", "/settings", Settings]] },
+  { label: "Sistema", items: [["Utilizadores", "/users", Users], ["Registos de Auditoria", "/audit-logs", Activity], ["Licença", "/license", Activity], ["Health Center", "/system-health", HeartPulse], ["Diagnostic Bundle", "/diagnostics", FileDown], ["Definições", "/settings", Settings]] },
 ] as const;
 
 type RuntimeHealth = { healthy: boolean; sovereign_default: boolean };

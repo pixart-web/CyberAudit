@@ -32,12 +32,13 @@ Environment: local, **real PostgreSQL 16** (docker, disposable), Alembic `upgrad
 | Engagements | ✔ (UI pre-existing) | ✔ | status only | – | not re-run | partial |
 | Scope / targets | ✔ | ✔ | ✗ | ✗ | form added, API ✔ | partial |
 | Assets | ✔ | ✔ | ✔ PATCH (pre-existing, no UI) | ✔ archive (API, no UI) | form added, API ✔ | partial |
-| Jobs / imports | ✔ (API) | ✔ | cancel/retry (API) | – | import UI missing | partial |
+| Jobs / imports | ✔ | ✔ | cancel/retry (API) | – | import UI exists (upload → preview → confirm), not re-run | partial |
 | Findings | via import/job only | ✔ | ✗ | ✗ | list ✔ | partial |
 | Evidence | adapter-collected only | ✔ | link/unlink | – | – | partial |
 | Reports | ✔ | ✔ | ✗ | ✗ | ✔ PDF export | done (MVP) |
 | Incidents/Cases/Identities/Cloud/Controls/Risks | per 10.4.1 | ✔ | per 10.4.1 | – | 10.4.1 pass | not re-verified |
-| Licensing, Connectors, AI models | – | – | – | – | – | not touched |
+| Licensing | signed offline import (new) | ✔ summary | N/A | N/A | page added; API tests ✔ | partial — no browser run |
+| Connectors, AI models | – | – | – | – | – | not touched |
 
 ## Automated
 Backend 319 passed, 1 skipped, coverage 76 % (gate 75 %); frontend 95 passed (axe a11y suite included); ruff, black, tsc, eslint clean;
@@ -47,3 +48,8 @@ Backend 319 passed, 1 skipped, coverage 76 % (gate 75 %); frontend 95 passed (ax
 `python -m cyberaudit.admin_cli seed-northstar` (requires `DEMO_ADMIN_PASSWORD`; refuses databases not named `*_demo`; idempotent).
 Verified on PostgreSQL 16: 3 users (Administrator / Security Analyst / Read-only Viewer), 8 assets with relationships, 9 synthetic findings (all `simulated`, `unverified`, `[DEMO]`-labelled), 1 incident with timeline, 2 risks, 2 controls with assessments (gaps), evidence links, knowledge-graph nodes, report. Verified live: dashboard posture 51 % from real asset risk, Command Center, graph (7 nodes / 5 edges), analyst can read but not administer (403), viewer cannot create (403), Cyber AI incident analysis grounded (degraded deterministic mode, no model installed).
 Demo reset = drop and recreate the dedicated demo database (never a customer database).
+
+## Licensing (item 44)
+`GET /license/summary`, `POST /license/import` (needs `license.manage`). A license is accepted only if its Ed25519 signature verifies against
+`LICENSE_TRUSTED_PUBLIC_KEYS` configured on that server, it names the importing organization, and it is not expired. No keys configured = import refused (409).
+Vendor tool: `scripts/licensing/issue_license.py` (`keygen`, `sign`) — the **evaluation entitlement** is simply a short-expiry signed license (e.g. `--days 30`) bound to one organization id; there is no universal license. Pricing/edition definitions were not changed.
