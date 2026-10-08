@@ -30,6 +30,10 @@ type Props = {
   /** Query keys (endpoint strings) to refresh after success. */
   invalidate?: string[];
   multipart?: boolean;
+  /** "PATCH" edits an existing record: only changed fields are sent; cleared optional fields become null. */
+  method?: "POST" | "PATCH";
+  initialValues?: Record<string, string>;
+  onCancel?: () => void;
   onCreated?: (created: unknown) => void;
   className?: string;
 };
@@ -61,8 +65,8 @@ function SelectOptions({ spec }: { spec: FieldSpec }) {
  * server's own validation/authorization error -- there is no optimistic or
  * simulated success path.
  */
-export function CreateForm({ title, endpoint, fields, submitLabel = "Criar", invalidate = [], multipart, onCreated, className = "" }: Props) {
-  const initial = Object.fromEntries(fields.map((f) => [f.name, f.type === "checkbox" ? false : (f.defaultValue ?? "")]));
+export function CreateForm({ title, endpoint, fields, submitLabel = "Criar", invalidate = [], multipart, method = "POST", initialValues, onCancel, onCreated, className = "" }: Props) {
+  const initial = Object.fromEntries(fields.map((f) => [f.name, f.type === "checkbox" ? false : (initialValues?.[f.name] ?? f.defaultValue ?? "")]));
   const [values, setValues] = useState<Values>(initial);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [done, setDone] = useState<string | null>(null);
@@ -77,19 +81,22 @@ export function CreateForm({ title, endpoint, fields, submitLabel = "Criar", inv
         });
         return api<unknown>(endpoint, { method: "POST", body: form });
       }
+      const editing = method === "PATCH";
       const payload = Object.fromEntries(
         Object.entries(body)
-          .filter(([, value]) => value !== "")
+          .filter(([key, value]) => (editing ? value !== initial[key] : value !== ""))
+          .map(([key, value]) => [key, editing && value === "" ? null : value])
+          .filter(([, value]) => value !== undefined)
           .map(([key, value]) => {
             const spec = fields.find((f) => f.name === key);
-            return [key, spec?.type === "number" ? Number(value) : value];
+            return [key, spec?.type === "number" && value !== null ? Number(value) : value];
           }),
       );
-      return api<unknown>(endpoint, { method: "POST", body: JSON.stringify(payload) });
+      return api<unknown>(endpoint, { method, body: JSON.stringify(payload) });
     },
     onSuccess: (created) => {
-      setDone("Criado com sucesso.");
-      setValues(initial);
+      setDone(method === "PATCH" ? "Guardado com sucesso." : "Criado com sucesso.");
+      if (method === "POST") setValues(initial);
       invalidate.forEach((key) => queryClient.invalidateQueries({ queryKey: [key] }));
       onCreated?.(created);
     },
@@ -183,6 +190,11 @@ export function CreateForm({ title, endpoint, fields, submitLabel = "Criar", inv
             <p role="status" className="text-sm text-green-300">
               {done}
             </p>
+          )}
+          {onCancel && (
+            <button type="button" className="text-sm text-muted hover:underline" onClick={onCancel}>
+              Cancelar
+            </button>
           )}
           <Button type="submit" disabled={mutation.isPending}>
             {mutation.isPending ? "A guardar…" : submitLabel}

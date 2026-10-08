@@ -11,6 +11,21 @@ export default function Page() {
       endpoint="/assets"
       rowHref="/assets"
       columns={[["name", "Nome"], ["asset_type", "Tipo"], ["primary_ip", "IP principal"], ["environment_id", "Ambiente"], ["internet_exposed", "Internet"], ["risk_score", "Risco"], ["status", "Estado"]]}
+      rowActions={{
+        edit: {
+          title: "Editar ativo",
+          path: (id) => `/assets/${id}`,
+          values: (item) => Object.fromEntries(["name", "fqdn", "primary_ip", "operating_system", "business_criticality"].map((k) => [k, String(item[k] ?? "")])),
+          fields: [
+            { name: "name", label: "Nome", required: true },
+            { name: "fqdn", label: "FQDN" },
+            { name: "primary_ip", label: "IP principal" },
+            { name: "operating_system", label: "Sistema operativo" },
+            { name: "business_criticality", label: "Criticidade de negócio", type: "select", options: [["low", "Baixa"], ["medium", "Média"], ["high", "Alta"], ["critical", "Crítica"]] },
+          ],
+        },
+        archive: { path: (id) => `/assets/${id}`, confirmTitle: "Arquivar este ativo?", confirmDescription: "O ativo deixa de aparecer no inventário. Findings e evidência que o referem são preservados." },
+      }}
       create={{
         title: "Novo ativo",
         fields: [
