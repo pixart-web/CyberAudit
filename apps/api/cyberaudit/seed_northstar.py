@@ -252,7 +252,7 @@ async def seed_northstar(db: AsyncSession, admin_password: str) -> str:
     )
 
     assets: list[Asset] = []
-    for name, kind, ip, crit, risk, exposed in ASSETS:
+    for name, kind, ip, crit, asset_risk, exposed in ASSETS:
         asset = Asset(
             organization_id=org.id,
             engagement_id=eng.id,
@@ -261,7 +261,7 @@ async def seed_northstar(db: AsyncSession, admin_password: str) -> str:
             identifier=name.lower().replace(" ", "-"),
             ip_address=None if ip == "n/a" else ip,
             criticality=crit,
-            risk_score=risk,
+            risk_score=asset_risk,
             exposure_score=70.0 if exposed else 25.0,
             internet_exposed=exposed,
             owner="Northstar IT (fictional)",
