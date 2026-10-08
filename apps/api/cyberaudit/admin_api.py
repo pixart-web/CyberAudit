@@ -25,7 +25,15 @@ from cyberaudit.audit import write_audit
 from cyberaudit.config import get_settings
 from cyberaudit.db import get_db
 from cyberaudit.enterprise_auth import SessionService
-from cyberaudit.models import Organization, Permission, RefreshToken, Role, User
+from cyberaudit.models import (
+    Asset,
+    Client,
+    Organization,
+    Permission,
+    RefreshToken,
+    Role,
+    User,
+)
 from cyberaudit.password_policy import validate_password_policy
 from cyberaudit.provisioning import provision_assessment_catalog
 from cyberaudit.rbac_catalog import (
@@ -364,3 +372,73 @@ async def initialize(payload: SetupPayload, db: AsyncSession = Depends(get_db)):
     await write_audit(db, admin, "setup.initialized", "organization", organization.id)
     await db.commit()
     return {"organization_id": organization.id, "administrator": admin.email}
+
+
+class ClientPatch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str | None = Field(default=None, min_length=2, max_length=160)
+    legal_name: str | None = Field(default=None, max_length=300)
+    tax_number: str | None = Field(default=None, max_length=60)
+    email: EmailStr | None = None
+    phone: str | None = Field(default=None, max_length=60)
+    address: str | None = Field(default=None, max_length=500)
+    status: str | None = Field(default=None, pattern=r"^(active|inactive)$")
+    notes: str | None = Field(default=None, max_length=5000)
+
+
+def _apply(target: object, payload: BaseModel) -> dict[str, str]:
+    changed: dict[str, str] = {}
+    for key, value in payload.model_dump(exclude_unset=True).items():
+        if getattr(target, key) != value:
+            setattr(target, key, value)
+            changed[key] = "changed"  # values are not logged (may be personal data)
+    return changed
+
+
+@router.patch("/clients/{client_id}")
+async def update_client(
+    client_id: str,
+    payload: ClientPatch,
+    caller: User = Depends(require_permission("clients.manage")),
+    db: AsyncSession = Depends(get_db),
+):
+    item = await db.scalar(
+        select(Client).where(
+            Client.id == client_id,
+            Client.organization_id == caller.organization_id,
+            Client.deleted_at.is_(None),
+        )
+    )
+    if not item:
+        raise HTTPException(404, "Client not found")
+    changed = _apply(item, payload)
+    await write_audit(db, caller, "client.updated", "client", item.id, metadata=changed)
+    await db.commit()
+    await db.refresh(item)
+    return {"id": item.id, "name": item.name, "status": item.status, "email": item.email}
+
+
+async def _tenant_asset(db: AsyncSession, caller: User, asset_id: str) -> Asset:
+    item = await db.scalar(
+        select(Asset).where(
+            Asset.id == asset_id,
+            Asset.organization_id == caller.organization_id,
+            Asset.deleted_at.is_(None),
+        )
+    )
+    if not item:
+        raise HTTPException(404, "Asset not found")
+    return item
+
+
+@router.delete("/assets/{asset_id}", status_code=204)
+async def archive_asset(
+    asset_id: str,
+    caller: User = Depends(require_permission("assets.manage")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Archive (soft delete): findings and evidence that reference the asset are preserved."""
+    item = await _tenant_asset(db, caller, asset_id)
+    item.deleted_at = datetime.now(timezone.utc)
+    await write_audit(db, caller, "asset.archived", "asset", item.id)
+    await db.commit()

@@ -225,3 +225,42 @@ async def test_bootstrap_is_token_gated_and_one_shot(
         }
     root = await db.scalar(select(User).where(User.email == "root@acme.example.com"))
     assert root is not None and [r.name for r in root.roles] == ["Platform Administrator"]
+
+
+@pytest.mark.asyncio
+async def test_client_and_asset_update_archive_are_tenant_scoped(rbac: AsyncSession):
+    from cyberaudit.models import Asset, Client, Criticality
+
+    a = await _tenant(rbac, "a")
+    b = await _tenant(rbac, "b")
+    client_a = Client(organization_id=a.organization_id, name="Client A")
+    client_b = Client(organization_id=b.organization_id, name="Client B")
+    asset_a = Asset(
+        organization_id=a.organization_id,
+        engagement_id="e",
+        name="srv",
+        asset_type="host",
+        identifier="srv",
+        criticality=Criticality.LOW,
+    )
+    rbac.add_all([client_a, client_b, asset_a])
+    await rbac.commit()
+    async with _Client(rbac, a) as c:
+        ok = await c.patch(
+            f"/api/v1/clients/{client_a.id}", json={"name": "Client A2", "status": "inactive"}
+        )
+        assert ok.status_code == 200 and ok.json()["name"] == "Client A2"
+        assert (
+            await c.patch(f"/api/v1/clients/{client_b.id}", json={"name": "xx"})
+        ).status_code == 404
+        assert (
+            await c.patch(f"/api/v1/clients/{client_a.id}", json={"status": "weird"})
+        ).status_code == 422
+        assert (
+            await c.patch(f"/api/v1/clients/{client_a.id}", json={"organization_id": "x"})
+        ).status_code == 422
+        assert (await c.delete(f"/api/v1/assets/{asset_a.id}")).status_code == 204
+    async with _Client(rbac, b) as c:
+        assert (await c.delete(f"/api/v1/assets/{asset_a.id}")).status_code == 404
+    actions = {x for (x,) in (await rbac.execute(select(AuditLog.action))).all()}
+    assert {"client.updated", "asset.archived"} <= actions
