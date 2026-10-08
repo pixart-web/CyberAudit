@@ -253,7 +253,9 @@ async def test_client_and_asset_update_archive_are_tenant_scoped(rbac: AsyncSess
         assert (
             await c.patch(f"/api/v1/clients/{client_b.id}", json={"name": "xx"})
         ).status_code == 404
-        cleared = await c.patch(f"/api/v1/clients/{client_a.id}", json={"email": None, "phone": None})
+        cleared = await c.patch(
+            f"/api/v1/clients/{client_a.id}", json={"email": None, "phone": None}
+        )
         assert cleared.status_code == 200 and cleared.json()["email"] is None
         assert (
             await c.patch(f"/api/v1/clients/{client_a.id}", json={"status": "weird"})
