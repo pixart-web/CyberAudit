@@ -124,7 +124,7 @@ export default function LoginPage() {
         </button>
         <div className="my-5 flex items-center gap-3 text-xs text-muted">
           <span className="h-px flex-1 bg-border" />
-          <span>acesso local de desenvolvimento</span>
+          <span>ou com credenciais locais</span>
           <span className="h-px flex-1 bg-border" />
         </div>
         <form method="post" onSubmit={handleSubmit(submit)} className="space-y-4">

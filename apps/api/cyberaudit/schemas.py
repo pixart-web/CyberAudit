@@ -183,6 +183,9 @@ class AssetRead(AssetCreate, ORMModel):
     id: str
     organization_id: str
     created_at: datetime
+    risk_score: float = 0.0
+    exposure_score: float = 0.0
+    internet_exposed: bool = False
 
 
 class LoginRequest(BaseModel):

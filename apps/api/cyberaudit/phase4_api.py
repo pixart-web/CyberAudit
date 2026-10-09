@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import ipaddress
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Literal, cast
 
 import redis.asyncio as redis
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from sqlalchemy import case, func, or_, select
+from sqlalchemy import case, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from cyberaudit.asset_graph import (
@@ -1688,20 +1688,35 @@ async def system_health(
     latest_sync = await db.scalar(
         select(VulnerabilityFeedSync).order_by(VulnerabilityFeedSync.created_at.desc())
     )
+    try:
+        schema_revision = str(
+            await db.scalar(text("SELECT version_num FROM alembic_version LIMIT 1")) or "unknown"
+        )
+    except Exception:  # noqa: BLE001 - table absent (e.g. create_all databases) is a valid state
+        await db.rollback()
+        schema_revision = "unmanaged"
+    stale_cutoff = utcnow() - timedelta(minutes=2)
+    stale_queued = await db.scalar(
+        select(func.count())
+        .select_from(ScanJob)
+        .where(ScanJob.status == JobStatus.QUEUED, ScanJob.queued_at < stale_cutoff)
+    )
+    notifications_ok = (await db.scalar(select(func.count()).select_from(Notification))) is not None
     return {
-        "status": "healthy" if database_ok and redis_ok else "degraded",
+        "status": "healthy" if database_ok and redis_ok and not stale_queued else "degraded",
         "components": {
             "api": "healthy",
             "frontend": "unknown",
             "postgresql": "healthy" if database_ok else "unavailable",
             "redis": "healthy" if redis_ok else "unavailable",
-            "workers": "unknown",
+            # No heartbeat exists: report only what is observable (jobs waiting too long).
+            "workers": "degraded" if stale_queued else "no_backlog",
             "runners": "contract_only",
             "storage": "healthy" if settings.upload_dir.exists() else "unknown",
             "vulnerability_feeds": (latest_sync.status if latest_sync else "unknown"),
             "scheduler": "contract_only",
-            "notifications": "healthy",
-            "migrations": "0004",
-            "version": "4.0.0-dev",
+            "notifications": "healthy" if notifications_ok else "unavailable",
+            "migrations": schema_revision,
+            "version": settings.app_version,
         },
     }

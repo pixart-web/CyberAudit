@@ -14,6 +14,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from cyberaudit.admin_api import ensure_rbac
+from cyberaudit.domain_expansion_models import (
+    AuthenticationPosture,
+    EnterpriseConnector,
+    ExternalIdentity,
+    IdentityProvider,
+)
 from cyberaudit.engagement_models import Report, ReportSection
 from cyberaudit.enterprise_models import (
     ControlAssessment,
@@ -539,6 +545,111 @@ async def seed_northstar(db: AsyncSession, admin_password: str) -> str:
                 facts={"basis": "synthetic_demo"},
                 source_references=[],
                 confidence=0.8,
+            )
+        )
+
+    # Identity story: the privileged-access weakness behind the incident and the MFA gap.
+    connector = EnterpriseConnector(
+        organization_id=org.id,
+        connector_type="identity",
+        provider="entra_id",
+        name=f"{TAG} Entra ID read-only",
+        description="Synthetic connector. No external connection.",
+        requested_permissions=["inventory.read"],
+        detected_permissions=["inventory.read"],
+        read_only=True,
+        status="active",
+        capabilities=["inventory"],
+        created_by=admin.id,
+    )
+    db.add(connector)
+    await db.flush()
+    idp = IdentityProvider(
+        organization_id=org.id,
+        connector_id=connector.id,
+        provider_type="entra_id",
+        name=f"{TAG} Northstar directory",
+        tenant_identifier="northstar-demo",
+        domain="northstar-demo.example.com",
+        provider_metadata={"demo_data": True},
+    )
+    db.add(idp)
+    await db.flush()
+    identity_specs = [
+        # external_id, display name, type, privileged, guest, service, owner, mfa, risk
+        (
+            "gw-admin",
+            "Gateway Administrator",
+            "user",
+            True,
+            False,
+            False,
+            "IT Operations",
+            "false",
+            88,
+        ),
+        (
+            "svc-backup",
+            "Backup Service Principal",
+            "service_principal",
+            True,
+            False,
+            True,
+            None,
+            "not_applicable",
+            81,
+        ),
+        (
+            "vendor-guest",
+            "Former Vendor Consultant",
+            "user",
+            False,
+            True,
+            False,
+            "Procurement",
+            "unknown",
+            57,
+        ),
+        ("cfo", "Chief Financial Officer", "user", True, False, False, "Finance", "true", 34),
+        ("analyst", "Finance Analyst", "user", False, False, False, "Finance", "true", 14),
+    ]
+    for ext, name, kind, privileged, guest, service, owner, mfa, identity_risk in identity_specs:
+        identity = ExternalIdentity(
+            organization_id=org.id,
+            provider_id=idp.id,
+            external_id=ext,
+            identity_type=kind,
+            username=f"{ext}@northstar-demo.example.com",
+            display_name=f"{TAG} {name}",
+            email=None if service else f"{ext}@northstar-demo.example.com",
+            privileged=privileged,
+            guest=guest,
+            service_account=service,
+            owner=owner,
+            mfa_state=mfa,
+            authentication_methods=[] if mfa == "false" else ["authenticator_app"],
+            risk_state=(
+                "high" if identity_risk >= 70 else "medium" if identity_risk >= 40 else "low"
+            ),
+            risk_score=identity_risk,
+            source_metadata={"demo_data": True},
+            demo_data=True,
+            last_activity_at=now - timedelta(days=200 if guest else 1),
+        )
+        db.add(identity)
+        await db.flush()
+        db.add(
+            AuthenticationPosture(
+                organization_id=org.id,
+                identity_id=identity.id,
+                mfa_registered=mfa,
+                mfa_available=mfa,
+                mfa_required=mfa,
+                mfa_enforced=mfa,
+                mfa_observed="unknown",
+                posture_score=15 if mfa == "false" else 80 if mfa == "true" else 45,
+                confidence=0.8,
+                unknown_factors=["mfa_observed"],
             )
         )
 

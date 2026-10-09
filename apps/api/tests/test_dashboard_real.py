@@ -124,3 +124,31 @@ async def test_dashboard_reflects_only_own_tenant_records(db: AsyncSession):
     assert [i["title"] for i in mine["incidents"]] == ["Incident A"]
     assert theirs["top_risks"] == [] and theirs["incidents"] == []
     assert "Autenticação sem MFA" not in str(mine) + str(theirs)
+
+
+@pytest.mark.asyncio
+async def test_system_health_reports_real_schema_version_and_no_hardcoded_claims(db: AsyncSession):
+    await ensure_rbac(db)
+    user = await _admin(db, "health")
+    await db.commit()
+
+    async def override_db() -> AsyncIterator[AsyncSession]:
+        yield db
+
+    async def override_user() -> User:
+        return await db.get(User, user.id, populate_existing=True)  # type: ignore[return-value]
+
+    app.dependency_overrides[get_db] = override_db
+    app.dependency_overrides[current_user] = override_user
+    try:
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app, raise_app_exceptions=False),
+            base_url="http://testserver",
+        ) as c:
+            body = (await c.get("/api/v1/system-health")).json()
+    finally:
+        app.dependency_overrides.clear()
+    components = body["components"]
+    assert components["migrations"] != "0004" and components["version"] != "4.0.0-dev"
+    assert components["migrations"] == "unmanaged"  # create_all test DB has no alembic table
+    assert components["workers"] in {"no_backlog", "degraded"}
