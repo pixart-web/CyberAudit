@@ -7,10 +7,22 @@ afterEach(cleanup);
 
 const calls: { path: string; init?: RequestInit }[] = [];
 let failWith: string | null = null;
+let failFields: Record<string, string> | null = null;
 
 vi.mock("@/lib/api", () => ({
+  ApiError: class ApiError extends Error {
+    fieldErrors: Record<string, string>;
+    constructor(message: string, fieldErrors: Record<string, string> = {}) {
+      super(message);
+      this.fieldErrors = fieldErrors;
+    }
+  },
   api: async (path: string, init?: RequestInit) => {
     calls.push({ path, init });
+    if (failFields && init?.method === "POST") {
+      const { ApiError } = await import("@/lib/api");
+      throw new ApiError("Dados inválidos", failFields);
+    }
     if (failWith && init?.method === "POST") throw new Error(failWith);
     if (path === "/roles") return { items: [{ name: "Auditor" }, { name: "Reviewer" }] };
     return { id: "new-1" };
@@ -20,6 +32,7 @@ vi.mock("@/lib/api", () => ({
 beforeEach(() => {
   calls.length = 0;
   failWith = null;
+  failFields = null;
 });
 
 function renderForm(onCreated = vi.fn()) {
@@ -92,4 +105,14 @@ test("datetime fields are sent as ISO-8601 and empty generated fields are filled
   const body = JSON.parse(String(calls.find((c) => c.init?.method === "POST")!.init!.body));
   expect(body.external_id).toBe("manual-123");
   expect(body.occurred_at).toBe(new Date("2026-10-08T10:30").toISOString());
+});
+
+test("server validation errors are shown on the offending field", async () => {
+  failFields = { password: "Password must use at least three character classes" };
+  renderForm();
+  fireEvent.change(screen.getByLabelText(/Nome/), { target: { value: "Maria" } });
+  fireEvent.change(screen.getByLabelText(/Palavra-passe/), { target: { value: "aaaaaaaaaaaaaaaa" } });
+  fireEvent.click(screen.getByRole("button", { name: "Criar" }));
+  expect(await screen.findByText(/three character classes/)).toBeInTheDocument();
+  expect(screen.getByLabelText(/Palavra-passe/)).toHaveAttribute("aria-invalid", "true");
 });

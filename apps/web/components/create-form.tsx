@@ -3,7 +3,7 @@
 import { Button, Card } from "@cyberaudit/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 
 export type FieldSpec = {
   name: string;
@@ -106,7 +106,10 @@ export function CreateForm({ title, endpoint, fields, submitLabel = "Criar", inv
       invalidate.forEach((key) => queryClient.invalidateQueries({ queryKey: [key] }));
       onCreated?.(created);
     },
-    onError: () => setDone(null),
+    onError: (error) => {
+      setDone(null);
+      if (error instanceof ApiError) setFieldErrors(error.fieldErrors);
+    },
   });
 
   function validate(): boolean {
