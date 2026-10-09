@@ -342,3 +342,62 @@ async def test_license_import_requires_trusted_key_matching_org_and_valid_dates(
         assert (await c.get("/api/v1/license/summary")).json()["edition"] == "community"
     actions = {x for (x,) in (await rbac.execute(select(AuditLog.action))).all()}
     assert {"license.imported", "license.import_rejected"} <= actions
+
+
+@pytest.mark.asyncio
+async def test_organization_edit_is_limited_to_own_org_and_validated(rbac: AsyncSession):
+    a = await _tenant(rbac, "a")
+    b = await _tenant(rbac, "b")
+    async with _Client(rbac, a) as c:
+        ok = await c.patch(
+            f"/api/v1/organizations/{a.organization_id}",
+            json={"name": "Renamed Org", "timezone": "Europe/Lisbon", "locale": "en"},
+        )
+        assert (
+            ok.status_code == 200
+            and ok.json()["name"] == "Renamed Org"
+            and ok.json()["slug"] == "a"
+        )
+        assert (
+            await c.patch(f"/api/v1/organizations/{b.organization_id}", json={"name": "Hijack"})
+        ).status_code == 404
+        assert (
+            await c.patch(
+                f"/api/v1/organizations/{a.organization_id}", json={"timezone": "Mars/Base"}
+            )
+        ).status_code == 422
+        assert (
+            await c.patch(f"/api/v1/organizations/{a.organization_id}", json={"slug": "new"})
+        ).status_code == 422
+        assert (
+            await c.patch(
+                f"/api/v1/organizations/{a.organization_id}", json={"status": "suspended"}
+            )
+        ).status_code == 422
+    other = await rbac.get(Organization, b.organization_id)
+    assert other is not None and other.name == "Org b"
+
+
+@pytest.mark.asyncio
+async def test_validation_errors_never_echo_submitted_secrets_nor_crash(rbac: AsyncSession):
+    admin = await _tenant(rbac, "a")
+    secret = "Short-Pw-1"  # 10 chars: fails the minimum length at the schema level
+    async with _Client(rbac, admin) as c:
+        weak = await c.post(
+            "/api/v1/users",
+            json={"name": "X Y", "email": "x@a.example.com", "password": secret, "role": "Auditor"},
+        )
+        assert weak.status_code == 422
+        assert secret not in weak.text
+        policy = await c.post(
+            "/api/v1/users",
+            json={
+                "name": "X Y",
+                "email": "x@a.example.com",
+                "password": "aaaaaaaaaaaaaaaa",
+                "role": "Auditor",
+            },
+        )
+        assert policy.status_code == 422 and "aaaaaaaaaaaaaaaa" not in policy.text
+        assert policy.json()["error"]["code"] == "VALIDATION_ERROR"
+        assert any("assword" in d["msg"] for d in policy.json()["error"]["details"])

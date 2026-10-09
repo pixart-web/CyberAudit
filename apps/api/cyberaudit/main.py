@@ -227,7 +227,17 @@ async def http_error(request: Request, exc: HTTPException):
 
 @app.exception_handler(RequestValidationError)
 async def validation_error(request: Request, exc: RequestValidationError):
-    return error_response(request, 422, "VALIDATION_ERROR", "Invalid request", exc.errors())
+    # Only field path and message: pydantic's ``input`` echoes submitted values (e.g. passwords)
+    # and ``ctx`` may hold non-serialisable exception objects.
+    safe = [
+        {
+            "type": err.get("type"),
+            "loc": [str(part) for part in err.get("loc", ())],
+            "msg": err.get("msg"),
+        }
+        for err in exc.errors()
+    ]
+    return error_response(request, 422, "VALIDATION_ERROR", "Invalid request", safe)
 
 
 @app.exception_handler(Exception)

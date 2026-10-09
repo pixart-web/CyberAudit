@@ -687,3 +687,49 @@ async def change_password(
     await _revoke_all(db, caller, caller)
     await write_audit(db, caller, "auth.password_changed", "user", caller.id)
     await db.commit()
+
+
+class OrganizationPatch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str | None = Field(default=None, min_length=2, max_length=160)
+    timezone: str | None = Field(default=None, max_length=80)
+    locale: str | None = Field(default=None, pattern=r"^(pt-PT|en)$")
+
+    @field_validator("timezone")
+    @classmethod
+    def valid_timezone(cls, value: str | None) -> str | None:
+        if value is not None:
+            from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+            try:
+                ZoneInfo(value)
+            except (ZoneInfoNotFoundError, ValueError) as exc:
+                raise ValueError("Unknown time zone") from exc
+        return value
+
+
+@router.patch("/organizations/{organization_id}")
+async def update_organization(
+    organization_id: str,
+    payload: OrganizationPatch,
+    caller: User = Depends(require_permission("organizations.manage")),
+    db: AsyncSession = Depends(get_db),
+):
+    """An administrator edits ONLY their own organization (slug and status are not editable here)."""
+    if organization_id != caller.organization_id:
+        raise HTTPException(404, "Organization not found")
+    item = await db.get(Organization, organization_id)
+    if not item or item.deleted_at:
+        raise HTTPException(404, "Organization not found")
+    changed = _apply(item, payload)
+    await write_audit(db, caller, "organization.updated", "organization", item.id, metadata=changed)
+    await db.commit()
+    await db.refresh(item)
+    return {
+        "id": item.id,
+        "name": item.name,
+        "slug": item.slug,
+        "timezone": item.timezone,
+        "locale": item.locale,
+        "status": item.status,
+    }
