@@ -218,6 +218,7 @@ ANALYST_WRITES = (
     "playbooks.manage",
     "findings.manage",
     "evidence.manage",
+    "grc_evidence.manage",
     "imports.create",
     "imports.confirm",
     "retests.create",

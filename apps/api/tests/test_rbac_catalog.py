@@ -91,3 +91,16 @@ def test_demo_seed_refuses_non_demo_databases(monkeypatch: pytest.MonkeyPatch):
         demo_database_guard("postgresql+asyncpg://u:p@db:5432/cyberaudit_demo")
     monkeypatch.setenv("DEMO_ADMIN_PASSWORD", "Some-Long-Demo-Pass-1")
     demo_database_guard("postgresql+asyncpg://u:p@db:5432/cyberaudit_demo?ssl=false")
+
+
+def test_analyst_can_link_evidence_to_incidents_and_cases():
+    # Regression: found live — analysts could upload evidence but not associate it.
+    analyst = set(ROLE_DEFINITIONS["Security Analyst"])
+    assert {
+        "evidence.manage",
+        "grc_evidence.manage",
+        "grc_evidence.read",
+        "incidents.manage",
+        "cases.manage",
+    } <= analyst
+    assert "users.manage" not in analyst and "platform.manage" not in analyst

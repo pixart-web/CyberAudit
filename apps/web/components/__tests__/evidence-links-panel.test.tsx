@@ -30,6 +30,9 @@ vi.mock("@/lib/api", () => ({
         ],
       };
     }
+    if (path.startsWith("/evidence")) {
+      return { items: [{ id: "evidence-1", title: "Auth log export", evidence_type: "log" }, { id: "evidence-2", title: "Config excerpt", evidence_type: "config" }] };
+    }
     if (init?.method === "POST") {
       lastPost = JSON.parse(String(init.body));
       return { id: "link-2" };
@@ -48,7 +51,10 @@ test("EvidenceLinksPanel shows associated evidence and can associate an existing
   expect(await screen.findByText("Auth log export")).toBeInTheDocument();
   expect(screen.getByText("Verificado")).toBeInTheDocument();
 
-  fireEvent.change(screen.getByPlaceholderText("ID de evidência existente"), { target: { value: "evidence-2" } });
+  const select = screen.getByLabelText("Evidência existente");
+  await screen.findByRole("option", { name: /Config excerpt/ });
+  expect(screen.queryByRole("option", { name: /Auth log export \(log\)/ })).not.toBeInTheDocument(); // already linked
+  fireEvent.change(select, { target: { value: "evidence-2" } });
   fireEvent.change(screen.getByPlaceholderText(/Finalidade/), { target: { value: "root cause" } });
   fireEvent.click(screen.getByRole("button", { name: "Associar" }));
 

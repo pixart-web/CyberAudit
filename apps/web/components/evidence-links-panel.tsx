@@ -22,6 +22,7 @@ type EvidenceLink = {
   evidence: EvidenceSummary;
 };
 type Items<T> = { items: T[] };
+type EvidenceOption = { id: string; title: string; evidence_type: string };
 
 /**
  * Shared evidence-links UI (section 9: one visual language for evidence
@@ -51,6 +52,14 @@ export function EvidenceLinksPanel({
     enabled,
   });
 
+  const catalogue = useQuery({
+    queryKey: ["evidence-catalogue"],
+    queryFn: () => api<Items<EvidenceOption>>("/evidence?page_size=100"),
+    enabled,
+  });
+  const alreadyLinked = new Set(links.data?.items.map((row) => row.evidence_id));
+  const options = (catalogue.data?.items ?? []).filter((item) => !alreadyLinked.has(item.id));
+
   const link = useMutation({
     mutationFn: () =>
       api("/grc/evidence-links", {
@@ -79,13 +88,15 @@ export function EvidenceLinksPanel({
     <div>
       <form onSubmit={submit} className="mb-4 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
         <label>
-          <span className="sr-only">ID da evidência existente</span>
-          <input
-            className="field"
-            value={evidenceId}
-            onChange={(event) => setEvidenceId(event.target.value)}
-            placeholder="ID de evidência existente"
-          />
+          <span className="sr-only">Evidência existente</span>
+          <select className="field" value={evidenceId} onChange={(event) => setEvidenceId(event.target.value)}>
+            <option value="">{options.length ? "Selecionar evidência…" : "Sem evidência disponível"}</option>
+            {options.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.title} ({item.evidence_type})
+              </option>
+            ))}
+          </select>
         </label>
         <label>
           <span className="sr-only">Finalidade</span>

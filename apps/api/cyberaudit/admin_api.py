@@ -17,7 +17,7 @@ import json
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -31,6 +31,9 @@ from cyberaudit.hardening_models import LicenseRecord
 from cyberaudit.models import (
     Asset,
     Client,
+    Engagement,
+    Evidence,
+    EvidenceSensitivity,
     Organization,
     Permission,
     RefreshToken,
@@ -558,3 +561,90 @@ async def import_license(
     )
     await db.commit()
     return _license_view(record, caller.organization_id)
+
+
+MANUAL_EVIDENCE_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg", ".txt", ".log", ".json", ".csv"}
+MANUAL_EVIDENCE_MIME = {
+    "application/pdf",
+    "image/png",
+    "image/jpeg",
+    "text/plain",
+    "application/json",
+    "text/csv",
+}
+MANUAL_EVIDENCE_MAX_BYTES = 10 * 1024 * 1024
+
+
+@router.post("/evidence", status_code=201)
+async def upload_evidence(
+    engagement_id: str = Form(),
+    title: str = Form(min_length=3, max_length=240),
+    evidence_type: str = Form(default="document", max_length=60),
+    description: str = Form(default="", max_length=5000),
+    sensitivity: EvidenceSensitivity = Form(default=EvidenceSensitivity.CONFIDENTIAL),
+    file: UploadFile = File(),
+    caller: User = Depends(require_permission("evidence.manage")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Analyst-supplied evidence: stored privately, hashed, never rendered or executed.
+
+    It is labelled ``manual_upload`` so reports can distinguish it from adapter-collected evidence.
+    """
+    from cyberaudit.storage import LocalStorage
+
+    engagement = await db.scalar(
+        select(Engagement).where(
+            Engagement.id == engagement_id, Engagement.organization_id == caller.organization_id
+        )
+    )
+    if not engagement:
+        raise HTTPException(404, "Engagement not found")
+    try:
+        key, digest, size = await LocalStorage().save_private_file(
+            file,
+            allowed_extensions=MANUAL_EVIDENCE_EXTENSIONS,
+            allowed_mime_types=MANUAL_EVIDENCE_MIME,
+            maximum_bytes=MANUAL_EVIDENCE_MAX_BYTES,
+        )
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    item = Evidence(
+        organization_id=caller.organization_id,
+        engagement_id=engagement.id,
+        job_id=None,
+        evidence_type=evidence_type,
+        title=title,
+        description=description,
+        storage_key=key,
+        content_hash=digest,
+        mime_type=file.content_type or "application/octet-stream",
+        size_bytes=size,
+        sensitivity=sensitivity,
+        collected_by_adapter="manual_upload",
+        evidence_metadata={
+            "manual": True,
+            "uploaded_by": caller.id,
+            "original_filename": (file.filename or "")[:255],
+            "untrusted": True,
+        },
+    )
+    db.add(item)
+    await db.flush()
+    await write_audit(
+        db,
+        caller,
+        "evidence.uploaded",
+        "evidence",
+        item.id,
+        metadata={"sha256": digest, "size": size},
+    )
+    await db.commit()
+    return {
+        "id": item.id,
+        "title": item.title,
+        "evidence_type": item.evidence_type,
+        "content_hash": digest,
+        "size_bytes": size,
+        "sensitivity": item.sensitivity.value,
+        "collected_by_adapter": item.collected_by_adapter,
+    }
