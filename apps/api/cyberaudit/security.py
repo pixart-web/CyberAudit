@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from passlib.context import CryptContext  # type: ignore[import-untyped]
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -86,10 +86,21 @@ async def issue_refresh_token(db: AsyncSession, user: User, family_id: str | Non
     return f"{token.id}.{raw}"
 
 
-async def current_user(
+PASSWORD_CHANGE_ALLOWED_PATHS = frozenset(
+    {
+        "/api/v1/auth/me",
+        "/api/v1/auth/logout",
+        "/api/v1/auth/refresh",
+        "/api/v1/auth/change-password",
+    }
+)
+
+
+async def authenticated_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
     db: AsyncSession = Depends(get_db),
 ) -> User:
+    """Authenticated active user, WITHOUT the forced-password-change gate."""
     if not credentials:
         raise HTTPException(status_code=401, detail="Authentication required")
     payload = decode_token(credentials.credentials)
@@ -105,6 +116,14 @@ async def current_user(
         raise HTTPException(status_code=401, detail="Inactive user")
     if user.organization_id != payload.get("org"):
         raise HTTPException(status_code=401, detail="Tenant mismatch")
+    return user
+
+
+async def current_user(request: Request, user: User = Depends(authenticated_user)) -> User:
+    """Authenticated user; accounts flagged ``must_change_password`` can only reach the
+    change-password flow until they set a new password."""
+    if user.must_change_password and request.url.path not in PASSWORD_CHANGE_ALLOWED_PATHS:
+        raise HTTPException(status_code=403, detail="PASSWORD_CHANGE_REQUIRED")
     return user
 
 

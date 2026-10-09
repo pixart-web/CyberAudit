@@ -17,7 +17,7 @@ import json
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -43,6 +43,7 @@ from cyberaudit.models import (
 from cyberaudit.password_policy import validate_password_policy
 from cyberaudit.product_services import EDITIONS, LicenseService
 from cyberaudit.provisioning import provision_assessment_catalog
+from cyberaudit.rate_limit import enforce_rate_limit
 from cyberaudit.rbac_catalog import (
     ALL_PERMISSIONS,
     PLATFORM_PERMISSION,
@@ -50,7 +51,12 @@ from cyberaudit.rbac_catalog import (
     ROLE_DEFINITIONS,
 )
 from cyberaudit.rls import set_tenant_context
-from cyberaudit.security import hash_password, require_permission
+from cyberaudit.security import (
+    authenticated_user,
+    hash_password,
+    require_permission,
+    verify_password,
+)
 from cyberaudit.seed import ROLE_CODES
 from cyberaudit.seed_phase3 import ROLE_PERMISSIONS as PHASE3_ROLE_PERMISSIONS
 
@@ -648,3 +654,36 @@ async def upload_evidence(
         "sensitivity": item.sensitivity.value,
         "collected_by_adapter": item.collected_by_adapter,
     }
+
+
+class ChangePassword(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=14, max_length=128)
+
+
+@router.post("/auth/change-password", status_code=204)
+async def change_password(
+    body: ChangePassword,
+    request: Request,
+    caller: User = Depends(authenticated_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Self-service change; also the only route open to accounts that must change password."""
+    await enforce_rate_limit(request, category="change_password", limit=10, window_seconds=300)
+    if not verify_password(body.current_password, caller.password_hash):
+        await write_audit(db, caller, "auth.password_change_failed", "user", caller.id, "failure")
+        await db.commit()
+        raise HTTPException(401, "Current password is incorrect")
+    if body.new_password == body.current_password:
+        raise HTTPException(422, "The new password must differ from the current one")
+    try:
+        _password(body.new_password, caller.email)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    caller.password_hash = hash_password(body.new_password)
+    caller.must_change_password = False
+    # Other sessions and refresh tokens are no longer trusted.
+    await _revoke_all(db, caller, caller)
+    await write_audit(db, caller, "auth.password_changed", "user", caller.id)
+    await db.commit()

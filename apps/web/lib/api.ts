@@ -33,6 +33,9 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   });
   if (!response.ok) {
     const body = await response.json().catch(() => null);
+    if (response.status === 403 && body?.error?.message === "PASSWORD_CHANGE_REQUIRED" && typeof window !== "undefined" && window.location.pathname !== "/account") {
+      window.location.assign("/account");
+    }
     const fields = validationFields(body?.error?.details);
     const summary = Object.entries(fields).map(([name, msg]) => `${name}: ${msg}`).join("; ");
     throw new ApiError(summary ? `Dados inválidos — ${summary}` : (body?.error?.message ?? "Não foi possível concluir o pedido."), fields);

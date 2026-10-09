@@ -14,9 +14,9 @@ from cyberaudit.config import Settings
 from cyberaudit.models import Organization, RefreshToken, User
 from cyberaudit.rate_limit import enforce_rate_limit
 from cyberaudit.security import (
+    authenticated_user,
     create_access_token,
     create_step_up_token,
-    current_user,
     decode_token,
     hash_password,
     issue_refresh_token,
@@ -188,10 +188,10 @@ async def test_password_tokens_refresh_and_authenticated_user_contract(db) -> No
     assert stored.token_hash == hashlib.sha256(raw.encode()).hexdigest()
 
     credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials=access_token)
-    authenticated = await current_user(credentials, db)
+    authenticated = await authenticated_user(credentials, db)
     assert authenticated.id == user.id
     with pytest.raises(HTTPException) as missing:
-        await current_user(None, db)
+        await authenticated_user(None, db)
     assert missing.value.status_code == 401
 
     forged = jwt.encode(
@@ -200,7 +200,7 @@ async def test_password_tokens_refresh_and_authenticated_user_contract(db) -> No
         algorithm="HS256",
     )
     with pytest.raises(HTTPException):
-        await current_user(
+        await authenticated_user(
             HTTPAuthorizationCredentials(scheme="Bearer", credentials=forged),
             db,
         )
@@ -210,7 +210,7 @@ async def test_password_tokens_refresh_and_authenticated_user_contract(db) -> No
         algorithm="HS256",
     )
     with pytest.raises(HTTPException) as missing_tenant_error:
-        await current_user(
+        await authenticated_user(
             HTTPAuthorizationCredentials(scheme="Bearer", credentials=missing_tenant),
             db,
         )
@@ -221,7 +221,7 @@ async def test_password_tokens_refresh_and_authenticated_user_contract(db) -> No
         algorithm="HS256",
     )
     with pytest.raises(HTTPException) as invalid_tenant_error:
-        await current_user(
+        await authenticated_user(
             HTTPAuthorizationCredentials(scheme="Bearer", credentials=invalid_tenant),
             db,
         )

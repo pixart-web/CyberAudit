@@ -826,6 +826,7 @@ async def create_user(
         email=payload.email.lower(),
         password_hash=hash_password(payload.password),
         roles=[role],
+        must_change_password=True,
     )
     db.add(item)
     try:

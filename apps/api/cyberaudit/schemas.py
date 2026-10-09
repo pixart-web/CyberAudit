@@ -61,6 +61,7 @@ class UserRead(ORMModel):
     mfa_enabled: bool
     roles: list[str] = Field(default_factory=list)
     last_login_at: datetime | None = None
+    must_change_password: bool = False
 
     @field_validator("roles", mode="before")
     @classmethod
