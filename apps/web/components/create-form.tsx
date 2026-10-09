@@ -8,7 +8,7 @@ import { api } from "@/lib/api";
 export type FieldSpec = {
   name: string;
   label: string;
-  type?: "text" | "email" | "password" | "textarea" | "select" | "number" | "date" | "checkbox" | "file";
+  type?: "text" | "email" | "password" | "textarea" | "select" | "number" | "date" | "checkbox" | "file" | "datetime";
   required?: boolean;
   placeholder?: string;
   help?: string;
@@ -18,6 +18,8 @@ export type FieldSpec = {
   defaultValue?: string;
   accept?: string;
   minLength?: number;
+  /** Value used when the field is left empty (e.g. a generated external id). */
+  generate?: () => string;
 };
 
 type Values = Record<string, string | boolean | File | undefined>;
@@ -82,13 +84,17 @@ export function CreateForm({ title, endpoint, fields, submitLabel = "Criar", inv
         return api<unknown>(endpoint, { method: "POST", body: form });
       }
       const editing = method === "PATCH";
+      const withGenerated = Object.fromEntries(
+        Object.entries(body).map(([key, value]) => [key, value === "" ? fields.find((f) => f.name === key)?.generate?.() ?? value : value]),
+      );
       const payload = Object.fromEntries(
-        Object.entries(body)
+        Object.entries(withGenerated)
           .filter(([key, value]) => (editing ? value !== initial[key] : value !== ""))
           .map(([key, value]) => [key, editing && value === "" ? null : value])
           .filter(([, value]) => value !== undefined)
           .map(([key, value]) => {
             const spec = fields.find((f) => f.name === key);
+            if (spec?.type === "datetime" && typeof value === "string" && value) return [key, new Date(value).toISOString()];
             return [key, spec?.type === "number" && value !== null ? Number(value) : value];
           }),
       );
@@ -158,7 +164,7 @@ export function CreateForm({ title, endpoint, fields, submitLabel = "Criar", inv
                 ) : (
                   <input
                     {...common}
-                    type={spec.type ?? "text"}
+                    type={spec.type === "datetime" ? "datetime-local" : (spec.type ?? "text")}
                     className="field"
                     placeholder={spec.placeholder}
                     autoComplete={spec.type === "password" ? "new-password" : undefined}

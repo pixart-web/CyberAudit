@@ -72,3 +72,24 @@ test("shows the server's error instead of faking success", async () => {
   expect(await screen.findByRole("alert")).toHaveTextContent("already exists");
   expect(screen.queryByRole("status")).not.toBeInTheDocument();
 });
+
+test("datetime fields are sent as ISO-8601 and empty generated fields are filled", async () => {
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <CreateForm
+        title="Evento"
+        endpoint="/security-events"
+        fields={[
+          { name: "occurred_at", label: "Ocorrido em", type: "datetime", required: true },
+          { name: "external_id", label: "ID externo", generate: () => "manual-123" },
+        ]}
+      />
+    </QueryClientProvider>,
+  );
+  fireEvent.change(screen.getByLabelText(/Ocorrido em/), { target: { value: "2026-10-08T10:30" } });
+  fireEvent.click(screen.getByRole("button", { name: "Criar" }));
+  await waitFor(() => expect(calls.some((c) => c.init?.method === "POST")).toBe(true));
+  const body = JSON.parse(String(calls.find((c) => c.init?.method === "POST")!.init!.body));
+  expect(body.external_id).toBe("manual-123");
+  expect(body.occurred_at).toBe(new Date("2026-10-08T10:30").toISOString());
+});
