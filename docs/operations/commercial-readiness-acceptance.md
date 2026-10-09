@@ -80,3 +80,9 @@ Note: denied requests return HTTP 201 with `status: "denied"` (the policy decisi
 | 10 Operations | PASS (after fix) | Health Center showed hard-coded migration 0004 / version 4.0.0-dev → now real (0018) |
 Also fixed: login divider said "acesso local de desenvolvimento".
 Not done: scripted/recorded rehearsal with a presenter; cloud/Kubernetes scenes have no Northstar data.
+
+## Backup / restore drill (item 51) — PostgreSQL 16, 30 008 assets + 60 009 findings
+`pg_dump -Fc` 0.38 s (5.6 MB, 1 733 catalogue entries, SHA-256 recorded) → `pg_restore` into an isolated database 1.58 s.
+Compared live vs restored: assets, findings, users, organizations, `alembic_version` (0018) and **135 RLS policies** — identical.
+Reproduce on the server with `deploy/hetzner-evaluation/restore-test.sh` (writes only a throwaway database, drops it on exit).
+Not tested: restore of the `uploads` volume, point-in-time recovery, restore timing at production size, off-host backup copy.
