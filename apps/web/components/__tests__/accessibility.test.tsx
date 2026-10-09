@@ -45,6 +45,11 @@ import CommandCenterPage from "@/app/command-center/page";
 import AssetGraphPage from "@/app/asset-graph/page";
 import KnowledgeGraphPage from "@/app/knowledge-graph/page";
 import ReportsPage from "@/app/reports/page";
+import LicensePage from "@/app/license/page";
+import SetupPage from "@/app/setup/page";
+import ClientsPage from "@/app/clients/page";
+import { UsersAdmin } from "../users-admin";
+import { CreateForm } from "../create-form";
 
 afterEach(cleanup);
 vi.mock("next/navigation", () => ({
@@ -252,6 +257,17 @@ const socFixtures: Record<string, unknown> = {
     status: "active",
     risk_level: "medium",
   },
+  "/license/summary": {
+    edition: "professional", state: "active", license_id: "EVAL-1", capabilities: ["soc"], limits: {},
+    expires_at: "2099-01-01T00:00:00Z", grace_until: null, days_remaining: 900, verified_at: "2026-10-01T00:00:00Z",
+    read_only: false, trusted_keys_configured: true,
+  },
+  "/setup/status": { initialized: false, bootstrap_enabled: true },
+  "/users?page_size=100": {
+    items: [{ id: "u1", name: "Maria", email: "m@x.example.com", status: "active", roles: ["Auditor"], mfa_enabled: false, last_login_at: null }],
+    total: 1,
+  },
+  "/roles": { items: [{ name: "Auditor", description: "" }, { name: "Administrator", description: "" }] },
   "/command-center": {
     security_posture: 60,
     exposure_score: 35,
@@ -398,6 +414,27 @@ describe("axe-core automated accessibility audit (jsdom, layout rules excluded)"
     expect(violations, JSON.stringify(violations, null, 2)).toHaveLength(0);
   });
 
+  test("CreateForm (labels, errors, required, select, checkbox, file) has no automated a11y violations", async () => {
+    const { container } = render(
+      <QueryClientProvider client={new QueryClient()}>
+        <CreateForm
+          title="Formulário"
+          endpoint="/x"
+          fields={[
+            { name: "a", label: "Nome", required: true, help: "Ajuda" },
+            { name: "b", label: "Perfil", type: "select", options: [["x", "X"]] },
+            { name: "c", label: "Ativo", type: "checkbox" },
+            { name: "d", label: "Ficheiro", type: "file" },
+            { name: "e", label: "Notas", type: "textarea" },
+          ]}
+        />
+      </QueryClientProvider>,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const violations = await auditedViolations(container);
+    expect(violations, JSON.stringify(violations, null, 2)).toHaveLength(0);
+  });
+
   test("EngagementWorkspace has no automated a11y violations", async () => {
     const { container } = render(
       <QueryClientProvider client={new QueryClient()}>
@@ -446,6 +483,10 @@ describe("axe-core automated accessibility audit (jsdom, layout rules excluded)"
     ["Cyber Asset Graph (incl. table-view fallback)", AssetGraphPage],
     ["Knowledge Graph (list)", KnowledgeGraphPage],
     ["Reports (executive summary)", ReportsPage],
+    ["License", LicensePage],
+    ["First-run setup", SetupPage],
+    ["Clients (list + row actions)", ClientsPage],
+    ["User administration", () => <UsersAdmin />],
   ])("SOC/Risk Workspace: %s has no automated a11y violations", async (_label, Page) => {
     const { container } = render(
       <QueryClientProvider client={new QueryClient()}>

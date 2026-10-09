@@ -1,11 +1,11 @@
 "use client";
 
-import { Badge, Card, EmptyState, ErrorState, LoadingState, SeverityBadge } from "@cyberaudit/ui";
-import { useQuery } from "@tanstack/react-query";
-import { BrainCircuit, FileCheck2, ShieldAlert, UserCheck } from "lucide-react";
+import { Badge, Button, Card, EmptyState, ErrorState, LoadingState, SeverityBadge } from "@cyberaudit/ui";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { BrainCircuit, Download, FileCheck2, ShieldAlert, UserCheck } from "lucide-react";
 import { useParams } from "next/navigation";
 import { Shell } from "@/components/shell";
-import { api } from "@/lib/api";
+import { api, downloadFile } from "@/lib/api";
 
 type Report = {
   id: string;
@@ -41,6 +41,8 @@ export default function ReportDetail() {
     retry: false,
   });
 
+  const exportPdf = useMutation({ mutationFn: () => downloadFile(`/reports/${id}/export.pdf`, "relatorio.pdf") });
+
   if (isLoading) return <Shell title="Relatório"><LoadingState /></Shell>;
   if (error || !data) {
     return (
@@ -57,6 +59,17 @@ export default function ReportDetail() {
       <div className="mb-5 flex flex-wrap items-center gap-3">
         <SeverityBadge state={report.status === "draft" ? "warning" : "healthy"} />
         <Badge tone="neutral">{new Date(report.created_at).toLocaleString("pt-PT")}</Badge>
+        <div className="ml-auto flex items-center gap-3">
+          {exportPdf.error && (
+            <span role="alert" className="text-sm text-critical">
+              {(exportPdf.error as Error).message}
+            </span>
+          )}
+          <Button type="button" onClick={() => exportPdf.mutate()} disabled={exportPdf.isPending}>
+            <Download size={16} />
+            {exportPdf.isPending ? "A exportar…" : "Exportar PDF"}
+          </Button>
+        </div>
       </div>
       {sections.length === 0 && (
         <Card className="p-8">

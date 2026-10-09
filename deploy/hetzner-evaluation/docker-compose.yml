@@ -1,0 +1,136 @@
+# CyberAudit — Hetzner EVALUATION profile (Traefik). Not the strict production profile:
+# local authentication stays enabled so an evaluation can run without an IdP.
+# PostgreSQL and Redis are on an internal network only: no published host ports.
+name: cyberaudit-eval
+
+x-api-env: &api-env
+  ENVIRONMENT: demo
+  DATABASE_URL: postgresql+asyncpg://cyberaudit:${POSTGRES_PASSWORD:?}@postgres:5432/cyberaudit
+  REDIS_URL: redis://:${REDIS_PASSWORD:?}@redis:6379/0
+  JWT_SECRET: ${JWT_SECRET:?}
+  ENCRYPTION_KEY: ${ENCRYPTION_KEY:?}
+  APP_ORIGIN: https://${CANONICAL_HOST:?}
+  ALLOWED_HOSTS: '["${CANONICAL_HOST}","localhost","127.0.0.1"]'
+  REQUIRE_HTTPS: "true"
+  SECURE_COOKIES: "true"
+  AUTHENTICATION_MODE: local
+  LOCAL_AUTH_ENABLED: "true"
+  UPLOAD_DIR: /data/uploads
+  API_DOCS_ENABLED: "false"
+  LICENSE_TRUSTED_PUBLIC_KEYS: ${LICENSE_TRUSTED_PUBLIC_KEYS:-[]}
+  AI_RUNTIME_BACKEND: ${AI_RUNTIME_BACKEND:-disabled}
+  BOOTSTRAP_TOKEN: ${BOOTSTRAP_TOKEN:-}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cyberaudit
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      POSTGRES_DB: cyberaudit
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cyberaudit -d cyberaudit"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [internal]
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:?}"]
+    volumes: [redisdata:/data]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?}
+    networks: [internal]
+
+  migrate:
+    image: ${CYBERAUDIT_API_IMAGE:?}
+    command: ["alembic", "upgrade", "head"]
+    environment: *api-env
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: "no"
+    networks: [internal]
+
+  api:
+    image: ${CYBERAUDIT_API_IMAGE:?}
+    restart: unless-stopped
+    # One uvicorn process saturates at ~80 req/s (measured); 2 workers for evaluation load.
+    command: ["uvicorn", "cyberaudit.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+    environment: *api-env
+    volumes: [uploads:/data/uploads]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/ready')"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    networks: [internal, traefik]
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${TRAEFIK_NETWORK:-traefik}
+      - traefik.http.routers.cyberaudit-api.rule=Host(`${CANONICAL_HOST}`) && (PathPrefix(`/api`) || Path(`/ready`) || Path(`/health`))
+      - traefik.http.routers.cyberaudit-api.priority=20
+      - traefik.http.routers.cyberaudit-api.entrypoints=websecure
+      - traefik.http.routers.cyberaudit-api.tls.certresolver=${TRAEFIK_CERT_RESOLVER:-letsencrypt}
+      - traefik.http.services.cyberaudit-api.loadbalancer.server.port=8000
+
+  worker:
+    image: ${CYBERAUDIT_API_IMAGE:?}
+    restart: unless-stopped
+    # All worker modules: detection/SOC, asset-intelligence, enterprise and identity/cloud queues.
+    command: ["dramatiq", "cyberaudit.worker", "cyberaudit.phase4_worker", "cyberaudit.enterprise_worker", "cyberaudit.domain_expansion_worker", "--processes", "1", "--threads", "4"]
+    environment: *api-env
+    volumes: [uploads:/data/uploads]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    networks: [internal]
+
+  web:
+    image: ${CYBERAUDIT_WEB_IMAGE:?}
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    networks: [traefik]
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${TRAEFIK_NETWORK:-traefik}
+      - traefik.http.routers.cyberaudit-web.rule=Host(`${CANONICAL_HOST}`)
+      - traefik.http.routers.cyberaudit-web.priority=10
+      - traefik.http.routers.cyberaudit-web.entrypoints=websecure
+      - traefik.http.routers.cyberaudit-web.tls.certresolver=${TRAEFIK_CERT_RESOLVER:-letsencrypt}
+      - traefik.http.services.cyberaudit-web.loadbalancer.server.port=3000
+      # Non-canonical host (www) -> canonical, permanent.
+      - traefik.http.routers.cyberaudit-www.rule=Host(`${ALIAS_HOST}`)
+      - traefik.http.routers.cyberaudit-www.entrypoints=websecure
+      - traefik.http.routers.cyberaudit-www.tls.certresolver=${TRAEFIK_CERT_RESOLVER:-letsencrypt}
+      - traefik.http.routers.cyberaudit-www.middlewares=cyberaudit-canonical
+      - traefik.http.middlewares.cyberaudit-canonical.redirectregex.regex=^https://${ALIAS_HOST}/(.*)
+      - traefik.http.middlewares.cyberaudit-canonical.redirectregex.replacement=https://${CANONICAL_HOST}/$${1}
+      - traefik.http.middlewares.cyberaudit-canonical.redirectregex.permanent=true
+
+volumes:
+  pgdata:
+  redisdata:
+  uploads:
+
+networks:
+  internal: { internal: true }
+  traefik:
+    name: ${TRAEFIK_NETWORK:-traefik}
+    external: true

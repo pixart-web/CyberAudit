@@ -535,7 +535,7 @@ class Evidence(Base):
     organization_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
     engagement_id: Mapped[str] = mapped_column(ForeignKey("engagements.id"), index=True)
     finding_id: Mapped[str | None] = mapped_column(ForeignKey("findings.id"), index=True)
-    job_id: Mapped[str] = mapped_column(ForeignKey("scan_jobs.id"), index=True)
+    job_id: Mapped[str | None] = mapped_column(ForeignKey("scan_jobs.id"), index=True)
     evidence_type: Mapped[str] = mapped_column(String(60))
     title: Mapped[str] = mapped_column(String(240))
     description: Mapped[str] = mapped_column(Text, default="")

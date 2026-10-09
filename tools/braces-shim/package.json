@@ -1,0 +1,8 @@
+{
+  "name": "braces",
+  "version": "3.0.4-cyberaudit.1",
+  "private": true,
+  "description": "Drop-in replacement for braces@3 (GHSA-vfj7-8cjw-p6xm, no upstream patch). Delegates to patched brace-expansion.",
+  "main": "index.js",
+  "dependencies": { "brace-expansion": "^5.0.9" }
+}
