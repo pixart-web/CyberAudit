@@ -64,3 +64,19 @@ Profile "Inventário básico" (consolidates known data; no traffic to third part
 | Local URL target on a non-standard port (earlier) | `url_port_blocked` |
 Not exercised: live network adapters (DNS/TLS/HTTP) against real third-party hosts — deliberately not run without an authorised target; Redis outage; mid-run worker crash; retry/cancel from the UI.
 Note: denied requests return HTTP 201 with `status: "denied"` (the policy decision is the resource); clients must read `status`.
+
+## Investor demo walk-through (Northstar tenant, browser, 1366×768; dashboard also 1920×1080)
+| Scene | Result | Notes |
+|---|---|---|
+| 1 Command Center | PASS | posture 50.8 %, real top assets; "Serviços abertos 0 / Cobertura 0 %" are honest (no service/coverage data in the demo) |
+| 2 Asset Intelligence | PASS (after fix) | list columns showed dashes (API/UI contract mismatch) → fixed |
+| 3 Identity risk | PASS (after fix) | tenant had no identities → synthetic directory added (privileged/unowned/guest, MFA posture) |
+| 4 Attack Graph | PASS | 7 nodes / 5 relations, search/filter/table view |
+| 5 SOC incident | PASS | incident, timeline, evidence tab, cases |
+| 6 Risk & GRC | PASS | controls with gaps, risk register, create forms |
+| 7 Cyber AI | PASS (degraded mode) | deterministic, grounded answer now lists the facts used; no local model installed, stated on screen |
+| 8 Reporting | PASS | executive report + PDF export (verified earlier) |
+| 9 Multi-tenancy | PASS | verified earlier with two tenants (API) |
+| 10 Operations | PASS (after fix) | Health Center showed hard-coded migration 0004 / version 4.0.0-dev → now real (0018) |
+Also fixed: login divider said "acesso local de desenvolvimento".
+Not done: scripted/recorded rehearsal with a presenter; cloud/Kubernetes scenes have no Northstar data.

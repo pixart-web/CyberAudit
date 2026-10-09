@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BrainCircuit } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { AgentAnswerView, type AgentAnswerData } from "@/components/agent-answer";
 import { EvidenceLinksPanel } from "@/components/evidence-links-panel";
 import { Shell } from "@/components/shell";
 import { api } from "@/lib/api";
@@ -25,12 +26,7 @@ type TimelineEntry = { id: string; entry_type: string; title: string; descriptio
 type IncidentDetail = { incident: Incident; timeline: TimelineEntry[] };
 type CaseRecord = { id: string; reference: string; title: string; status: string };
 type Alert = { id: string; title: string; severity: string; status: string };
-type AgentAnswer = {
-  response: string;
-  citations: { node_id?: string; source_id?: string }[];
-  confidence: number;
-  limitations: string[];
-};
+type AgentAnswer = AgentAnswerData;
 
 const TABS = [
   { id: "overview", label: "Visão Geral" },
@@ -218,24 +214,7 @@ export function IncidentWorkspace({ id }: { id: string }) {
               <BrainCircuit size={16} className="text-primary" />
               {analyze.isPending ? "A analisar…" : "Analisar incidente"}
             </button>
-            {analyze.data && (
-              <div className="space-y-3 rounded-lg border border-border bg-surface p-4 text-sm">
-                <p>{analyze.data.response}</p>
-                {analyze.data.citations.length > 0 && (
-                  <p className="text-xs text-muted">
-                    Fontes: {analyze.data.citations.map((citation) => citation.source_id ?? citation.node_id).join(", ")}
-                  </p>
-                )}
-                <p className="text-xs text-muted">Confiança: {(analyze.data.confidence * 100).toFixed(0)}%</p>
-                {analyze.data.limitations.length > 0 && (
-                  <ul className="list-disc pl-4 text-xs text-muted">
-                    {analyze.data.limitations.map((limitation, index) => (
-                      <li key={index}>{limitation}</li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            )}
+            {analyze.data && <AgentAnswerView answer={analyze.data} />}
 
             <button
               type="button"
@@ -246,24 +225,7 @@ export function IncidentWorkspace({ id }: { id: string }) {
               <BrainCircuit size={16} className="text-primary" />
               {summarizeTimeline.isPending ? "A resumir…" : "Resumir cronologia"}
             </button>
-            {summarizeTimeline.data && (
-              <div className="space-y-3 rounded-lg border border-border bg-surface p-4 text-sm">
-                <p>{summarizeTimeline.data.response}</p>
-                {summarizeTimeline.data.citations.length > 0 && (
-                  <p className="text-xs text-muted">
-                    Fontes: {summarizeTimeline.data.citations.map((citation) => citation.source_id ?? citation.node_id).join(", ")}
-                  </p>
-                )}
-                <p className="text-xs text-muted">Confiança: {(summarizeTimeline.data.confidence * 100).toFixed(0)}%</p>
-                {summarizeTimeline.data.limitations.length > 0 && (
-                  <ul className="list-disc pl-4 text-xs text-muted">
-                    {summarizeTimeline.data.limitations.map((limitation, index) => (
-                      <li key={index}>{limitation}</li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            )}
+            {summarizeTimeline.data && <AgentAnswerView answer={summarizeTimeline.data} />}
           </TabPanel>
         </div>
       </Card>
