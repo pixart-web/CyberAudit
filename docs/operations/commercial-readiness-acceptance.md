@@ -53,3 +53,14 @@ Demo reset = drop and recreate the dedicated demo database (never a customer dat
 `GET /license/summary`, `POST /license/import` (needs `license.manage`). A license is accepted only if its Ed25519 signature verifies against
 `LICENSE_TRUSTED_PUBLIC_KEYS` configured on that server, it names the importing organization, and it is not expired. No keys configured = import refused (409).
 Vendor tool: `scripts/licensing/issue_license.py` (`keygen`, `sign`) — the **evaluation entitlement** is simply a short-expiry signed license (e.g. `--days 30`) bound to one organization id; there is no universal license. Pricing/edition definitions were not changed.
+
+## Assessment execution and job lifecycle (items 16, 17, 50) — live, PostgreSQL 16 + Dramatiq worker
+Profile "Inventário básico" (consolidates known data; no traffic to third parties), analyst role, Northstar demo engagement (scope `10.40.0.0/16`):
+| Case | Result |
+|---|---|
+| Target `10.40.0.10` (in scope) | job `queued` → worker → `completed` (100 %), `job.completed` notification created |
+| Target `8.8.8.8` / `10.50.0.1` (outside scope) | `denied` by ScopePolicyEngine, never queued |
+| Worker stopped, job created in scope | stays `queued` (durable); after the worker restarts → `COMPLETED` |
+| Local URL target on a non-standard port (earlier) | `url_port_blocked` |
+Not exercised: live network adapters (DNS/TLS/HTTP) against real third-party hosts — deliberately not run without an authorised target; Redis outage; mid-run worker crash; retry/cancel from the UI.
+Note: denied requests return HTTP 201 with `status: "denied"` (the policy decision is the resource); clients must read `status`.
