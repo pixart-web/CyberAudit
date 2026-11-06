@@ -28,9 +28,30 @@ jobs:
         with: { node-version: "22.17.1", cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
-      - run: pnpm test
+      - run: pnpm --filter @cyberaudit/web test
       - run: pnpm --filter @cyberaudit/web build
       - run: pnpm audit --audit-level high
+  desktop:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Tauri Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf
+      - uses: dtolnay/rust-toolchain@1.90.0
+        with:
+          components: clippy, rustfmt
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with: { node-version: "22.17.1", cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @cyberaudit/desktop check
+      - run: pnpm --filter @cyberaudit/desktop test
   migrations:
     runs-on: ubuntu-24.04
     services:
