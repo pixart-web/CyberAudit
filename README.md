@@ -7,6 +7,7 @@ Plataforma profissional para gestão e execução segura de auditorias de cibers
 - Docker 24+ e Docker Compose v2
 - pnpm 9+ e Node.js 22+ (desenvolvimento local)
 - Python 3.12 (desenvolvimento local)
+- Rust 1.90 via rustup (apenas para desenvolvimento desktop)
 
 ## Arranque
 
@@ -74,6 +75,7 @@ workflow protegido e só é alcançável depois do gate.
 
 - `apps/web`: Next.js App Router, Tailwind, React Query, RHF/Zod e gráficos.
 - `apps/api`: FastAPI, SQLAlchemy assíncrono, Alembic, autenticação e políticas.
+- `apps/desktop`: shell Tauri 2 e fronteira do runtime local em implementação.
 - `apps/worker`: processo Dramatiq isolado logicamente, sem ferramentas ofensivas.
 - `packages`: UI, tipos, configuração e helpers de segurança.
 - `infrastructure`: imagens Docker e espaço para nginx/scripts.
@@ -117,6 +119,24 @@ make test
 ```
 
 O backend usa Ruff, Black, mypy, pytest e coverage. O frontend usa TypeScript strict, ESLint, Prettier, Vitest e Testing Library.
+
+### Desktop-first (em implementação)
+
+A branch desktop preserva o core existente e acrescenta Tauri 2, layout local
+de dados, capability efémera API, proxy same-origin e verificação SHA-256 dos
+recursos. Não existe ainda installer suportado nem bundle com PostgreSQL,
+Valkey, API, worker e Next empacotados; Docker continua a ser o arranque
+funcional documentado enquanto D2–D10 não forem validados.
+
+```bash
+pnpm desktop:check
+pnpm desktop:test
+```
+
+Ver `docs/architecture/desktop-reality-audit.md`,
+`docs/architecture/adr-035-desktop-first-runtime.md`,
+`docs/development/desktop-development.md` e
+`docs/security/desktop-threat-model.md`.
 
 ## Laboratório controlado
 

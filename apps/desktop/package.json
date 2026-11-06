@@ -1,0 +1,15 @@
+{
+  "name": "@cyberaudit/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "check": "../../infrastructure/scripts/rust-cargo.sh check --manifest-path src-tauri/Cargo.toml",
+    "test": "../../infrastructure/scripts/rust-cargo.sh test --manifest-path src-tauri/Cargo.toml && node --test scripts/*.test.mjs",
+    "runtime:manifest": "node scripts/generate-runtime-manifest.mjs"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.12.0"
+  }
+}

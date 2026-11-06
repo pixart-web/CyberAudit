@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="pt-PT">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <title>CyberAudit OS</title>
+    <style>
+      :root { color-scheme: dark; font-family: ui-sans-serif, system-ui, sans-serif; background: #05090d; color: #f2f7f9; }
+      * { box-sizing: border-box; }
+      body { min-height: 100dvh; margin: 0; display: grid; place-items: center; background: #05090d; }
+      main { width: min(34rem, calc(100% - 2rem)); border: 1px solid #17262f; border-radius: 12px; background: #0b151c; padding: 2rem; box-shadow: 0 24px 80px rgb(0 0 0 / 28%); }
+      h1 { margin: 0 0 .5rem; font-size: 1.25rem; letter-spacing: -.02em; }
+      p { margin: 0; color: #a5b5bc; line-height: 1.55; }
+      .status { margin-top: 1.5rem; display: flex; gap: .75rem; align-items: center; color: #31f27c; font-size: .875rem; }
+      .indicator { width: .625rem; height: .625rem; border-radius: 999px; background: currentColor; }
+      @media (prefers-reduced-motion: no-preference) { .indicator { animation: pulse 1.4s ease-in-out infinite; } }
+      @keyframes pulse { 50% { opacity: .35; transform: scale(.75); } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>CyberAudit OS</h1>
+      <p>O runtime local está a ser verificado. A aplicação só abre depois de a base de dados e os serviços responderem.</p>
+      <div class="status" role="status" aria-live="polite"><span class="indicator" aria-hidden="true"></span>A iniciar serviços locais</div>
+    </main>
+  </body>
+</html>

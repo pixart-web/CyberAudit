@@ -102,6 +102,8 @@ class Settings(BaseSettings):
     # A bundle's signature must verify against one of these; it is never
     # trusted merely because it was uploaded (see cyberaudit.update_bundle).
     update_trusted_public_keys_pem: list[str] = []
+    desktop_mode: bool = False
+    desktop_session_secret_file: Path | None = None
 
     @property
     def production_like(self) -> bool:
@@ -109,6 +111,17 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def reject_insecure_production(self) -> "Settings":
+        if self.desktop_mode:
+            if self.desktop_session_secret_file is None:
+                raise ValueError("Desktop mode requires DESKTOP_SESSION_SECRET_FILE")
+            parsed_origin = urlparse(self.app_origin)
+            if (
+                parsed_origin.scheme != "http"
+                or parsed_origin.hostname not in {"127.0.0.1", "localhost"}
+                or parsed_origin.username is not None
+                or parsed_origin.password is not None
+            ):
+                raise ValueError("Desktop mode requires a plain HTTP loopback APP_ORIGIN")
         if not self.production_like:
             return self
         errors: list[str] = []

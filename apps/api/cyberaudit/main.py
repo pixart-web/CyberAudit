@@ -32,6 +32,7 @@ from cyberaudit.ai_runtime_api import router as ai_runtime_router
 from cyberaudit.audit import write_audit
 from cyberaudit.config import get_settings
 from cyberaudit.db import Base, engine, get_db
+from cyberaudit.desktop_security import DESKTOP_SESSION_HEADER, desktop_request_authorized
 from cyberaudit.diagnostics_api import router as diagnostics_router
 from cyberaudit.domain_expansion_api import router as domain_expansion_router
 from cyberaudit.engagement_api import reports_router as engagement_reports_router
@@ -169,6 +170,22 @@ def error_response(
 async def request_context(request: Request, call_next):
     started_at = time.perf_counter()
     request.state.request_id = request.headers.get("x-request-id", str(uuid.uuid4()))
+    if not desktop_request_authorized(
+        settings,
+        request.url.path,
+        request.headers.get(DESKTOP_SESSION_HEADER),
+    ):
+        structured_event(
+            "desktop_session_rejected",
+            request_id=request.state.request_id,
+            path=request.url.path,
+        )
+        return error_response(
+            request,
+            403,
+            "DESKTOP_SESSION_REQUIRED",
+            "Desktop session capability is missing or invalid",
+        )
     trace = trace_context(request.headers.get("traceparent"))
     request.state.trace_id = trace.trace_id
     content_length = request.headers.get("content-length")
