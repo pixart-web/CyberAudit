@@ -148,10 +148,21 @@ endpoint NODUS hardcoded. O contrato está em
 - toolchain Rust 1.90 disponível e fixada no repositório; shell compilado em
   modo release e 4 testes Rust passaram;
 - binários sidecar por target ainda não construídos;
-- empacotamento `tauri build --no-bundle` não concluiu nesta execução, embora o
-  binário Rust release tenha compilado; a causa precisa de diagnóstico antes de
-  produzir `.app`/`.dmg`;
+- o binário Rust release sem `custom-protocol` compilou, mas
+  `tauri build --no-bundle` falhou com `E0463` ao resolver proc-macros
+  (`tauri_macros` e, num `CARGO_TARGET_DIR` limpo, `phf_macros`). `cargo check` e
+  os testes permanecem verdes; a toolchain/packaging precisa de diagnóstico
+  antes de produzir `.app`/`.dmg`;
 - inexistência de Windows limpo para validação x64;
 - inexistência de macOS Intel para validação x64;
 - assinatura Windows e Apple notarization sem credenciais confirmadas;
 - nenhum installer desktop produzido nesta auditoria.
+
+## QA visual do shell
+
+O estado de recuperação foi aberto num browser integrado em 2026-11-06. A
+árvore acessível continha heading, explicação sanitizada, `role=status`, lista
+de componentes e botão “Verificar novamente”. A captura confirmou contraste,
+hierarquia e ausência de overflow. O CLI Playwright não concluiu porque as
+revisões locais de browser não correspondiam à versão exigida; esta limitação
+não é contada como teste Playwright aprovado.
