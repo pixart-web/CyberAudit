@@ -21,6 +21,11 @@ limpa o ambiente herdado, aplica apenas configuração construída pelo shell e
 redireciona stdout/stderr para ficheiros privados. O plano que pode ser
 serializado contém apenas nomes, papéis e argumentos não secretos.
 
+O manifesto v2 inventaria recursivamente o runtime completo. O verificador
+nativo rejeita qualquer dependência não manifestada, symlink ou path inseguro,
+para que bibliotecas PostgreSQL e módulos Next/Node fiquem na mesma fronteira de
+integridade dos entrypoints.
+
 Quatro portas são reservadas pelo sistema operativo exclusivamente em
 `127.0.0.1`. Passwords de PostgreSQL e Valkey, segredo JWT, chave de cifragem e
 token de bootstrap são independentes e persistem no macOS Keychain ou Windows

@@ -3,7 +3,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
 use std::io::{BufReader, Read, Write};
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 const REQUIRED_SIDECARS: [&str; 5] = [
     "cyberaudit-postgres",
@@ -12,6 +12,7 @@ const REQUIRED_SIDECARS: [&str; 5] = [
     "cyberaudit-worker",
     "cyberaudit-web",
 ];
+const MAX_RUNTIME_RESOURCES: usize = 100_000;
 
 #[derive(Debug, Clone)]
 pub struct RuntimeLayout {
@@ -79,8 +80,9 @@ pub struct RuntimeStatus {
 }
 
 pub fn inspect_resources(resource_root: &Path) -> RuntimeStatus {
-    let binary_root = resource_root.join("runtime").join("bin");
-    let manifest_path = resource_root.join("runtime").join("manifest.json");
+    let runtime_root = resource_root.join("runtime");
+    let binary_root = runtime_root.join("bin");
+    let manifest_path = runtime_root.join("manifest.json");
     let mut missing_resources = REQUIRED_SIDECARS
         .iter()
         .filter(|name| !is_regular_nonsymlink(&binary_root.join(executable_name(name))))
@@ -92,7 +94,7 @@ pub fn inspect_resources(resource_root: &Path) -> RuntimeStatus {
         missing_resources.push("manifest.json".to_owned());
     } else {
         match load_manifest(&manifest_path) {
-            Ok(manifest) => verify_manifest(&binary_root, &manifest, &mut invalid_resources),
+            Ok(manifest) => verify_manifest(&runtime_root, &manifest, &mut invalid_resources),
             Err(_) => invalid_resources.push("manifest.json".to_owned()),
         }
     }
@@ -127,55 +129,125 @@ struct RuntimeManifest {
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct ManifestResource {
-    name: String,
+    path: String,
     sha256: String,
 }
 
 fn load_manifest(path: &Path) -> Result<RuntimeManifest, RuntimeError> {
     let file = File::open(path)?;
     let manifest: RuntimeManifest = serde_json::from_reader(BufReader::new(file))?;
-    if manifest.version != 1 {
+    if manifest.version != 2 || manifest.resources.len() > MAX_RUNTIME_RESOURCES {
         return Err(RuntimeError::InvalidManifest);
     }
     Ok(manifest)
 }
 
 fn verify_manifest(
-    binary_root: &Path,
+    runtime_root: &Path,
     manifest: &RuntimeManifest,
     invalid_resources: &mut Vec<String>,
 ) {
-    let expected = REQUIRED_SIDECARS
+    let required = REQUIRED_SIDECARS
         .iter()
-        .map(|name| (executable_name(name), *name))
+        .map(|name| (format!("bin/{}", executable_name(name)), *name))
         .collect::<HashMap<_, _>>();
     let mut seen = HashSet::new();
     for resource in &manifest.resources {
-        let Some(display_name) = expected.get(&resource.name) else {
-            invalid_resources.push(resource.name.clone());
-            continue;
-        };
-        if !seen.insert(resource.name.clone()) || !valid_sha256(&resource.sha256) {
-            invalid_resources.push((*display_name).to_owned());
+        if !safe_manifest_path(&resource.path)
+            || !seen.insert(resource.path.clone())
+            || !valid_sha256(&resource.sha256)
+        {
+            invalid_resources.push(display_resource(&resource.path, &required));
             continue;
         }
-        let path = binary_root.join(&resource.name);
+        let path = join_manifest_path(runtime_root, &resource.path);
         if !is_regular_nonsymlink(&path) {
-            invalid_resources.push((*display_name).to_owned());
+            invalid_resources.push(display_resource(&resource.path, &required));
             continue;
         }
         match sha256_file(&path) {
             Ok(actual) if actual == resource.sha256.to_ascii_lowercase() => {}
-            _ => invalid_resources.push((*display_name).to_owned()),
+            _ => invalid_resources.push(display_resource(&resource.path, &required)),
         }
     }
-    for (filename, display_name) in expected {
-        if !seen.contains(&filename) {
+    for (path, display_name) in required {
+        if !seen.contains(&path) {
             invalid_resources.push(display_name.to_owned());
         }
     }
+    match collect_runtime_files(runtime_root) {
+        Ok(actual) => {
+            for unexpected in actual.difference(&seen) {
+                invalid_resources.push((*unexpected).clone());
+            }
+        }
+        Err(_) => invalid_resources.push("runtime-tree".to_owned()),
+    }
     invalid_resources.sort();
     invalid_resources.dedup();
+}
+
+fn display_resource(path: &str, required: &HashMap<String, &str>) -> String {
+    required
+        .get(path)
+        .map(|name| (*name).to_owned())
+        .unwrap_or_else(|| path.to_owned())
+}
+
+fn safe_manifest_path(value: &str) -> bool {
+    if value.is_empty() || value.contains('\\') || value == "manifest.json" {
+        return false;
+    }
+    Path::new(value)
+        .components()
+        .all(|component| matches!(component, Component::Normal(_)))
+}
+
+fn join_manifest_path(root: &Path, value: &str) -> PathBuf {
+    value
+        .split('/')
+        .fold(root.to_path_buf(), |path, component| path.join(component))
+}
+
+fn collect_runtime_files(runtime_root: &Path) -> Result<HashSet<String>, RuntimeError> {
+    let mut files = HashSet::new();
+    let mut pending = vec![runtime_root.to_path_buf()];
+    while let Some(directory) = pending.pop() {
+        for entry in fs::read_dir(&directory)? {
+            let entry = entry?;
+            let path = entry.path();
+            let metadata = fs::symlink_metadata(&path)?;
+            if metadata.file_type().is_symlink() {
+                return Err(RuntimeError::UnsafeResourceTree);
+            }
+            if metadata.is_dir() {
+                pending.push(path);
+                continue;
+            }
+            if !metadata.is_file() {
+                return Err(RuntimeError::UnsafeResourceTree);
+            }
+            let relative = path
+                .strip_prefix(runtime_root)
+                .map_err(|_| RuntimeError::UnsafeResourceTree)?;
+            let components = relative
+                .components()
+                .map(|component| match component {
+                    Component::Normal(value) => value.to_str().map(str::to_owned),
+                    _ => None,
+                })
+                .collect::<Option<Vec<_>>>()
+                .ok_or(RuntimeError::UnsafeResourceTree)?;
+            let manifest_path = components.join("/");
+            if manifest_path == "manifest.json" || manifest_path == ".manifest.json.tmp" {
+                continue;
+            }
+            if files.len() >= MAX_RUNTIME_RESOURCES || !files.insert(manifest_path) {
+                return Err(RuntimeError::UnsafeResourceTree);
+            }
+        }
+    }
+    Ok(files)
 }
 
 fn valid_sha256(value: &str) -> bool {
@@ -253,6 +325,8 @@ pub enum RuntimeError {
     InvalidManifest,
     #[error("runtime manifest cannot be decoded: {0}")]
     Manifest(#[from] serde_json::Error),
+    #[error("runtime resource tree contains an unsafe entry")]
+    UnsafeResourceTree,
     #[error("secure random generation failed: {0}")]
     Random(String),
 }
@@ -270,6 +344,31 @@ mod tests {
                 .expect("system clock must be after the Unix epoch")
                 .as_nanos()
         ))
+    }
+
+    fn write_fixture_manifest(root: &Path) -> PathBuf {
+        let binary_root = root.join("runtime/bin");
+        fs::create_dir_all(&binary_root).expect("resource root should initialize");
+        let mut resources = Vec::new();
+        for name in REQUIRED_SIDECARS {
+            let filename = executable_name(name);
+            let path = binary_root.join(&filename);
+            fs::write(&path, name.as_bytes()).expect("sidecar fixture should be written");
+            resources.push(serde_json::json!({
+                "path": format!("bin/{filename}"),
+                "sha256": sha256_file(&path).expect("fixture should hash")
+            }));
+        }
+        fs::write(
+            root.join("runtime/manifest.json"),
+            serde_json::to_vec(&serde_json::json!({
+                "version": 2,
+                "resources": resources
+            }))
+            .expect("manifest should encode"),
+        )
+        .expect("manifest should be written");
+        binary_root
     }
 
     #[test]
@@ -298,27 +397,7 @@ mod tests {
     #[test]
     fn rejects_a_tampered_sidecar() {
         let root = temp_root("tampered");
-        let binary_root = root.join("runtime/bin");
-        fs::create_dir_all(&binary_root).expect("resource root should initialize");
-        let mut resources = Vec::new();
-        for name in REQUIRED_SIDECARS {
-            let filename = executable_name(name);
-            let path = binary_root.join(&filename);
-            fs::write(&path, name.as_bytes()).expect("sidecar fixture should be written");
-            resources.push(serde_json::json!({
-                "name": filename,
-                "sha256": sha256_file(&path).expect("fixture should hash")
-            }));
-        }
-        fs::write(
-            root.join("runtime/manifest.json"),
-            serde_json::to_vec(&serde_json::json!({
-                "version": 1,
-                "resources": resources
-            }))
-            .expect("manifest should encode"),
-        )
-        .expect("manifest should be written");
+        let binary_root = write_fixture_manifest(&root);
         fs::write(
             binary_root.join(executable_name("cyberaudit-api")),
             b"tampered",
@@ -328,6 +407,25 @@ mod tests {
         let status = inspect_resources(&root);
         assert!(!status.ready);
         assert_eq!(status.invalid_resources, vec!["cyberaudit-api"]);
+        fs::remove_dir_all(root).expect("temporary resources should be removable");
+    }
+
+    #[test]
+    fn rejects_an_unmanifested_runtime_dependency() {
+        let root = temp_root("unexpected");
+        write_fixture_manifest(&root);
+        let library = root.join("runtime/tools/postgresql/lib/untrusted-library");
+        fs::create_dir_all(library.parent().expect("library should have a parent"))
+            .expect("library directory should initialize");
+        fs::write(&library, b"not in the manifest").expect("library fixture should be written");
+
+        let status = inspect_resources(&root);
+
+        assert!(!status.ready);
+        assert_eq!(
+            status.invalid_resources,
+            vec!["tools/postgresql/lib/untrusted-library"]
+        );
         fs::remove_dir_all(root).expect("temporary resources should be removable");
     }
 

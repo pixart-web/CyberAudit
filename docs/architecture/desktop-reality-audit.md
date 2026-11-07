@@ -163,13 +163,13 @@ endpoint NODUS hardcoded. O contrato está em
 - Cobertura backend observada após D2: 76,43%, acima do gate de 75%.
 - Runtime Python desktop: 12 testes focados passaram; dois sidecars macOS ARM64
   foram construídos e executaram smoke tests com ambiente vazio.
-- Runtime Rust após D3 parcial: 10 testes passaram, incluindo estabilidade e
+- Runtime Rust após D3 parcial: 11 testes passaram, incluindo estabilidade e
   rejeição de segredos inválidos, sequência fixa, sessão confinada e quatro
   portas loopback distintas. O teste de portas foi executado fora do sandbox.
 
 ## Bloqueadores confirmados
 
-- toolchain Rust 1.90 disponível e fixada no repositório; `cargo check` e 10
+- toolchain Rust 1.90 disponível e fixada no repositório; `cargo check` e 11
   testes Rust passam no incremento atual;
 - a matriz de sidecars de produção por target ainda não está construída;
 - o binário Rust release sem `custom-protocol` compilou, mas

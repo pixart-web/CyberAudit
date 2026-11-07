@@ -47,6 +47,12 @@ versionados. O CI Linux constrói e publica sidecars de curta retenção para
 detetar regressões de packaging; esses artefactos não são installers de
 produto.
 
+O manifesto v2 cobre todos os ficheiros sob `runtime`, não apenas os cinco
+entrypoints. Paths absolutos, traversal, symlinks, duplicados, hashes inválidos,
+ficheiros ausentes e ficheiros extra falham fechado. Isto é necessário porque
+PostgreSQL e Node carregam bibliotecas e módulos adicionais depois do primeiro
+processo; verificar só o executável daria uma garantia incompleta.
+
 ## Evidência observada
 
 No runner local macOS ARM64:
