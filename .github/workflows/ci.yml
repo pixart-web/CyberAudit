@@ -46,12 +46,33 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.90.0
         with:
           components: clippy, rustfmt
+      - uses: actions/setup-python@v7
+        with: { python-version: "3.12", cache: pip }
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with: { node-version: "22.17.1", cache: pnpm }
       - run: pnpm install --frozen-lockfile
+      - run: python -m pip install -e "apps/api[desktop]"
       - run: pnpm --filter @cyberaudit/desktop check
       - run: pnpm --filter @cyberaudit/desktop test
+      - name: Build packaged API and worker sidecars
+        run: >-
+          pyinstaller --noconfirm
+          --distpath artifacts/desktop-python/linux-x64
+          --workpath "${RUNNER_TEMP}/cyberaudit-pyinstaller"
+          apps/api/desktop/cyberaudit-runtime.spec
+        env:
+          PYINSTALLER_CONFIG_DIR: ${{ runner.temp }}/pyinstaller-config
+      - name: Smoke-test packaged Python sidecars
+        run: |
+          artifacts/desktop-python/linux-x64/cyberaudit-api --help
+          artifacts/desktop-python/linux-x64/cyberaudit-worker --help
+      - uses: actions/upload-artifact@v6
+        with:
+          name: desktop-python-sidecars-linux-x64
+          path: artifacts/desktop-python/linux-x64/
+          if-no-files-found: error
+          retention-days: 7
   migrations:
     runs-on: ubuntu-24.04
     services:

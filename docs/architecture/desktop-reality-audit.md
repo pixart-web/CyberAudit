@@ -1,21 +1,38 @@
 # CyberAudit desktop reality audit
 
-Estado da auditoria: concluída em 2026-11-06 sobre
-`codex/real-product-commercial-readiness` (`548cf6c`). Esta página descreve a
-baseline observada. Não é uma declaração de prontidão desktop.
+Estado da auditoria: atualizada em 2026-11-07 sobre
+`codex/cyberaudit-desktop-first`. Esta página descreve a baseline observada e
+o primeiro incremento D2. Não é uma declaração de prontidão desktop.
 
 ## Resumo executivo
 
-O produto já possui um núcleo funcional extenso: Next.js, FastAPI, PostgreSQL,
-RLS, Redis/Dramatiq, autenticação local e OIDC, RBAC, CRUD administrativo,
-relatórios PDF, runtime de IA local, agentes contextualizados, updates offline
-assinados e diagnósticos sanitizados. Não existe, porém, aplicação desktop,
-installer nativo, runtime embebido, supervisão de processos por Tauri ou
-validação em instalações limpas.
+O produto possui um núcleo funcional extenso e uma shell Tauri 2 real em
+`apps/desktop`. A shell cria diretórios OS-specific, roda uma capability por
+arranque, verifica hashes dos recursos e apresenta recuperação fail-closed. A
+API e o worker já podem ser empacotados sem Python de sistema. Ainda não existe
+runtime completo: PostgreSQL, Valkey e Next standalone não estão incluídos, os
+processos não são supervisionados e não há installer validado em máquina limpa.
 
-A baseline suportada continua a ser Docker Compose. O ficheiro
-`docs/architecture/local-installation.md` confirma que nenhum `.app`, `.dmg`,
-`.pkg`, `.exe` ou `.msi` foi produzido.
+A baseline funcional completa continua a ser Docker Compose. Nenhum `.app`,
+`.dmg`, `.pkg`, `.exe` ou `.msi` de produto foi produzido.
+
+## Auditoria do runtime atual
+
+1. Tauri 2 (`tauri`/`tauri-build` major 2) está em `apps/desktop/src-tauri`.
+2. Produção usa `apps/desktop/ui`, um estado local de recuperação, não URL remota.
+3. Desenvolvimento inicia Next em `127.0.0.1:3000`; o bundle ainda não inicia Next.
+4. O frontend usa Next standalone para preservar SSR, rotas dinâmicas e handlers.
+5. As 102 rotas compilam, mas navegação packaged completa ainda não foi provada.
+6. FastAPI não era iniciado pela shell; agora possui sidecar PyInstaller validado isoladamente.
+7. PostgreSQL continua externo ao bundle; SQLite é rejeitado em desktop mode.
+8. Redis/Valkey continua externo ao bundle; broker sem password é rejeitado.
+9. Dramatiq tem sidecar empacotado, mas a shell ainda não o supervisiona.
+10. Alembic está incluído no sidecar API e exposto apenas pela operação fixa `migrate`.
+11. O setup real e CRUD de utilizadores/clientes existem no backend, mas não foram validados numa app instalada.
+12. Evidências e modelos já usam paths configuráveis; a ligação final aos diretórios Tauri está pendente.
+13. Artefactos atuais: shell Rust release sem bundle e sidecars temporários macOS ARM64.
+14. CI real: Linux valida Tauri e passa a construir sidecars Python; não prova Windows/macOS.
+15. Simulado/incompleto: supervisor, serviços de dados, first-run nativo, installers, offline E2E, upgrade e recovery.
 
 ## Respostas à auditoria obrigatória
 
@@ -139,9 +156,11 @@ endpoint NODUS hardcoded. O contrato está em
 - Backend Ruff: passou.
 - Backend Black check: passou, 182 ficheiros sem alterações.
 - Backend mypy strict: passou, 98 ficheiros.
-- Backend pytest: 331 passaram no sandbox, 1 foi ignorado e 5 testes loopback
-  falharam por proibição de bind do sandbox; os 5 passaram fora do sandbox.
-- Cobertura backend observada: 71%, abaixo do objetivo de 75% do novo programa.
+- Backend pytest após D2: 348 passaram, 1 foi ignorado; a suite foi executada
+  fora do sandbox para permitir os testes loopback.
+- Cobertura backend observada após D2: 76,43%, acima do gate de 75%.
+- Runtime Python desktop: 12 testes focados passaram; dois sidecars macOS ARM64
+  foram construídos e executaram smoke tests com ambiente vazio.
 
 ## Bloqueadores confirmados
 

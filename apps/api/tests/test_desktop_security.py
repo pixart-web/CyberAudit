@@ -14,9 +14,18 @@ from cyberaudit.desktop_security import (
 
 def desktop_settings(secret_file: Path) -> Settings:
     return Settings(
+        environment="desktop",
         desktop_mode=True,
         desktop_session_secret_file=secret_file,
         app_origin="http://127.0.0.1:32100",
+        allowed_hosts=["127.0.0.1", "localhost"],
+        database_url="postgresql+asyncpg://runtime:db-secret@127.0.0.1:55432/cyberaudit",
+        redis_url="redis://:broker-secret@127.0.0.1:56379/0",
+        jwt_secret="j" * 48,
+        encryption_key="e" * 48,
+        api_docs_enabled=False,
+        rls_required=True,
+        database_runtime_role="cyberaudit_runtime",
     )
 
 
@@ -37,6 +46,18 @@ def test_desktop_mode_requires_private_session_file(tmp_path: Path):
     assert desktop_request_authorized(settings, "/api/v1/users", "a" * 64)
 
 
+def test_desktop_mode_rejects_development_defaults(tmp_path: Path):
+    secret_file = tmp_path / "desktop-session"
+    write_secret(secret_file)
+
+    with pytest.raises(ValueError, match="Unsafe desktop configuration"):
+        Settings(
+            desktop_mode=True,
+            desktop_session_secret_file=secret_file,
+            app_origin="http://127.0.0.1:32100",
+        )
+
+
 def test_desktop_secret_rejects_unsafe_permissions(tmp_path: Path):
     secret_file = tmp_path / "desktop-session"
     write_secret(secret_file)
@@ -52,16 +73,34 @@ def test_desktop_configuration_requires_loopback_origin(tmp_path: Path):
 
     with pytest.raises(ValueError, match="HTTP loopback APP_ORIGIN"):
         Settings(
+            environment="desktop",
             desktop_mode=True,
             desktop_session_secret_file=secret_file,
             app_origin="https://portal.example.invalid",
+            allowed_hosts=["127.0.0.1", "localhost"],
+            database_url="postgresql+asyncpg://runtime:db-secret@127.0.0.1:55432/cyberaudit",
+            redis_url="redis://:broker-secret@127.0.0.1:56379/0",
+            jwt_secret="j" * 48,
+            encryption_key="e" * 48,
+            api_docs_enabled=False,
+            rls_required=True,
+            database_runtime_role="cyberaudit_runtime",
         )
 
     with pytest.raises(ValueError, match="HTTP loopback APP_ORIGIN"):
         Settings(
+            environment="desktop",
             desktop_mode=True,
             desktop_session_secret_file=secret_file,
             app_origin="https://127.0.0.1:32100",
+            allowed_hosts=["127.0.0.1", "localhost"],
+            database_url="postgresql+asyncpg://runtime:db-secret@127.0.0.1:55432/cyberaudit",
+            redis_url="redis://:broker-secret@127.0.0.1:56379/0",
+            jwt_secret="j" * 48,
+            encryption_key="e" * 48,
+            api_docs_enabled=False,
+            rls_required=True,
+            database_runtime_role="cyberaudit_runtime",
         )
 
 
