@@ -1,4 +1,6 @@
-mod runtime;
+pub mod runtime;
+pub mod secrets;
+pub mod supervisor;
 
 use runtime::{inspect_resources, provision_session_secret, RuntimeLayout, RuntimeStatus};
 use tauri::Manager;

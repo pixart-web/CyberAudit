@@ -2,7 +2,7 @@
 
 Estado da auditoria: atualizada em 2026-11-07 sobre
 `codex/cyberaudit-desktop-first`. Esta página descreve a baseline observada e
-o primeiro incremento D2. Não é uma declaração de prontidão desktop.
+os incrementos D2 e D3 parcial. Não é uma declaração de prontidão desktop.
 
 ## Resumo executivo
 
@@ -11,7 +11,8 @@ O produto possui um núcleo funcional extenso e uma shell Tauri 2 real em
 arranque, verifica hashes dos recursos e apresenta recuperação fail-closed. A
 API e o worker já podem ser empacotados sem Python de sistema. Ainda não existe
 runtime completo: PostgreSQL, Valkey e Next standalone não estão incluídos, os
-processos não são supervisionados e não há installer validado em máquina limpa.
+processos ainda não têm lifecycle/readiness integral e não há installer validado
+em máquina limpa.
 
 A baseline funcional completa continua a ser Docker Compose. Nenhum `.app`,
 `.dmg`, `.pkg`, `.exe` ou `.msi` de produto foi produzido.
@@ -26,13 +27,14 @@ A baseline funcional completa continua a ser Docker Compose. Nenhum `.app`,
 6. FastAPI não era iniciado pela shell; agora possui sidecar PyInstaller validado isoladamente.
 7. PostgreSQL continua externo ao bundle; SQLite é rejeitado em desktop mode.
 8. Redis/Valkey continua externo ao bundle; broker sem password é rejeitado.
-9. Dramatiq tem sidecar empacotado, mas a shell ainda não o supervisiona.
+9. Dramatiq tem sidecar empacotado e plano de lançamento allowlisted, mas a shell ainda não gere o seu lifecycle.
 10. Alembic está incluído no sidecar API e exposto apenas pela operação fixa `migrate`.
 11. O setup real e CRUD de utilizadores/clientes existem no backend, mas não foram validados numa app instalada.
 12. Evidências e modelos já usam paths configuráveis; a ligação final aos diretórios Tauri está pendente.
 13. Artefactos atuais: shell Rust release sem bundle e sidecars temporários macOS ARM64.
 14. CI real: Linux valida Tauri e passa a construir sidecars Python; não prova Windows/macOS.
-15. Simulado/incompleto: supervisor, serviços de dados, first-run nativo, installers, offline E2E, upgrade e recovery.
+15. Implementado parcialmente: segredos de instalação via cofre do SO, reserva loopback e launch plan fixo.
+16. Simulado/incompleto: readiness/shutdown do supervisor, serviços de dados, first-run nativo, installers, offline E2E, upgrade e recovery.
 
 ## Respostas à auditoria obrigatória
 
@@ -161,12 +163,15 @@ endpoint NODUS hardcoded. O contrato está em
 - Cobertura backend observada após D2: 76,43%, acima do gate de 75%.
 - Runtime Python desktop: 12 testes focados passaram; dois sidecars macOS ARM64
   foram construídos e executaram smoke tests com ambiente vazio.
+- Runtime Rust após D3 parcial: 10 testes passaram, incluindo estabilidade e
+  rejeição de segredos inválidos, sequência fixa, sessão confinada e quatro
+  portas loopback distintas. O teste de portas foi executado fora do sandbox.
 
 ## Bloqueadores confirmados
 
-- toolchain Rust 1.90 disponível e fixada no repositório; shell compilado em
-  modo release e 4 testes Rust passaram;
-- binários sidecar por target ainda não construídos;
+- toolchain Rust 1.90 disponível e fixada no repositório; `cargo check` e 10
+  testes Rust passam no incremento atual;
+- a matriz de sidecars de produção por target ainda não está construída;
 - o binário Rust release sem `custom-protocol` compilou, mas
   `tauri build --no-bundle` falhou com `E0463` ao resolver proc-macros
   (`tauri_macros` e, num `CARGO_TARGET_DIR` limpo, `phf_macros`). `cargo check` e

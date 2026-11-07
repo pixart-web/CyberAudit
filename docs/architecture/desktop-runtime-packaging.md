@@ -65,6 +65,6 @@ release, pois o build ainda não integra PostgreSQL, Valkey, Next ou Tauri.
 
 - empacotar PostgreSQL e Valkey por target com licença e proveniência;
 - empacotar Next standalone e respetivo Node runtime;
-- guardar segredos persistentes no Keychain/Credential Manager;
-- implementar supervisor Tauri e shutdown ordenado;
+- ligar ao arranque da shell a abstração já criada para Keychain/Credential Manager;
+- completar readiness, retry limitado e shutdown ordenado do supervisor Tauri;
 - construir instaladores nativos e validar em máquinas limpas.

@@ -125,10 +125,13 @@ O backend usa Ruff, Black, mypy, pytest e coverage. O frontend usa TypeScript st
 A branch desktop preserva o core existente e acrescenta Tauri 2, layout local
 de dados, capability efémera API, proxy same-origin e verificação SHA-256 dos
 recursos. A API FastAPI e o worker já possuem entrypoints PyInstaller fechados,
-migrações Alembic incluídas e validação desktop fail-closed. Isto ainda não é
-um installer suportado: PostgreSQL, Valkey e Next standalone não estão
-empacotados nem supervisionados pelo shell. Docker continua a ser o arranque
-funcional completo enquanto D3–D10 não forem validados.
+migrações Alembic incluídas e validação desktop fail-closed. A fronteira Rust
+também possui uma abstração de Keychain/Credential Manager, reserva de portas
+loopback e um plano de arranque estritamente allowlisted, sem shell nem
+argumentos escolhidos pelo renderer. Isto ainda não é um installer suportado:
+PostgreSQL, Valkey e Next standalone não estão empacotados e o lifecycle
+completo ainda não está ligado ao arranque da shell. Docker continua a ser o
+arranque funcional completo enquanto D3–D10 não forem validados.
 
 ```bash
 pnpm desktop:check
