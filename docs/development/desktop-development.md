@@ -39,6 +39,13 @@ runtime/
     cyberaudit-api[.exe]
     cyberaudit-worker[.exe]
     cyberaudit-web[.exe]
+  tools/
+    node/bin/node[.exe]
+    postgresql/bin/{initdb,postgres,pg_isready,pg_ctl,createdb,psql}[.exe]
+    valkey/bin/valkey-server[.exe]
+  web/
+    apps/web/server.js
+    ...Next standalone e assets estáticos...
 ```
 
 Depois de construir/copiar exclusivamente os launchers aprovados, gerar o
@@ -50,11 +57,24 @@ pnpm --filter @cyberaudit/desktop runtime:manifest -- /caminho/runtime
 pnpm --filter @cyberaudit/desktop runtime:manifest -- /caminho/runtime --windows
 ```
 
-O manifesto é atómico e contém SHA-256. Ele deteta corrupção local, mas não
-substitui assinatura de código, assinatura do updater ou proveniência de build.
+O manifesto v2 é atómico, contém SHA-256 de todos os ficheiros e rejeita
+symlinks e recursos extra. Ele deteta corrupção local, mas não substitui
+assinatura de código, assinatura do updater ou proveniência de build.
+
+Os hosts fixos podem ser construídos e testados sem Tauri:
+
+```bash
+make desktop-runtime-hosts
+make desktop-runtime-host-test
+```
+
+Esses comandos não descarregam nem copiam automaticamente PostgreSQL, Valkey ou
+Node. A proveniência e licença dos runtimes por plataforma têm de ser preservadas
+pela futura pipeline de assembly.
 
 ## Estado honesto
 
-`cargo build --release` produz atualmente o binário Rust do shell em macOS
-ARM64. Ainda não constitui `CyberAudit.app` nem inclui serviços executáveis. Não
-distribuir este binário como produto final.
+`cargo build --release` produz atualmente a shell e três hosts Rust em macOS
+ARM64. Os hosts não constituem um runtime sem as ferramentas verificadas sob
+`runtime/tools`. Ainda não existe `CyberAudit.app`; não distribuir estes
+binários como produto final.

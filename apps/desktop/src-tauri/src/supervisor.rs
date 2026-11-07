@@ -358,14 +358,18 @@ fn runtime_environment(
         }
         RuntimeProcess::Web => {
             environment.insert(
-                "CYBERAUDIT_API_URL",
-                format!("http://127.0.0.1:{}", ports.api),
+                "CYBERAUDIT_DESKTOP_API_URL",
+                format!("http://127.0.0.1:{}/api/v1", ports.api),
             );
             environment.insert(
                 "CYBERAUDIT_DESKTOP_SESSION_FILE",
                 session_secret_file.to_string_lossy().into_owned(),
             );
             environment.insert("CYBERAUDIT_WEB_PORT", ports.web.to_string());
+            environment.insert(
+                "CYBERAUDIT_DESKTOP_WEB_ORIGIN",
+                format!("http://127.0.0.1:{}", ports.web),
+            );
         }
     }
     environment.insert(
@@ -450,8 +454,10 @@ mod tests {
     use crate::secrets::{provision_installation_secrets, SecretStore, SecretStoreError};
     use std::collections::HashMap;
     use std::fs;
+    use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::Mutex;
-    use std::time::{SystemTime, UNIX_EPOCH};
+
+    static NEXT_FIXTURE_ID: AtomicU64 = AtomicU64::new(1);
 
     #[derive(Default)]
     struct MemorySecretStore(Mutex<HashMap<String, String>>);
@@ -472,11 +478,9 @@ mod tests {
 
     fn fixture() -> (PathBuf, RuntimeLayout, PathBuf, InstallationSecrets) {
         let root = std::env::temp_dir().join(format!(
-            "cyberaudit-supervisor-{}",
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("valid system time")
-                .as_nanos()
+            "cyberaudit-supervisor-{}-{}",
+            std::process::id(),
+            NEXT_FIXTURE_ID.fetch_add(1, Ordering::Relaxed)
         ));
         let layout = RuntimeLayout::initialize(&root).expect("layout should initialize");
         let session =
@@ -545,6 +549,12 @@ mod tests {
         );
         assert!(!plan.steps()[5].environment.contains_key("DATABASE_URL"));
         assert!(!plan.steps()[5].environment.contains_key("JWT_SECRET"));
+        assert_eq!(
+            plan.steps()[5]
+                .environment
+                .get("CYBERAUDIT_DESKTOP_API_URL"),
+            Some(&"http://127.0.0.1:18000/api/v1".to_owned())
+        );
         assert!(!plan.steps()[2].environment.contains_key("DATABASE_URL"));
         assert!(!plan.steps()[0].environment.contains_key("REDIS_URL"));
         let serialized = serde_json::to_string(&plan.sanitized_steps())

@@ -12,7 +12,8 @@ arranque, verifica hashes dos recursos e apresenta recuperação fail-closed. A
 API e o worker já podem ser empacotados sem Python de sistema. Ainda não existe
 runtime completo: PostgreSQL, Valkey e Next standalone não estão incluídos, os
 processos ainda não têm lifecycle/readiness integral e não há installer validado
-em máquina limpa.
+em máquina limpa. Hosts nativos fixos para PostgreSQL, broker e Next já existem,
+mas os runtimes redistribuíveis a que dão acesso ainda não integram o bundle.
 
 A baseline funcional completa continua a ser Docker Compose. Nenhum `.app`,
 `.dmg`, `.pkg`, `.exe` ou `.msi` de produto foi produzido.
@@ -25,8 +26,8 @@ A baseline funcional completa continua a ser Docker Compose. Nenhum `.app`,
 4. O frontend usa Next standalone para preservar SSR, rotas dinâmicas e handlers.
 5. As 102 rotas compilam, mas navegação packaged completa ainda não foi provada.
 6. FastAPI não era iniciado pela shell; agora possui sidecar PyInstaller validado isoladamente.
-7. PostgreSQL continua externo ao bundle; SQLite é rejeitado em desktop mode.
-8. Redis/Valkey continua externo ao bundle; broker sem password é rejeitado.
+7. PostgreSQL continua externo ao bundle; o host nativo de bootstrap/persistência foi validado com PostgreSQL 16.14 local; SQLite é rejeitado.
+8. Redis/Valkey continua externo ao bundle; o host usa pipe e password obrigatória; apenas compatibilidade Redis 8.8 foi exercitada localmente.
 9. Dramatiq tem sidecar empacotado e plano de lançamento allowlisted, mas a shell ainda não gere o seu lifecycle.
 10. Alembic está incluído no sidecar API e exposto apenas pela operação fixa `migrate`.
 11. O setup real e CRUD de utilizadores/clientes existem no backend, mas não foram validados numa app instalada.
@@ -166,12 +167,18 @@ endpoint NODUS hardcoded. O contrato está em
 - Runtime Rust após D3 parcial: 11 testes passaram, incluindo estabilidade e
   rejeição de segredos inválidos, sequência fixa, sessão confinada e quatro
   portas loopback distintas. O teste de portas foi executado fora do sandbox.
+- Runtime hosts Rust: 7 testes passaram. PostgreSQL 16.14 macOS ARM64 criou um
+  cluster com checksums/SCRAM, a base `cyberaudit`, autenticou, fez shutdown e
+  restart preservando a base. O host de broker respondeu `PONG` autenticado e
+  fez `SHUTDOWN SAVE` com Redis 8.8; isto não é validação Valkey.
 
 ## Bloqueadores confirmados
 
 - toolchain Rust 1.90 disponível e fixada no repositório; `cargo check` e 11
   testes Rust passam no incremento atual;
 - a matriz de sidecars de produção por target ainda não está construída;
+- PostgreSQL, Valkey e Node redistribuíveis ainda não foram incorporados com
+  licenças/SBOM; os hosts isolados não são um runtime completo;
 - o binário Rust release sem `custom-protocol` compilou, mas
   `tauri build --no-bundle` falhou com `E0463` ao resolver proc-macros
   (`tauri_macros` e, num `CARGO_TARGET_DIR` limpo, `phf_macros`). `cargo check` e

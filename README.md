@@ -128,15 +128,21 @@ recursos. A API FastAPI e o worker já possuem entrypoints PyInstaller fechados,
 migrações Alembic incluídas e validação desktop fail-closed. A fronteira Rust
 também possui uma abstração de Keychain/Credential Manager, reserva de portas
 loopback e um plano de arranque estritamente allowlisted, sem shell nem
-argumentos escolhidos pelo renderer. Isto ainda não é um installer suportado:
-PostgreSQL, Valkey e Next standalone não estão empacotados e o lifecycle
-completo ainda não está ligado ao arranque da shell. Docker continua a ser o
-arranque funcional completo enquanto D3–D10 não forem validados.
+argumentos escolhidos pelo renderer. Hosts nativos fixos inicializam PostgreSQL,
+alimentam a configuração autenticada do broker por pipe e lançam Next com Node
+empacotado. PostgreSQL 16 foi exercitado localmente com criação, SCRAM, restart
+e persistência; o broker teve apenas smoke de compatibilidade Redis nesta
+máquina. Isto ainda não é um installer suportado: os binários redistribuíveis
+PostgreSQL/Valkey/Node não estão no bundle e o lifecycle completo ainda não está
+ligado ao arranque da shell. Docker continua a ser o arranque funcional completo
+enquanto D3–D10 não forem validados.
 
 ```bash
 pnpm desktop:check
 pnpm desktop:test
+pnpm --filter @cyberaudit/desktop lint
 make desktop-python-smoke
+make desktop-runtime-hosts
 ```
 
 Ver `docs/architecture/desktop-reality-audit.md`,
