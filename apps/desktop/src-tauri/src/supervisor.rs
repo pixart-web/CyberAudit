@@ -11,6 +11,101 @@ const DATABASE_OWNER_USER: &str = "cyberaudit";
 const DATABASE_APPLICATION_USER: &str = "cyberaudit_app";
 const DATABASE_NAME: &str = "cyberaudit";
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SupervisorState {
+    VerifyingResources,
+    DatabaseStarting,
+    DatabaseReady,
+    MigrationsRunning,
+    MigrationsComplete,
+    BrokerStarting,
+    BrokerReady,
+    ApiStarting,
+    ApiReady,
+    WorkerStarting,
+    WorkerReady,
+    WebStarting,
+    Ready,
+    Stopping,
+    Stopped,
+    Failed,
+}
+
+pub struct StartupStateMachine {
+    state: SupervisorState,
+}
+
+impl StartupStateMachine {
+    pub fn new() -> Self {
+        Self {
+            state: SupervisorState::VerifyingResources,
+        }
+    }
+
+    pub fn state(&self) -> SupervisorState {
+        self.state
+    }
+
+    pub fn transition(&mut self, next: SupervisorState) -> Result<(), SupervisorError> {
+        let allowed = matches!(
+            (self.state, next),
+            (
+                SupervisorState::VerifyingResources,
+                SupervisorState::DatabaseStarting
+            ) | (
+                SupervisorState::DatabaseStarting,
+                SupervisorState::DatabaseReady
+            ) | (
+                SupervisorState::DatabaseReady,
+                SupervisorState::MigrationsRunning
+            ) | (
+                SupervisorState::MigrationsRunning,
+                SupervisorState::MigrationsComplete
+            ) | (
+                SupervisorState::MigrationsComplete,
+                SupervisorState::BrokerStarting
+            ) | (
+                SupervisorState::BrokerStarting,
+                SupervisorState::BrokerReady
+            ) | (SupervisorState::BrokerReady, SupervisorState::ApiStarting)
+                | (SupervisorState::ApiStarting, SupervisorState::ApiReady)
+                | (SupervisorState::ApiReady, SupervisorState::WorkerStarting)
+                | (
+                    SupervisorState::WorkerStarting,
+                    SupervisorState::WorkerReady
+                )
+                | (SupervisorState::WorkerReady, SupervisorState::WebStarting)
+                | (SupervisorState::WebStarting, SupervisorState::Ready)
+                | (SupervisorState::Ready, SupervisorState::Stopping)
+                | (SupervisorState::Stopping, SupervisorState::Stopped)
+        ) || (next == SupervisorState::Failed
+            && !matches!(
+                self.state,
+                SupervisorState::Stopped | SupervisorState::Failed
+            ))
+            || (next == SupervisorState::Stopping
+                && !matches!(
+                    self.state,
+                    SupervisorState::Stopped | SupervisorState::Stopping
+                ));
+        if !allowed {
+            return Err(SupervisorError::InvalidTransition {
+                from: self.state,
+                to: next,
+            });
+        }
+        self.state = next;
+        Ok(())
+    }
+}
+
+impl Default for StartupStateMachine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RuntimePorts {
     pub database: u16,
@@ -435,6 +530,11 @@ fn executable_name(name: &str) -> String {
 
 #[derive(Debug, thiserror::Error)]
 pub enum SupervisorError {
+    #[error("invalid runtime supervisor transition from {from:?} to {to:?}")]
+    InvalidTransition {
+        from: SupervisorState,
+        to: SupervisorState,
+    },
     #[error("unable to reserve a loopback port")]
     PortReservation(#[source] std::io::Error),
     #[error("runtime sidecar {0} is missing or invalid")]
@@ -511,6 +611,52 @@ mod tests {
             .collect::<std::collections::HashSet<_>>();
         assert_eq!(distinct.len(), 4);
         reservations.release_all();
+    }
+
+    #[test]
+    fn startup_state_machine_requires_dependency_order() {
+        let mut machine = StartupStateMachine::new();
+        for state in [
+            SupervisorState::DatabaseStarting,
+            SupervisorState::DatabaseReady,
+            SupervisorState::MigrationsRunning,
+            SupervisorState::MigrationsComplete,
+            SupervisorState::BrokerStarting,
+            SupervisorState::BrokerReady,
+            SupervisorState::ApiStarting,
+            SupervisorState::ApiReady,
+            SupervisorState::WorkerStarting,
+            SupervisorState::WorkerReady,
+            SupervisorState::WebStarting,
+            SupervisorState::Ready,
+        ] {
+            machine
+                .transition(state)
+                .expect("transition should be valid");
+        }
+        assert_eq!(machine.state(), SupervisorState::Ready);
+    }
+
+    #[test]
+    fn startup_state_machine_rejects_skips_and_allows_failure_cleanup() {
+        let mut machine = StartupStateMachine::new();
+        assert!(matches!(
+            machine.transition(SupervisorState::ApiStarting),
+            Err(SupervisorError::InvalidTransition { .. })
+        ));
+        machine
+            .transition(SupervisorState::DatabaseStarting)
+            .expect("database may start first");
+        machine
+            .transition(SupervisorState::Failed)
+            .expect("active startup may fail");
+        machine
+            .transition(SupervisorState::Stopping)
+            .expect("failed startup may clean up");
+        machine
+            .transition(SupervisorState::Stopped)
+            .expect("cleanup may stop");
+        assert!(machine.transition(SupervisorState::Ready).is_err());
     }
 
     #[test]

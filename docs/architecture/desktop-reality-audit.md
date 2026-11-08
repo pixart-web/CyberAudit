@@ -164,9 +164,10 @@ endpoint NODUS hardcoded. O contrato está em
 - Cobertura backend observada após D2: 76,43%, acima do gate de 75%.
 - Runtime Python desktop: 12 testes focados passaram; dois sidecars macOS ARM64
   foram construídos e executaram smoke tests com ambiente vazio.
-- Runtime Rust após D3 parcial: 11 testes passaram, incluindo estabilidade e
+- Runtime Rust após D5 parcial: 13 testes passaram, incluindo estabilidade e
   rejeição de segredos inválidos, sequência fixa, sessão confinada e quatro
-  portas loopback distintas. O teste de portas foi executado fora do sandbox.
+  portas loopback distintas, ordem da máquina de estados e rejeição de saltos.
+  O teste de portas foi executado fora do sandbox.
 - Runtime hosts Rust: 8 testes passaram. PostgreSQL 16.14 macOS ARM64 criou um
   cluster com checksums/SCRAM, a base `cyberaudit`, roles separados de migration
   e runtime, aplicou migrations até `0018`, fez shutdown e restart preservando

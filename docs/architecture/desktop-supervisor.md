@@ -1,6 +1,6 @@
 # Supervisor do runtime desktop
 
-Estado: D3 parcial, 2026-11-07. Este contrato está implementado e testado, mas
+Estado: D5 parcial, 2026-11-08. Este contrato está implementado e testado, mas
 ainda não inicia o produto completo porque faltam sidecars redistribuíveis de
 PostgreSQL, Valkey e Next standalone.
 
@@ -38,6 +38,12 @@ silenciosamente: o arranque falha fechado para evitar perda de dados.
 A capability API continua diferente: é efémera, roda a cada arranque e fica num
 ficheiro privado dentro de `configuration`. O launch plan rejeita qualquer
 capability fora desse diretório ou que não seja um ficheiro regular.
+
+Uma máquina de estados explícita impede saltos na ordem de dependências:
+verificação, PostgreSQL, migrações, Valkey, API, worker e web. Falhas podem
+transitar para limpeza, mas estados terminados não regressam a `ready`. Esta
+máquina já tem testes positivos e de transições inválidas; ainda falta ligá-la
+à criação e monitorização efetiva dos processos na shell Tauri.
 
 ## Próximo incremento obrigatório
 
