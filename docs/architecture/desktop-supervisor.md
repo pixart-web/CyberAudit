@@ -27,10 +27,13 @@ para que bibliotecas PostgreSQL e módulos Next/Node fiquem na mesma fronteira d
 integridade dos entrypoints.
 
 Quatro portas são reservadas pelo sistema operativo exclusivamente em
-`127.0.0.1`. Passwords de PostgreSQL e Valkey, segredo JWT, chave de cifragem e
-token de bootstrap são independentes e persistem no macOS Keychain ou Windows
-Credential Manager através de `keyring` 4.2. Um valor existente malformado não
-é rodado silenciosamente: o arranque falha fechado para evitar perda de dados.
+`127.0.0.1`. As credenciais PostgreSQL do owner de migrações e do login de
+aplicação, a password Valkey, o segredo JWT, a chave de cifragem e o token de
+bootstrap são independentes e persistem no macOS Keychain ou Windows Credential
+Manager através de `keyring` 4.2. Migrações usam exclusivamente o owner; API e
+worker autenticam como `cyberaudit_app` e assumem o role RLS limitado
+`cyberaudit_runtime`. Um valor existente malformado não é rodado
+silenciosamente: o arranque falha fechado para evitar perda de dados.
 
 A capability API continua diferente: é efémera, roda a cada arranque e fica num
 ficheiro privado dentro de `configuration`. O launch plan rejeita qualquer

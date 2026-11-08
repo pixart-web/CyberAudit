@@ -1,6 +1,6 @@
 # Serviços de dados do runtime desktop
 
-Estado: D3 parcial, validado localmente em macOS ARM64 em 2026-11-07.
+Estado: D4 parcial, validado localmente em macOS ARM64 em 2026-11-08.
 
 ## Hosts fixos
 
@@ -19,20 +19,27 @@ que o serviço permaneça filho direto da shell.
 
 No primeiro arranque o host:
 
-1. exige diretórios absolutos e privados, porta não privilegiada e password
-   hexadecimal de 256 bits;
+1. exige diretórios absolutos e privados, porta não privilegiada e duas
+   passwords hexadecimais independentes de 256 bits;
 2. executa `initdb` com UTF-8, locale C, checksums e SCRAM para host/local;
 3. passa a password por ficheiro temporário 0600 de nome aleatório e remove-o
    imediatamente;
 4. inicia PostgreSQL apenas em `127.0.0.1` e sem Unix socket;
-5. confirma readiness, cria idempotentemente a base `cyberaudit`, grava um
-   marcador atómico e faz shutdown `fast`;
-6. substitui o host pelo processo PostgreSQL final.
+5. confirma readiness e cria idempotentemente a base `cyberaudit` com o owner
+   de migrações `cyberaudit`;
+6. cria o login de aplicação `cyberaudit_app` e o role
+   `cyberaudit_runtime`, ambos `NOSUPERUSER`, `NOCREATEDB`, `NOCREATEROLE`,
+   `NOINHERIT` e `NOBYPASSRLS`; só o segundo pode ser assumido pela aplicação;
+7. grava um marcador de bootstrap versionado e atómico, faz shutdown `fast` e
+   substitui o host pelo processo PostgreSQL final.
 
 O teste real macOS usou PostgreSQL 16.14 Homebrew apenas como fixture local. A
-base autenticou como `cyberaudit`, desligou, reiniciou e preservou a identidade.
-Isto não prova redistribuição: bibliotecas, licença, SBOM e rpaths ainda precisam
-de assembly por target.
+base aplicou as migrações até `0018` com o owner, autenticou o login não
+privilegiado, assumiu `cyberaudit_runtime`, leu o schema de 140 tabelas,
+desligou, reiniciou e preservou os dados. O login de aplicação foi consultado
+diretamente em `pg_roles` e não possui `rolsuper` nem `rolbypassrls`. Isto não
+prova redistribuição: bibliotecas, licença, SBOM e rpaths ainda precisam de
+assembly por target.
 
 ## Broker
 

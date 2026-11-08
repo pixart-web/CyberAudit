@@ -167,9 +167,11 @@ endpoint NODUS hardcoded. O contrato está em
 - Runtime Rust após D3 parcial: 11 testes passaram, incluindo estabilidade e
   rejeição de segredos inválidos, sequência fixa, sessão confinada e quatro
   portas loopback distintas. O teste de portas foi executado fora do sandbox.
-- Runtime hosts Rust: 7 testes passaram. PostgreSQL 16.14 macOS ARM64 criou um
-  cluster com checksums/SCRAM, a base `cyberaudit`, autenticou, fez shutdown e
-  restart preservando a base. O host de broker respondeu `PONG` autenticado e
+- Runtime hosts Rust: 8 testes passaram. PostgreSQL 16.14 macOS ARM64 criou um
+  cluster com checksums/SCRAM, a base `cyberaudit`, roles separados de migration
+  e runtime, aplicou migrations até `0018`, fez shutdown e restart preservando
+  140 tabelas. O login de aplicação foi confirmado sem superuser nem bypass de
+  RLS. O host de broker respondeu `PONG` autenticado e
   fez `SHUTDOWN SAVE` com Redis 8.8; isto não é validação Valkey.
 - Web standalone: o build de produção passou com 102 rotas; 3 testes de assembly
   passaram, incluindo dereference de symlinks e recusa de overwrite. O smoke

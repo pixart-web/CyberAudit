@@ -7,7 +7,8 @@ use std::net::{Ipv4Addr, TcpListener};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, ExitStatus, Stdio};
 
-const DATABASE_USER: &str = "cyberaudit";
+const DATABASE_OWNER_USER: &str = "cyberaudit";
+const DATABASE_APPLICATION_USER: &str = "cyberaudit_app";
 const DATABASE_NAME: &str = "cyberaudit";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -298,8 +299,12 @@ fn runtime_environment(
                 layout.database.to_string_lossy().into_owned(),
             );
             environment.insert(
-                "CYBERAUDIT_POSTGRES_PASSWORD",
+                "CYBERAUDIT_POSTGRES_ADMIN_PASSWORD",
                 secrets.database_password().to_owned(),
+            );
+            environment.insert(
+                "CYBERAUDIT_POSTGRES_RUNTIME_PASSWORD",
+                secrets.database_runtime_password().to_owned(),
             );
             environment.insert("CYBERAUDIT_DATABASE_PORT", ports.database.to_string());
         }
@@ -325,11 +330,18 @@ fn runtime_environment(
                 "DESKTOP_SESSION_SECRET_FILE",
                 session_secret_file.to_string_lossy().into_owned(),
             );
+            let (database_user, database_password) = if process == RuntimeProcess::Migration {
+                (DATABASE_OWNER_USER, secrets.database_password())
+            } else {
+                (
+                    DATABASE_APPLICATION_USER,
+                    secrets.database_runtime_password(),
+                )
+            };
             environment.insert(
                 "DATABASE_URL",
                 format!(
-                    "postgresql+asyncpg://{DATABASE_USER}:{}@127.0.0.1:{}/{DATABASE_NAME}",
-                    secrets.database_password(),
+                    "postgresql+asyncpg://{database_user}:{database_password}@127.0.0.1:{}/{DATABASE_NAME}",
                     ports.database
                 ),
             );
@@ -561,6 +573,15 @@ mod tests {
             .expect("sanitized plan should serialize");
         assert!(!serialized.contains(secrets.jwt_secret()));
         assert!(!serialized.contains(secrets.database_password()));
+        assert!(!serialized.contains(secrets.database_runtime_password()));
+        assert!(plan.steps()[1]
+            .environment
+            .get("DATABASE_URL")
+            .is_some_and(|url| url.contains("cyberaudit:")));
+        assert!(plan.steps()[3]
+            .environment
+            .get("DATABASE_URL")
+            .is_some_and(|url| url.contains("cyberaudit_app:")));
         fs::remove_dir_all(root).expect("fixture should be removed");
     }
 

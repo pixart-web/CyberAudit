@@ -5,6 +5,7 @@ const SECRET_BYTES: usize = 32;
 const SECRET_HEX_LENGTH: usize = SECRET_BYTES * 2;
 
 const DATABASE_PASSWORD: &str = "database-password";
+const DATABASE_RUNTIME_PASSWORD: &str = "database-runtime-password";
 const BROKER_PASSWORD: &str = "broker-password";
 const JWT_SECRET: &str = "jwt-secret";
 const ENCRYPTION_KEY: &str = "encryption-key";
@@ -43,6 +44,7 @@ fn map_keyring_error(error: KeyringError) -> SecretStoreError {
 #[derive(Clone)]
 pub struct InstallationSecrets {
     database_password: String,
+    database_runtime_password: String,
     broker_password: String,
     jwt_secret: String,
     encryption_key: String,
@@ -52,6 +54,10 @@ pub struct InstallationSecrets {
 impl InstallationSecrets {
     pub(crate) fn database_password(&self) -> &str {
         &self.database_password
+    }
+
+    pub(crate) fn database_runtime_password(&self) -> &str {
+        &self.database_runtime_password
     }
 
     pub(crate) fn broker_password(&self) -> &str {
@@ -76,6 +82,7 @@ pub fn provision_installation_secrets(
 ) -> Result<InstallationSecrets, SecretStoreError> {
     Ok(InstallationSecrets {
         database_password: get_or_create(store, DATABASE_PASSWORD)?,
+        database_runtime_password: get_or_create(store, DATABASE_RUNTIME_PASSWORD)?,
         broker_password: get_or_create(store, BROKER_PASSWORD)?,
         jwt_secret: get_or_create(store, JWT_SECRET)?,
         encryption_key: get_or_create(store, ENCRYPTION_KEY)?,
@@ -161,11 +168,16 @@ mod tests {
         let second = provision_installation_secrets(&store).expect("secrets should be reused");
 
         assert_eq!(first.database_password(), second.database_password());
+        assert_eq!(
+            first.database_runtime_password(),
+            second.database_runtime_password()
+        );
         assert_eq!(first.broker_password(), second.broker_password());
         assert_eq!(first.jwt_secret(), second.jwt_secret());
         assert_eq!(first.encryption_key(), second.encryption_key());
         assert_eq!(first.bootstrap_token(), second.bootstrap_token());
         assert_ne!(first.database_password(), first.broker_password());
+        assert_ne!(first.database_password(), first.database_runtime_password());
         assert!(is_valid_secret(first.jwt_secret()));
     }
 

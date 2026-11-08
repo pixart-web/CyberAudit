@@ -1,6 +1,7 @@
 use cyberaudit_runtime_host::{
     packaged_tool, random_hex, replace_process, require_success, restrict_file, runtime_root,
-    validated_directory, validated_port, validated_secret, HostError, DATABASE_NAME, DATABASE_USER,
+    validated_directory, validated_port, validated_secret, HostError, DATABASE_APPLICATION_USER,
+    DATABASE_NAME, DATABASE_OWNER_USER, DATABASE_RUNTIME_ROLE,
 };
 use std::fs;
 use std::io::Write;
@@ -24,14 +25,22 @@ fn run() -> Result<(), HostError> {
     let data = validated_directory("CYBERAUDIT_DATABASE_DIRECTORY")?;
     let temporary = validated_directory("CYBERAUDIT_TEMPORARY_DIRECTORY")?;
     let port = validated_port("CYBERAUDIT_DATABASE_PORT")?;
-    let password = validated_secret("CYBERAUDIT_POSTGRES_PASSWORD")?;
+    let admin_password = validated_secret("CYBERAUDIT_POSTGRES_ADMIN_PASSWORD")?;
+    let runtime_password = validated_secret("CYBERAUDIT_POSTGRES_RUNTIME_PASSWORD")?;
 
     if !data.join("PG_VERSION").is_file() {
-        initialize_cluster(&tools, &data, &temporary, &password)?;
+        initialize_cluster(&tools, &data, &temporary, &admin_password)?;
     }
-    let bootstrap_marker = data.join("cyberaudit-bootstrap-v1");
+    let bootstrap_marker = data.join("cyberaudit-bootstrap-v2");
     if !bootstrap_marker.is_file() {
-        bootstrap_database(&tools, &data, port, &password, &bootstrap_marker)?;
+        bootstrap_database(
+            &tools,
+            &data,
+            port,
+            &admin_password,
+            &runtime_password,
+            &bootstrap_marker,
+        )?;
     }
 
     let command = postgres_command(&tools.postgres, &data, port);
@@ -104,7 +113,7 @@ fn initialize_cluster(
         .arg("--pgdata")
         .arg(data)
         .arg("--username")
-        .arg(DATABASE_USER)
+        .arg(DATABASE_OWNER_USER)
         .arg("--pwfile")
         .arg(&password_file.0)
         .arg("--auth-host=scram-sha-256")
@@ -125,17 +134,19 @@ fn bootstrap_database(
     tools: &PostgresTools,
     data: &Path,
     port: u16,
-    password: &str,
+    admin_password: &str,
+    runtime_password: &str,
     marker: &Path,
 ) -> Result<(), HostError> {
     let mut server = postgres_command(&tools.postgres, data, port)
         .spawn()
         .map_err(HostError::ProcessStart)?;
     let result = (|| {
-        wait_until_ready(tools, port, password, &mut server)?;
-        if !database_exists(tools, port, password)? {
-            create_database(tools, port, password)?;
+        wait_until_ready(tools, port, admin_password, &mut server)?;
+        if !database_exists(tools, port, admin_password)? {
+            create_database(tools, port, admin_password)?;
         }
+        provision_runtime_roles(tools, port, admin_password, runtime_password)?;
         write_bootstrap_marker(marker)?;
         stop_database(tools, data)?;
         require_success(server.wait().map_err(HostError::ProcessStart)?)
@@ -187,7 +198,7 @@ fn wait_until_ready(
         if let Some(status) = server.try_wait().map_err(HostError::ProcessStart)? {
             return Err(HostError::ProcessFailed(status.code()));
         }
-        let status = database_command(&tools.pg_isready, port, password)
+        let status = database_command(&tools.pg_isready, port, DATABASE_OWNER_USER, password)
             .arg("--dbname")
             .arg("postgres")
             .arg("--timeout=1")
@@ -206,7 +217,7 @@ fn wait_until_ready(
 }
 
 fn database_exists(tools: &PostgresTools, port: u16, password: &str) -> Result<bool, HostError> {
-    let output = database_command(&tools.psql, port, password)
+    let output = database_command(&tools.psql, port, DATABASE_OWNER_USER, password)
         .arg("--dbname")
         .arg("postgres")
         .arg("--tuples-only")
@@ -221,10 +232,10 @@ fn database_exists(tools: &PostgresTools, port: u16, password: &str) -> Result<b
 }
 
 fn create_database(tools: &PostgresTools, port: u16, password: &str) -> Result<(), HostError> {
-    let status = database_command(&tools.createdb, port, password)
+    let status = database_command(&tools.createdb, port, DATABASE_OWNER_USER, password)
         .arg("--no-password")
         .arg("--owner")
-        .arg(DATABASE_USER)
+        .arg(DATABASE_OWNER_USER)
         .arg("--encoding=UTF8")
         .arg("--template=template0")
         .arg(DATABASE_NAME)
@@ -233,7 +244,50 @@ fn create_database(tools: &PostgresTools, port: u16, password: &str) -> Result<(
     require_success(status)
 }
 
-fn database_command(program: &Path, port: u16, password: &str) -> Command {
+fn provision_runtime_roles(
+    tools: &PostgresTools,
+    port: u16,
+    admin_password: &str,
+    runtime_password: &str,
+) -> Result<(), HostError> {
+    let sql = runtime_role_sql(runtime_password);
+    let mut child = database_command(&tools.psql, port, DATABASE_OWNER_USER, admin_password)
+        .arg("--dbname")
+        .arg("postgres")
+        .arg("--no-password")
+        .arg("--set")
+        .arg("ON_ERROR_STOP=1")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::inherit())
+        .spawn()
+        .map_err(HostError::ProcessStart)?;
+    child
+        .stdin
+        .take()
+        .ok_or(HostError::ProcessFailed(None))?
+        .write_all(sql.as_bytes())
+        .map_err(HostError::Io)?;
+    require_success(child.wait().map_err(HostError::ProcessStart)?)
+}
+
+fn runtime_role_sql(runtime_password: &str) -> String {
+    format!(
+        "DO $$ BEGIN\n\
+         IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{DATABASE_RUNTIME_ROLE}') THEN\n\
+           CREATE ROLE {DATABASE_RUNTIME_ROLE};\n\
+         END IF;\n\
+         IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{DATABASE_APPLICATION_USER}') THEN\n\
+           CREATE ROLE {DATABASE_APPLICATION_USER};\n\
+         END IF;\n\
+         END $$;\n\
+         ALTER ROLE {DATABASE_RUNTIME_ROLE} NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;\n\
+         ALTER ROLE {DATABASE_APPLICATION_USER} LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS PASSWORD '{runtime_password}';\n\
+         GRANT {DATABASE_RUNTIME_ROLE} TO {DATABASE_APPLICATION_USER};\n"
+    )
+}
+
+fn database_command(program: &Path, port: u16, user: &str, password: &str) -> Command {
     let mut command = Command::new(program);
     command
         .env_clear()
@@ -246,7 +300,7 @@ fn database_command(program: &Path, port: u16, password: &str) -> Command {
         .arg("--port")
         .arg(port.to_string())
         .arg("--username")
-        .arg(DATABASE_USER)
+        .arg(user)
         .stdin(Stdio::null());
     command
 }
@@ -302,7 +356,12 @@ mod tests {
     #[test]
     fn database_password_is_environment_only_and_never_an_argument() {
         let password = "a".repeat(64);
-        let command = database_command(Path::new("/packaged/psql"), 55432, &password);
+        let command = database_command(
+            Path::new("/packaged/psql"),
+            55432,
+            DATABASE_OWNER_USER,
+            &password,
+        );
         let arguments = command
             .get_args()
             .map(|argument| argument.to_string_lossy().into_owned())
@@ -311,6 +370,21 @@ mod tests {
         assert!(command.get_envs().any(|(name, value)| {
             name == "PGPASSWORD" && value.is_some_and(|value| value == password.as_str())
         }));
+    }
+
+    #[test]
+    fn runtime_role_is_login_only_without_privilege_bypass() {
+        let password = "b".repeat(64);
+        let sql = runtime_role_sql(&password);
+
+        assert!(sql.contains(
+            "ALTER ROLE cyberaudit_runtime NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS"
+        ));
+        assert!(sql.contains(
+            "ALTER ROLE cyberaudit_app LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS"
+        ));
+        assert!(sql.contains("GRANT cyberaudit_runtime TO cyberaudit_app"));
+        assert!(sql.contains(&password));
     }
 
     #[test]

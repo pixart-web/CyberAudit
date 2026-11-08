@@ -132,7 +132,8 @@ argumentos escolhidos pelo renderer. Hosts nativos fixos inicializam PostgreSQL,
 alimentam a configuração autenticada do broker por pipe e lançam Next com Node
 empacotado. A pipeline desktop monta o output Next standalone, assets e uma
 distribuição Node 22.17.1 completa, rejeitando versões ou executáveis não
-portáveis. PostgreSQL 16 foi exercitado localmente com criação, SCRAM, restart
+portáveis. PostgreSQL 16 foi exercitado localmente com criação, SCRAM,
+migrations, separação entre owner e login de aplicação sem privilégios, restart
 e persistência; o broker teve apenas smoke de compatibilidade Redis nesta
 máquina. Isto ainda não é um installer suportado: os binários redistribuíveis
 PostgreSQL/Valkey e o runtime web ainda não estão unidos num bundle assinado, e

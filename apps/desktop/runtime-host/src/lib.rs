@@ -3,7 +3,9 @@ use std::fs;
 use std::path::{Component, Path, PathBuf};
 use std::process::{Command, ExitStatus};
 
-pub const DATABASE_USER: &str = "cyberaudit";
+pub const DATABASE_OWNER_USER: &str = "cyberaudit";
+pub const DATABASE_APPLICATION_USER: &str = "cyberaudit_app";
+pub const DATABASE_RUNTIME_ROLE: &str = "cyberaudit_runtime";
 pub const DATABASE_NAME: &str = "cyberaudit";
 
 pub fn runtime_root() -> Result<PathBuf, HostError> {
