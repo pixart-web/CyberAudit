@@ -57,7 +57,8 @@ export async function assembleWebRuntime({
   await requireRegularFile(nodeExecutable, "Node runtime");
   await requireRegularFile(nodeLicense, "Node license");
   await requireRegularFile(nextLicense, "Next license");
-  if (smokeTestNode) validateNode(nodeExecutable, root, windows);
+  if (smokeTestNode)
+    validateNode(nodeExecutable, nodeDistributionRoot, windows);
 
   for (const destination of [webDestination, nodeDestinationRoot]) {
     try {

@@ -171,7 +171,7 @@ endpoint NODUS hardcoded. O contrato está em
   cluster com checksums/SCRAM, a base `cyberaudit`, autenticou, fez shutdown e
   restart preservando a base. O host de broker respondeu `PONG` autenticado e
   fez `SHUTDOWN SAVE` com Redis 8.8; isto não é validação Valkey.
-- Web standalone: o build de produção passou com 102 rotas; 2 testes de assembly
+- Web standalone: o build de produção passou com 102 rotas; 3 testes de assembly
   passaram, incluindo dereference de symlinks e recusa de overwrite. O smoke
   rejeitou corretamente Node Homebrew 26 por não ser a distribuição portátil
   22.17.1. O artefacto oficial Linux permanece dependente do próximo CI verde.

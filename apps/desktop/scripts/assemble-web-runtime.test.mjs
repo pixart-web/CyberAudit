@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {
+  chmod,
   lstat,
   mkdir,
   mkdtemp,
@@ -37,7 +38,11 @@ async function fixture() {
   );
   await writeFile(join(staticRoot, "chunk.js"), "chunk");
   await writeFile(join(publicRoot, "asset.txt"), "asset");
-  await writeFile(join(nodeDistributionRoot, "bin", "node"), "node");
+  await writeFile(
+    join(nodeDistributionRoot, "bin", "node"),
+    "#!/bin/sh\nprintf 'v22.17.1\\n'\n",
+  );
+  await chmod(join(nodeDistributionRoot, "bin", "node"), 0o700);
   await writeFile(join(nodeDistributionRoot, "LICENSE"), "Node license");
   await writeFile(nextLicense, "Next license");
   return {
@@ -62,6 +67,7 @@ test("assembles regular standalone resources, assets, runtime and licenses", asy
       nodeDistributionRoot: item.nodeDistributionRoot,
       nextLicense: item.nextLicense,
       windows: false,
+      smokeTestNode: true,
     });
     assert.equal(metadata.build_id, "desktopBuild_1234");
     assert.equal(
@@ -113,6 +119,7 @@ test("refuses to overwrite an existing assembled web runtime", async () => {
 test("rejects an invalid Node distribution before creating runtime files", async () => {
   const item = await fixture();
   try {
+    await writeFile(join(item.nodeDistributionRoot, "bin", "node"), "invalid");
     await assert.rejects(
       assembleWebRuntime({
         runtimeRoot: item.runtime,
