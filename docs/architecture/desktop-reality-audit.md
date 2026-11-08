@@ -10,8 +10,8 @@ O produto possui um núcleo funcional extenso e uma shell Tauri 2 real em
 `apps/desktop`. A shell cria diretórios OS-specific, roda uma capability por
 arranque, verifica hashes dos recursos e apresenta recuperação fail-closed. A
 API e o worker já podem ser empacotados sem Python de sistema. Ainda não existe
-runtime completo: PostgreSQL, Valkey e Next standalone não estão incluídos, os
-processos ainda não têm lifecycle/readiness integral e não há installer validado
+runtime completo: PostgreSQL e Valkey não estão incluídos, e o assembly Next
+standalone ainda não foi integrado num installer. Os processos ainda não têm lifecycle/readiness integral e não há installer validado
 em máquina limpa. Hosts nativos fixos para PostgreSQL, broker e Next já existem,
 mas os runtimes redistribuíveis a que dão acesso ainda não integram o bundle.
 
@@ -22,7 +22,7 @@ A baseline funcional completa continua a ser Docker Compose. Nenhum `.app`,
 
 1. Tauri 2 (`tauri`/`tauri-build` major 2) está em `apps/desktop/src-tauri`.
 2. Produção usa `apps/desktop/ui`, um estado local de recuperação, não URL remota.
-3. Desenvolvimento inicia Next em `127.0.0.1:3000`; o bundle ainda não inicia Next.
+3. Desenvolvimento inicia Next em `127.0.0.1:3000`; o bundle ainda não inicia Next, mas a pipeline já monta o runtime standalone com Node 22.17.1.
 4. O frontend usa Next standalone para preservar SSR, rotas dinâmicas e handlers.
 5. As 102 rotas compilam, mas navegação packaged completa ainda não foi provada.
 6. FastAPI não era iniciado pela shell; agora possui sidecar PyInstaller validado isoladamente.
@@ -171,14 +171,19 @@ endpoint NODUS hardcoded. O contrato está em
   cluster com checksums/SCRAM, a base `cyberaudit`, autenticou, fez shutdown e
   restart preservando a base. O host de broker respondeu `PONG` autenticado e
   fez `SHUTDOWN SAVE` com Redis 8.8; isto não é validação Valkey.
+- Web standalone: o build de produção passou com 102 rotas; 2 testes de assembly
+  passaram, incluindo dereference de symlinks e recusa de overwrite. O smoke
+  rejeitou corretamente Node Homebrew 26 por não ser a distribuição portátil
+  22.17.1. O artefacto oficial Linux permanece dependente do próximo CI verde.
 
 ## Bloqueadores confirmados
 
 - toolchain Rust 1.90 disponível e fixada no repositório; `cargo check` e 11
   testes Rust passam no incremento atual;
 - a matriz de sidecars de produção por target ainda não está construída;
-- PostgreSQL, Valkey e Node redistribuíveis ainda não foram incorporados com
-  licenças/SBOM; os hosts isolados não são um runtime completo;
+- PostgreSQL e Valkey redistribuíveis ainda não foram incorporados com
+  licenças/SBOM; Node/Next já têm assembly isolado, mas ainda não formam um
+  runtime completo com os restantes serviços;
 - o binário Rust release sem `custom-protocol` compilou, mas
   `tauri build --no-bundle` falhou com `E0463` ao resolver proc-macros
   (`tauri_macros` e, num `CARGO_TARGET_DIR` limpo, `phf_macros`). `cargo check` e

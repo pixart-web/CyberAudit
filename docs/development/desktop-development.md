@@ -6,7 +6,7 @@ sidecars e o respetivo manifesto não existirem.
 
 ## Requisitos de desenvolvimento
 
-- Node.js e pnpm definidos na raiz;
+- distribuição oficial Node.js 22.17.1 e pnpm definidos na raiz;
 - Rust 1.90.0 através de rustup (fixado em `rust-toolchain.toml`);
 - dependências nativas Tauri da plataforma;
 - no macOS, Command Line Tools; Xcode completo será necessário para algumas
@@ -68,9 +68,21 @@ make desktop-runtime-hosts
 make desktop-runtime-host-test
 ```
 
-Esses comandos não descarregam nem copiam automaticamente PostgreSQL, Valkey ou
-Node. A proveniência e licença dos runtimes por plataforma têm de ser preservadas
-pela futura pipeline de assembly.
+O runtime web standalone pode ser montado sem usar Node do sistema no produto:
+
+```bash
+make desktop-web-runtime
+```
+
+O comando copia a distribuição Node completa que contém `process.execPath`,
+valida-a depois da cópia e falha se a versão não for exatamente 22.17.1 ou se o
+executável depender de ficheiros fora da distribuição. Instalações Homebrew não
+são artefactos redistribuíveis válidos.
+
+Esses comandos não descarregam PostgreSQL, Valkey ou Node. O assembly web copia
+apenas a distribuição Node já instalada e preserva as licenças. A proveniência,
+SBOM e licença dos runtimes por plataforma têm de ser verificadas pela pipeline
+de release.
 
 ## Estado honesto
 

@@ -27,7 +27,7 @@ jobs:
       - uses: actions/setup-node@v7
         with: { node-version: "22.17.1", cache: pnpm }
       - run: pnpm install --frozen-lockfile
-      - run: pnpm lint
+      - run: pnpm turbo lint --filter=@cyberaudit/web...
       - run: pnpm --filter @cyberaudit/web test
       - run: pnpm --filter @cyberaudit/web build
       - run: pnpm audit --audit-level high
@@ -55,6 +55,12 @@ jobs:
       - run: python -m pip install -e "apps/api[desktop]"
       - run: pnpm --filter @cyberaudit/desktop check
       - run: pnpm --filter @cyberaudit/desktop test
+      - name: Build same-origin Next standalone runtime
+        run: |
+          pnpm --filter @cyberaudit/web build
+          node apps/desktop/scripts/assemble-web-runtime.mjs artifacts/desktop-web/linux-x64
+        env:
+          NEXT_PUBLIC_API_URL: /api/v1
       - name: Build fixed native runtime hosts
         run: |
           cargo build --release --manifest-path apps/desktop/runtime-host/Cargo.toml
@@ -84,6 +90,13 @@ jobs:
         with:
           name: desktop-runtime-hosts-linux-x64
           path: artifacts/desktop-runtime-hosts/linux-x64/
+          if-no-files-found: error
+          retention-days: 7
+      - uses: actions/upload-artifact@v6
+        with:
+          name: desktop-web-runtime-linux-x64
+          path: artifacts/desktop-web/linux-x64/
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 7
   migrations:

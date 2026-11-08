@@ -50,5 +50,9 @@ empacotada em Windows x64, macOS ARM64 e macOS x64.
 
 O host web exige URL exata `http://127.0.0.1:<porta>/api/v1`, ficheiro regular
 da capability e origem web loopback. Executa apenas o Node empacotado com o
-`server.js` conhecido. Ainda falta a pipeline que copie Next standalone,
-`.next/static`, assets públicos e o Node LTS redistribuível para o manifesto v2.
+`server.js` conhecido. A pipeline copia Next standalone, `.next/static`, assets
+públicos, licenças e a distribuição Node completa, eliminando symlinks antes do
+manifesto v2. O assembly executa o Node copiado com ambiente mínimo e exige
+exatamente a versão 22.17.1; a instalação Homebrew local 26 foi corretamente
+rejeitada por depender de bibliotecas externas. A validação do artefacto Linux
+com a distribuição oficial fica a cargo do gate desktop do CI.
