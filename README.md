@@ -132,14 +132,14 @@ argumentos escolhidos pelo renderer. Hosts nativos fixos inicializam PostgreSQL,
 alimentam a configuração autenticada do broker por pipe e lançam Next com Node
 empacotado. A pipeline desktop monta o output Next standalone, assets e uma
 distribuição Node 22.17.1 completa, rejeitando versões ou executáveis não
-portáveis. PostgreSQL 16 foi exercitado localmente com criação, SCRAM,
-migrations, separação entre owner e login de aplicação sem privilégios, restart
-e persistência; o broker teve apenas smoke de compatibilidade Redis nesta
-máquina. Um assembler atómico já reúne todos os componentes, licenças,
-proveniência e manifesto quando recebe distribuições verificadas. Isto ainda
-não é um installer suportado: os binários redistribuíveis PostgreSQL/Valkey não
-foram adquiridos e validados por target, nenhum bundle assinado foi produzido e
-o lifecycle completo ainda não está ligado ao arranque da shell. Docker
+portáveis. PostgreSQL 16.15, Valkey 8.1.10 e Node 22.17.1 foram compilados ou
+extraídos de fontes oficiais com SHA-256 fixado para macOS ARM64. A distribuição
+PostgreSQL é relocável via `@rpath`; o host Valkey validou autenticação,
+persistência e restart. O assembler atómico produziu um runtime completo sem
+symlinks, com licenças, proveniência e manifesto recursivo. Isto ainda não é um
+installer suportado: faltam os artefactos equivalentes de macOS x64 e Windows
+x64, nenhum bundle assinado foi produzido e o lifecycle completo ainda não está
+ligado ao arranque da shell. Docker
 continua a ser o arranque funcional completo enquanto D4–D10 não forem
 validados.
 
@@ -149,6 +149,7 @@ pnpm desktop:test
 pnpm --filter @cyberaudit/desktop lint
 make desktop-python-smoke
 make desktop-runtime-hosts
+make desktop-native-dependencies-macos-arm64
 # requer a distribuição oficial Node 22.17.1
 make desktop-web-runtime
 # requer distribuições PostgreSQL/Valkey e proveniência explícitas por target

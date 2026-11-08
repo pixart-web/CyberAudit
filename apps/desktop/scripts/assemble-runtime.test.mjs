@@ -9,7 +9,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import test from "node:test";
 import { assembleRuntime } from "./assemble-runtime.mjs";
 
@@ -130,6 +130,29 @@ test("atomically assembles every runtime component and its provenance", async ()
       target: "macos-arm64",
       components: { postgresql: "16.14", valkey: "8.1.5" },
     });
+  } finally {
+    await rm(paths.root, { recursive: true, force: true });
+  }
+});
+
+test("normalizes relative source paths before complete assembly", async () => {
+  const paths = await fixture();
+  try {
+    const supplied = options(paths);
+    for (const key of [
+      "runtimeRoot",
+      "webRuntimeRoot",
+      "runtimeHostRoot",
+      "pythonSidecarRoot",
+      "postgresqlDistributionRoot",
+      "postgresqlProvenance",
+      "valkeyDistributionRoot",
+      "valkeyProvenance",
+    ]) {
+      supplied[key] = relative(process.cwd(), supplied[key]);
+    }
+    const manifest = await assembleRuntime(supplied);
+    assert.ok(manifest.resources.length > 0);
   } finally {
     await rm(paths.root, { recursive: true, force: true });
   }

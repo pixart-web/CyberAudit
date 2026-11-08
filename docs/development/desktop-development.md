@@ -82,6 +82,18 @@ make desktop-runtime-hosts
 make desktop-runtime-host-test
 ```
 
+No macOS ARM64, as dependências nativas fixadas podem ser compiladas a partir
+das fontes oficiais verificadas:
+
+```bash
+make desktop-native-dependencies-macos-arm64
+```
+
+O output fica em `.artifacts/desktop-native/macos-arm64`. O script falha se o
+target não for macOS ARM64, se um checksum divergir, se um Mach-O não for ARM64
+ou se depender de Homebrew/MacPorts. PostgreSQL é relinkado com `@rpath` e
+validado novamente depois de mover a distribuição.
+
 O runtime web standalone pode ser montado sem usar Node do sistema no produto:
 
 ```bash

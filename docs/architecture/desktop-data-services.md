@@ -33,13 +33,13 @@ No primeiro arranque o host:
 7. grava um marcador de bootstrap versionado e atómico, faz shutdown `fast` e
    substitui o host pelo processo PostgreSQL final.
 
-O teste real macOS usou PostgreSQL 16.14 Homebrew apenas como fixture local. A
-base aplicou as migrações até `0018` com o owner, autenticou o login não
-privilegiado, assumiu `cyberaudit_runtime`, leu o schema de 140 tabelas,
-desligou, reiniciou e preservou os dados. O login de aplicação foi consultado
-diretamente em `pg_roles` e não possui `rolsuper` nem `rolbypassrls`. Isto não
-prova redistribuição: bibliotecas, licença, SBOM e rpaths ainda precisam de
-assembly por target.
+PostgreSQL 16.15 foi compilado do tarball oficial verificado para macOS ARM64,
+sem ICU, readline, zlib, OpenSSL, LZ4 ou Zstd externos. Os Mach-O foram
+relinkados com `@rpath`; o gate rejeita qualquer dependência fora de `/usr/lib`,
+`/System/Library` ou da distribuição. Depois de mover o artefacto, `initdb`,
+arranque loopback, consulta por `psql` e shutdown passaram. A validação anterior
+de RLS aplicou migrações até `0018`, confirmou 140 tabelas e verificou que o
+login de aplicação não possui `rolsuper` nem `rolbypassrls`.
 
 ## Broker
 
@@ -48,10 +48,12 @@ O host gera configuração fechada em memória: loopback, protected mode, AOF,
 sem dados de utilizador. A password segue num pipe anónimo; não existe ficheiro
 de configuração com segredo nem argumento de processo sensível.
 
-O smoke local usou Redis 8.8 por ser o binário disponível e confirmou `PONG`
-autenticado e `SHUTDOWN SAVE`. É apenas evidência de compatibilidade de protocolo
-e configuração. D3 exige repetir com uma distribuição Valkey licenciada e
-empacotada em Windows x64, macOS ARM64 e macOS x64.
+Valkey 8.1.10 foi compilado do tarball oficial verificado para macOS ARM64, com
+`MALLOC=libc` e sem TLS externo. O binário liga apenas a `libSystem`. O host
+empacotado recusou `PING` sem autenticação, respondeu `PONG` autenticado,
+persistiu um valor, fez `SHUTDOWN SAVE`, reiniciou e recuperou o valor. O
+tarball não inclui `.git`, pelo que o banner upstream mostra commit
+`00000000, modified=1`; a proveniência é estabelecida pelo SHA-256 oficial.
 
 ## Next
 

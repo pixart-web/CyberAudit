@@ -260,6 +260,13 @@ export async function assembleRuntime({
   windows = false,
   smokeTestDistributions = false,
 }) {
+  webRuntimeRoot = resolve(webRuntimeRoot);
+  runtimeHostRoot = resolve(runtimeHostRoot);
+  pythonSidecarRoot = resolve(pythonSidecarRoot);
+  postgresqlDistributionRoot = resolve(postgresqlDistributionRoot);
+  postgresqlProvenance = resolve(postgresqlProvenance);
+  valkeyDistributionRoot = resolve(valkeyDistributionRoot);
+  valkeyProvenance = resolve(valkeyProvenance);
   if (!/^[a-z0-9]+-[a-z0-9_]+$/.test(target)) {
     throw new Error("runtime target must use the platform-architecture format");
   }

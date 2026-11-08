@@ -180,7 +180,7 @@ endpoint NODUS hardcoded. O contrato está em
   22.17.1. O CI Linux executou o Node oficial copiado e publicou com sucesso o
   runtime web (114 641 865 bytes), os hosts nativos (698 569 bytes) e os
   sidecars Python (163 098 786 bytes) no run `42461371672`.
-- Assembly integral D4: 7 testes passaram para composição atómica dos cinco
+- Assembly integral D4: 8 testes passaram para composição atómica dos cinco
   sidecars, web/Node, PostgreSQL, Valkey, licenças e proveniência; também cobrem
   overwrite, target incompatível, link externo e sidecar ausente. São fixtures
   estruturais e não substituem um build com redistribuíveis reais por target.
@@ -190,9 +190,9 @@ endpoint NODUS hardcoded. O contrato está em
 - toolchain Rust 1.90 disponível e fixada no repositório; `cargo check` e 11
   testes Rust passam no incremento atual;
 - a matriz de sidecars de produção por target ainda não está construída;
-- PostgreSQL e Valkey redistribuíveis ainda não foram adquiridos e validados por
-  target. O assembler completo exige licenças e proveniência, mas ainda não foi
-  executado com distribuições reais suportadas;
+- macOS ARM64 possui agora PostgreSQL 16.15, Valkey 8.1.10 e Node 22.17.1
+  verificados, assembly real de 520 MB, 11 175 recursos manifestados e zero
+  symlinks. A validação equivalente ainda falta em macOS x64 e Windows x64;
 - o binário Rust release sem `custom-protocol` compilou, mas
   `tauri build --no-bundle` falhou com `E0463` ao resolver proc-macros
   (`tauri_macros` e, num `CARGO_TARGET_DIR` limpo, `phf_macros`). `cargo check` e
