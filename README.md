@@ -135,10 +135,13 @@ distribuição Node 22.17.1 completa, rejeitando versões ou executáveis não
 portáveis. PostgreSQL 16 foi exercitado localmente com criação, SCRAM,
 migrations, separação entre owner e login de aplicação sem privilégios, restart
 e persistência; o broker teve apenas smoke de compatibilidade Redis nesta
-máquina. Isto ainda não é um installer suportado: os binários redistribuíveis
-PostgreSQL/Valkey e o runtime web ainda não estão unidos num bundle assinado, e
-o lifecycle completo ainda não está ligado ao arranque da shell. Docker continua a ser o arranque funcional completo
-enquanto D3–D10 não forem validados.
+máquina. Um assembler atómico já reúne todos os componentes, licenças,
+proveniência e manifesto quando recebe distribuições verificadas. Isto ainda
+não é um installer suportado: os binários redistribuíveis PostgreSQL/Valkey não
+foram adquiridos e validados por target, nenhum bundle assinado foi produzido e
+o lifecycle completo ainda não está ligado ao arranque da shell. Docker
+continua a ser o arranque funcional completo enquanto D4–D10 não forem
+validados.
 
 ```bash
 pnpm desktop:check
@@ -148,6 +151,12 @@ make desktop-python-smoke
 make desktop-runtime-hosts
 # requer a distribuição oficial Node 22.17.1
 make desktop-web-runtime
+# requer distribuições PostgreSQL/Valkey e proveniência explícitas por target
+make desktop-runtime-assemble DESKTOP_TARGET=macos-arm64 \
+  POSTGRESQL_RUNTIME_ROOT=/artefactos/postgresql-16 \
+  POSTGRESQL_PROVENANCE=/artefactos/postgresql-16.json \
+  VALKEY_RUNTIME_ROOT=/artefactos/valkey \
+  VALKEY_PROVENANCE=/artefactos/valkey.json
 ```
 
 Ver `docs/architecture/desktop-reality-audit.md`,

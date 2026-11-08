@@ -1,8 +1,8 @@
 # Desenvolvimento desktop
 
 O shell desktop reutiliza `apps/web` e `apps/api`; não aponta para Hetzner. A
-implementação atual é uma fundação D2 e falha fechado enquanto os cinco
-sidecars e o respetivo manifesto não existirem.
+implementação atual está em D4 parcial e falha fechado enquanto os cinco
+sidecars, ferramentas redistribuíveis e o respetivo manifesto não existirem.
 
 ## Requisitos de desenvolvimento
 
@@ -33,6 +33,7 @@ O diretório de recursos esperado é:
 ```text
 runtime/
   manifest.json
+  runtime.json
   bin/
     cyberaudit-postgres[.exe]
     cyberaudit-valkey[.exe]
@@ -46,6 +47,11 @@ runtime/
   web/
     apps/web/server.js
     ...Next standalone e assets estáticos...
+  licenses/
+    {node,next,postgresql,valkey}-LICENSE
+  provenance/
+    postgresql.json
+    valkey.json
 ```
 
 Depois de construir/copiar exclusivamente os launchers aprovados, gerar o
@@ -61,6 +67,14 @@ O manifesto v2 é atómico, contém SHA-256 de todos os ficheiros e rejeita
 symlinks e recursos extra. Ele deteta corrupção local, mas não substitui
 assinatura de código, assinatura do updater ou proveniência de build.
 
+O assembly integral recebe apenas outputs já construídos e distribuições
+redistribuíveis previamente verificadas. Nunca descarrega componentes durante o
+build ou no primeiro arranque. Cada ficheiro de proveniência tem exatamente os
+campos `component`, `version`, `target`, `source_url`, `archive_sha256` e
+`license`; o target tem de corresponder ao artefacto em construção, PostgreSQL
+tem de ser 16 e a origem tem de usar HTTPS. O output é montado num diretório
+temporário, validado pelo manifesto v2 e renomeado atomicamente.
+
 Os hosts fixos podem ser construídos e testados sem Tauri:
 
 ```bash
@@ -74,15 +88,34 @@ O runtime web standalone pode ser montado sem usar Node do sistema no produto:
 make desktop-web-runtime
 ```
 
+Depois de construir o runtime web, hosts Rust e sidecars Python, o runtime
+completo é montado com distribuições fornecidas explicitamente:
+
+```bash
+make desktop-runtime-assemble \
+  DESKTOP_TARGET=macos-arm64 \
+  POSTGRESQL_RUNTIME_ROOT=/artefactos/postgresql-16 \
+  POSTGRESQL_PROVENANCE=/artefactos/postgresql-16.json \
+  VALKEY_RUNTIME_ROOT=/artefactos/valkey \
+  VALKEY_PROVENANCE=/artefactos/valkey.json \
+  DESKTOP_RUNTIME_FLAGS=--smoke
+```
+
+`--smoke` só pode ser usado num build nativo: executa os servidores com
+`--version` e confirma que as versões correspondem à proveniência. Cross-builds
+mantêm validação estrutural e dependem do job nativo do target para este gate.
+
 O comando copia a distribuição Node completa que contém `process.execPath`,
 valida-a depois da cópia e falha se a versão não for exatamente 22.17.1 ou se o
 executável depender de ficheiros fora da distribuição. Instalações Homebrew não
 são artefactos redistribuíveis válidos.
 
 Esses comandos não descarregam PostgreSQL, Valkey ou Node. O assembly web copia
-apenas a distribuição Node já instalada e preserva as licenças. A proveniência,
-SBOM e licença dos runtimes por plataforma têm de ser verificadas pela pipeline
-de release.
+apenas a distribuição Node já instalada e preserva as licenças. O assembly
+integral copia as distribuições PostgreSQL/Valkey completas, rejeita links que
+escapem às respetivas raízes, elimina symlinks no output e inclui licenças e
+proveniência no manifesto. A origem dos binários, o SBOM e a assinatura por
+plataforma continuam a ser gates da pipeline de release.
 
 ## Estado honesto
 
