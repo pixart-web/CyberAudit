@@ -174,7 +174,9 @@ endpoint NODUS hardcoded. O contrato está em
 - Web standalone: o build de produção passou com 102 rotas; 3 testes de assembly
   passaram, incluindo dereference de symlinks e recusa de overwrite. O smoke
   rejeitou corretamente Node Homebrew 26 por não ser a distribuição portátil
-  22.17.1. O artefacto oficial Linux permanece dependente do próximo CI verde.
+  22.17.1. O CI Linux executou o Node oficial copiado e publicou com sucesso o
+  runtime web (114 641 865 bytes), os hosts nativos (698 569 bytes) e os
+  sidecars Python (163 098 786 bytes) no run `42461371672`.
 
 ## Bloqueadores confirmados
 
