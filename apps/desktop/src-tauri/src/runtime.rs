@@ -18,6 +18,7 @@ const MAX_RUNTIME_RESOURCES: usize = 100_000;
 pub struct RuntimeLayout {
     pub configuration: PathBuf,
     pub database: PathBuf,
+    pub broker: PathBuf,
     pub evidence: PathBuf,
     pub models: PathBuf,
     pub knowledge_packs: PathBuf,
@@ -31,6 +32,7 @@ impl RuntimeLayout {
         let layout = Self {
             configuration: root.join("configuration"),
             database: root.join("database"),
+            broker: root.join("broker"),
             evidence: root.join("evidence"),
             models: root.join("models"),
             knowledge_packs: root.join("knowledge-packs"),
@@ -45,10 +47,11 @@ impl RuntimeLayout {
         Ok(layout)
     }
 
-    fn directories(&self) -> [&Path; 8] {
+    fn directories(&self) -> [&Path; 9] {
         [
             &self.configuration,
             &self.database,
+            &self.broker,
             &self.evidence,
             &self.models,
             &self.knowledge_packs,

@@ -55,15 +55,28 @@ describe("desktop API proxy", () => {
         "sec-fetch-site": "cross-site",
       },
     });
-    const wrongHost = new Request("http://localhost:48124/api/v1/assets");
+    const equivalentLoopback = new Request(
+      "http://localhost:48124/api/v1/assets",
+    );
+    const wrongPort = new Request("http://localhost:48125/api/v1/assets");
+    const malformedOrigin = new Request(
+      "http://127.0.0.1:48124/api/v1/assets",
+      { headers: { origin: "not a URL" } },
+    );
 
     expect(desktopRequestAllowed(allowed, "http://127.0.0.1:48124")).toBe(true);
     expect(desktopRequestAllowed(crossSite, "http://127.0.0.1:48124")).toBe(
       false,
     );
-    expect(desktopRequestAllowed(wrongHost, "http://127.0.0.1:48124")).toBe(
+    expect(
+      desktopRequestAllowed(equivalentLoopback, "http://127.0.0.1:48124"),
+    ).toBe(true);
+    expect(desktopRequestAllowed(wrongPort, "http://127.0.0.1:48124")).toBe(
       false,
     );
+    expect(
+      desktopRequestAllowed(malformedOrigin, "http://127.0.0.1:48124"),
+    ).toBe(false);
   });
 
   it("forwards an allowlist of headers and preserves the query", () => {

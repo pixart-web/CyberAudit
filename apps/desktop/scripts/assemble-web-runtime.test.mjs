@@ -22,11 +22,34 @@ async function fixture() {
   const nodeDistributionRoot = join(root, "node-distribution");
   const nextLicense = join(root, "next-license");
   await mkdir(join(standalone, "apps/web/.next"), { recursive: true });
+  await mkdir(join(standalone, "apps/web/node_modules"), { recursive: true });
+  await mkdir(
+    join(standalone, "node_modules/.pnpm/next-fixture/node_modules/next"),
+    { recursive: true },
+  );
+  await mkdir(
+    join(
+      standalone,
+      "node_modules/.pnpm/next-fixture/node_modules/styled-jsx",
+    ),
+    { recursive: true },
+  );
   await mkdir(join(standalone, "shared"), { recursive: true });
   await mkdir(staticRoot, { recursive: true });
   await mkdir(publicRoot, { recursive: true });
   await mkdir(join(nodeDistributionRoot, "bin"), { recursive: true });
   await writeFile(join(standalone, "apps/web/server.js"), "server");
+  await writeFile(
+    join(
+      standalone,
+      "node_modules/.pnpm/next-fixture/node_modules/styled-jsx/package.json",
+    ),
+    '{"name":"styled-jsx"}\n',
+  );
+  await symlink(
+    "../../../node_modules/.pnpm/next-fixture/node_modules/next",
+    join(standalone, "apps/web/node_modules/next"),
+  );
   await writeFile(
     join(standalone, "apps/web/.next/BUILD_ID"),
     "desktopBuild_1234\n",
@@ -90,6 +113,16 @@ test("assembles regular standalone resources, assets, runtime and licenses", asy
     assert.equal(
       await readFile(join(item.runtime, "licenses/node-LICENSE"), "utf8"),
       "Node license",
+    );
+    assert.equal(
+      await readFile(
+        join(
+          item.runtime,
+          "web/apps/web/node_modules/styled-jsx/package.json",
+        ),
+        "utf8",
+      ),
+      '{"name":"styled-jsx"}\n',
     );
   } finally {
     await rm(item.root, { recursive: true, force: true });

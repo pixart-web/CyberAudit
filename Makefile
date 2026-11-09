@@ -1,4 +1,4 @@
-.PHONY: setup up down restart logs migrate seed test lint format clean worker worker-logs test-worker seed-jobs adapters-health purge-demo-jobs seed-phase3 seed-phase4 seed-phase5 seed-enterprise seed-hardening desktop-python-sidecars desktop-python-smoke desktop-runtime-hosts desktop-runtime-host-test desktop-native-dependencies-macos-arm64 desktop-web-runtime desktop-runtime-assemble enterprise-domain-seed enterprise-domain-test enterprise-domain-sync-demo enterprise-domain-health identity-test cloud-test kubernetes-test zero-trust-test test-adapters test-network-safety test-discovery test-graph test-vulnerability-intelligence test-risk test-appsec test-soc test-grc test-ai test-enterprise test-hardening test-production-readiness test-rls verify-production-config backup restore-drill load-smoke readiness-environment-check readiness-tools-verify readiness-up readiness-down readiness-keycloak readiness-vault readiness-minio readiness-kind readiness-oidc-test readiness-webauthn-test readiness-rls-test readiness-cross-tenant-test readiness-dlq-test readiness-runner-test readiness-providers-test readiness-collect readiness-backup readiness-restore readiness-ha-test readiness-dr-test readiness-sbom readiness-scan readiness-provenance readiness-sign readiness-verify-signatures readiness-load-test readiness-coverage readiness-evidence readiness-gate release-candidate test-web-inventory test-api-security test-dependencies test-sca test-secrets test-sast test-iac test-containers test-cicd test-security-gates lab-services-up lab-services-down lab-network-up lab-network-down appsec-lab-up appsec-lab-down appsec-lab-down import-demo-results import-demo-api-spec generate-demo-sbom purge-evidence purge-appsec-demo retest-demo sync-vulnerability-feeds recalculate-risk rebuild-appsec-scores refresh-attack-paths rebuild-knowledge-graph coverage-report benchmark-appsec
+.PHONY: setup up down restart logs migrate seed test lint format clean worker worker-logs test-worker seed-jobs adapters-health purge-demo-jobs seed-phase3 seed-phase4 seed-phase5 seed-enterprise seed-hardening desktop-python-sidecars desktop-python-smoke desktop-runtime-hosts desktop-runtime-host-test desktop-native-dependencies-macos-arm64 desktop-web-runtime desktop-runtime-assemble desktop-build enterprise-domain-seed enterprise-domain-test enterprise-domain-sync-demo enterprise-domain-health identity-test cloud-test kubernetes-test zero-trust-test test-adapters test-network-safety test-discovery test-graph test-vulnerability-intelligence test-risk test-appsec test-soc test-grc test-ai test-enterprise test-hardening test-production-readiness test-rls verify-production-config backup restore-drill load-smoke readiness-environment-check readiness-tools-verify readiness-up readiness-down readiness-keycloak readiness-vault readiness-minio readiness-kind readiness-oidc-test readiness-webauthn-test readiness-rls-test readiness-cross-tenant-test readiness-dlq-test readiness-runner-test readiness-providers-test readiness-collect readiness-backup readiness-restore readiness-ha-test readiness-dr-test readiness-sbom readiness-scan readiness-provenance readiness-sign readiness-verify-signatures readiness-load-test readiness-coverage readiness-evidence readiness-gate release-candidate test-web-inventory test-api-security test-dependencies test-sca test-secrets test-sast test-iac test-containers test-cicd test-security-gates lab-services-up lab-services-down lab-network-up lab-network-down appsec-lab-up appsec-lab-down appsec-lab-down import-demo-results import-demo-api-spec generate-demo-sbom purge-evidence purge-appsec-demo retest-demo sync-vulnerability-feeds recalculate-risk rebuild-appsec-scores refresh-attack-paths rebuild-knowledge-graph coverage-report benchmark-appsec
 
 setup:
 	cp -n .env.example .env || true
@@ -193,7 +193,7 @@ desktop-native-dependencies-macos-arm64:
 	infrastructure/scripts/build-desktop-runtime-macos-arm64.sh
 
 desktop-web-runtime:
-	NEXT_PUBLIC_API_URL=/api/v1 pnpm --filter @cyberaudit/web build
+	CYBERAUDIT_DESKTOP_BUILD=1 NEXT_PUBLIC_API_URL=/api/v1 pnpm --filter @cyberaudit/web build
 	pnpm --filter @cyberaudit/desktop runtime:web:assemble -- .artifacts/desktop-web
 
 desktop-runtime-assemble:
@@ -203,6 +203,9 @@ desktop-runtime-assemble:
 	test -n "$(VALKEY_RUNTIME_ROOT)"
 	test -n "$(VALKEY_PROVENANCE)"
 	pnpm --filter @cyberaudit/desktop runtime:assemble -- .artifacts/desktop-runtime .artifacts/desktop-web apps/desktop/runtime-host/target/release .artifacts/desktop-python/dist "$(POSTGRESQL_RUNTIME_ROOT)" "$(POSTGRESQL_PROVENANCE)" "$(VALKEY_RUNTIME_ROOT)" "$(VALKEY_PROVENANCE)" "$(DESKTOP_TARGET)" $(DESKTOP_RUNTIME_FLAGS)
+
+desktop-build:
+	CYBERAUDIT_DESKTOP_RUNTIME_DIR=.artifacts/desktop-runtime pnpm --filter @cyberaudit/desktop build
 
 test-worker:
 	.venv/bin/pytest apps/api/tests/test_worker.py apps/api/tests/test_orchestrator.py

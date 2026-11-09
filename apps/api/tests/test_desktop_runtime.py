@@ -1,4 +1,5 @@
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -41,6 +42,35 @@ def test_worker_configuration_is_fixed_and_bounded(monkeypatch: pytest.MonkeyPat
     monkeypatch.setenv("CYBERAUDIT_DESKTOP_WORKER_THREADS", "64")
     with pytest.raises(desktop_runtime.DesktopRuntimeConfigurationError):
         desktop_runtime.worker_arguments()
+
+
+def test_worker_readiness_capability_is_private_and_scoped(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    configuration = tmp_path / "configuration"
+    configuration.mkdir()
+    session = configuration / "desktop-session"
+    session.write_text("a" * 64, encoding="ascii")
+    readiness = configuration / "worker-ready"
+    monkeypatch.setenv("CYBERAUDIT_DESKTOP_READY_FILE", str(readiness))
+
+    created = desktop_runtime._provision_worker_readiness(  # noqa: SLF001
+        SimpleNamespace(desktop_session_secret_file=session)
+    )
+
+    assert created == readiness
+    assert readiness.read_text(encoding="ascii") == "ready\n"
+    assert readiness.stat().st_mode & 0o077 == 0
+    readiness.unlink()
+
+    monkeypatch.setenv("CYBERAUDIT_DESKTOP_READY_FILE", str(tmp_path / "worker-ready"))
+    with pytest.raises(
+        desktop_runtime.DesktopRuntimeConfigurationError,
+        match="outside configuration",
+    ):
+        desktop_runtime._provision_worker_readiness(  # noqa: SLF001
+            SimpleNamespace(desktop_session_secret_file=session)
+        )
 
 
 def test_api_entrypoint_exposes_only_fixed_operations(monkeypatch: pytest.MonkeyPatch) -> None:

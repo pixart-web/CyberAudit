@@ -8,9 +8,11 @@ path is accepted from the web frontend.
 from __future__ import annotations
 
 import argparse
+import asyncio
 import ipaddress
 import multiprocessing
 import os
+import stat
 import sys
 from argparse import Namespace
 from collections.abc import Callable, Sequence
@@ -89,6 +91,37 @@ def run_migrations() -> None:
     # before a database connection is attempted.
     desktop_settings()
     command.upgrade(alembic_configuration(), "head")
+    asyncio.run(provision_rbac_catalog())
+
+
+async def provision_rbac_catalog() -> None:
+    """Reconcile fixed RBAC data using the migration owner's connection."""
+
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+    from sqlalchemy.pool import NullPool
+
+    from cyberaudit.provisioning import provision_builtin_adapters
+    from cyberaudit.rbac_provisioning import ensure_rbac
+
+    settings = desktop_settings()
+    engine = create_async_engine(
+        settings.database_url,
+        poolclass=NullPool,
+        connect_args={
+            "server_settings": {
+                "application_name": "cyberaudit-desktop-migration",
+                "statement_timeout": str(settings.database_statement_timeout_ms),
+            }
+        },
+    )
+    sessions = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with sessions() as session:
+            await ensure_rbac(session)
+            await provision_builtin_adapters(session)
+            await session.commit()
+    finally:
+        await engine.dispose()
 
 
 def run_api() -> NoReturn:
@@ -128,9 +161,40 @@ def worker_arguments() -> Namespace:
 def run_worker() -> int:
     from dramatiq.cli import main as dramatiq_main
 
-    desktop_settings()
-    multiprocessing.freeze_support()
-    return int(dramatiq_main(worker_arguments()) or 0)
+    settings = desktop_settings()
+    ready_file = _provision_worker_readiness(settings)
+    try:
+        return int(dramatiq_main(worker_arguments()) or 0)
+    finally:
+        try:
+            ready_file.unlink()
+        except FileNotFoundError:
+            pass
+
+
+def _provision_worker_readiness(settings: Any) -> Path:
+    raw = os.environ.get("CYBERAUDIT_DESKTOP_READY_FILE")
+    if not raw:
+        raise DesktopRuntimeConfigurationError("CYBERAUDIT_DESKTOP_READY_FILE is required")
+    path = Path(raw)
+    session_file = settings.desktop_session_secret_file
+    if session_file is None or path.parent != session_file.parent or path.name != "worker-ready":
+        raise DesktopRuntimeConfigurationError("worker readiness path is outside configuration")
+    try:
+        descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except OSError as exc:
+        raise DesktopRuntimeConfigurationError(
+            "worker readiness file could not be created"
+        ) from exc
+    try:
+        os.write(descriptor, b"ready\n")
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+    if os.name == "posix" and stat.S_IMODE(path.stat().st_mode) & 0o077:
+        path.unlink(missing_ok=True)
+        raise DesktopRuntimeConfigurationError("worker readiness file permissions are unsafe")
+    return path
 
 
 def api_main(argv: Sequence[str] | None = None) -> int:
@@ -144,6 +208,9 @@ def api_main(argv: Sequence[str] | None = None) -> int:
 
 
 def worker_main(argv: Sequence[str] | None = None) -> int:
+    # PyInstaller multiprocessing children re-enter this executable with private
+    # interpreter arguments. Intercept those before our closed CLI parser.
+    multiprocessing.freeze_support()
     parser = argparse.ArgumentParser(prog="cyberaudit-worker", allow_abbrev=False)
     parser.parse_args(argv)
     return run_worker()

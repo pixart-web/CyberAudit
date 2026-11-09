@@ -1,8 +1,8 @@
 # Desenvolvimento desktop
 
-O shell desktop reutiliza `apps/web` e `apps/api`; não aponta para Hetzner. A
-implementação atual está em D4 parcial e falha fechado enquanto os cinco
-sidecars, ferramentas redistribuíveis e o respetivo manifesto não existirem.
+O shell desktop reutiliza `apps/web` e `apps/api`; não aponta para Hetzner. O
+runtime completo falha fechado se qualquer sidecar, ferramenta, recurso ou hash
+do manifesto estiver ausente ou inválido.
 
 ## Requisitos de desenvolvimento
 
@@ -129,9 +129,25 @@ escapem às respetivas raízes, elimina symlinks no output e inclui licenças e
 proveniência no manifesto. A origem dos binários, o SBOM e a assinatura por
 plataforma continuam a ser gates da pipeline de release.
 
+## Construir o bundle Tauri
+
+O build não aceita um runtime implícito. A variável tem de apontar para o output
+completo do assembler; o pre-build faz staging atómico e volta a verificar o
+manifesto antes de executar o bundler:
+
+```bash
+CYBERAUDIT_DESKTOP_RUNTIME_DIR=/caminho/runtime-completo \
+  pnpm --filter @cyberaudit/desktop build
+# ou
+make desktop-build DESKTOP_RUNTIME_DIR=/caminho/runtime-completo
+```
+
+O diretório `apps/desktop/src-tauri/resources/runtime` é staging ignorado pelo
+Git e nunca deve ser usado como fonte canónica.
+
 ## Estado honesto
 
-`cargo build --release` produz atualmente a shell e três hosts Rust em macOS
-ARM64. Os hosts não constituem um runtime sem as ferramentas verificadas sob
-`runtime/tools`. Ainda não existe `CyberAudit.app`; não distribuir estes
-binários como produto final.
+Foi construído e aberto um `CyberAudit OS.app` debug em macOS ARM64 com o runtime
+integral. Esta evidência valida integração local, não distribuição: o artefacto
+não está assinado/notarizado, não foi testado numa máquina limpa e não prova
+Windows x64 ou macOS x64. Não o distribuir como produto final.

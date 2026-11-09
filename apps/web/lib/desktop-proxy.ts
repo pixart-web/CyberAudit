@@ -49,10 +49,26 @@ export async function desktopProxyConfiguration() {
   return { apiUrl: parsed, secret, webOrigin: parsedWebOrigin.origin };
 }
 
+function sameLoopbackOrigin(left: string, right: string) {
+  try {
+    const first = new URL(left);
+    const second = new URL(right);
+    return (
+      first.protocol === "http:" &&
+      second.protocol === "http:" &&
+      ["127.0.0.1", "localhost"].includes(first.hostname) &&
+      ["127.0.0.1", "localhost"].includes(second.hostname) &&
+      first.port === second.port
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function desktopRequestAllowed(request: Request, webOrigin: string) {
-  if (new URL(request.url).origin !== webOrigin) return false;
+  if (!sameLoopbackOrigin(new URL(request.url).origin, webOrigin)) return false;
   const origin = request.headers.get("origin");
-  if (origin && origin !== webOrigin) return false;
+  if (origin && !sameLoopbackOrigin(origin, webOrigin)) return false;
   const fetchSite = request.headers.get("sec-fetch-site");
   return !fetchSite || ["none", "same-origin"].includes(fetchSite);
 }

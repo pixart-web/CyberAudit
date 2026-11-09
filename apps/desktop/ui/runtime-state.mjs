@@ -8,13 +8,36 @@ const RESOURCE_LABELS = Object.freeze({
 });
 
 export function runtimePresentation(status) {
-  if (status?.ready && status?.state === "resources_verified") {
+  if (status?.state === "verifying_resources") {
+    return {
+      kind: "progress",
+      title: "A verificar o CyberAudit OS",
+      message:
+        "A validar a integridade dos componentes locais antes do arranque.",
+      statusText: "Verificação em curso",
+      resources: [],
+      retry: false,
+    };
+  }
+
+  if (status?.state === "resources_verified") {
     return {
       kind: "progress",
       title: "Componentes locais verificados",
       message:
         "A integridade do runtime foi confirmada. O supervisor pode iniciar os serviços locais.",
       statusText: "Integridade confirmada",
+      resources: [],
+      retry: false,
+    };
+  }
+
+  if (status?.ready && status?.state === "ready") {
+    return {
+      kind: "progress",
+      title: "Runtime local pronto",
+      message: "A interface segura do CyberAudit está a ser aberta.",
+      statusText: "Serviços locais disponíveis",
       resources: [],
       retry: false,
     };

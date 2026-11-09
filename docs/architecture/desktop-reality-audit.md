@@ -1,51 +1,51 @@
 # CyberAudit desktop reality audit
 
-Estado da auditoria: atualizada em 2026-11-07 sobre
-`codex/cyberaudit-desktop-first`. Esta página descreve a baseline observada e
-os incrementos D2 e D3 parcial. Não é uma declaração de prontidão desktop.
+Estado da auditoria: atualizada em 2026-11-09 sobre
+`codex/cyberaudit-desktop-first`. Esta página contém evidência executada até D6;
+não é uma declaração de prontidão de release.
 
 ## Resumo executivo
 
 O produto possui um núcleo funcional extenso e uma shell Tauri 2 real em
-`apps/desktop`. A shell cria diretórios OS-specific, roda uma capability por
-arranque, verifica hashes dos recursos e apresenta recuperação fail-closed. A
-API e o worker já podem ser empacotados sem Python de sistema. Ainda não existe
-runtime completo: PostgreSQL e Valkey não estão incluídos, e o assembly Next
-standalone ainda não foi integrado num installer. Os processos ainda não têm lifecycle/readiness integral e não há installer validado
-em máquina limpa. Hosts nativos fixos para PostgreSQL, broker e Next já existem,
-mas os runtimes redistribuíveis a que dão acesso ainda não integram o bundle.
+`apps/desktop`. Em macOS ARM64, o bundle debug contém PostgreSQL, Valkey, Node,
+Next, API, worker e migrações, sem depender das instalações de sistema desses
+componentes. O supervisor aplica integridade recursiva, segredos no cofre do SO,
+readiness, monitorização, shutdown e restart. O first-run e o customer journey
+local com persistência foram exercitados sobre o runtime empacotado.
 
-A baseline funcional completa continua a ser Docker Compose. Nenhum `.app`,
-`.dmg`, `.pkg`, `.exe` ou `.msi` de produto foi produzido.
+Ainda não há release suportada: o `.app` produzido é debug, não foi
+assinado/notarizado nem validado numa máquina limpa. Não existem ainda bundles
+equivalentes de macOS x64 ou Windows x64, DMG/PKG/NSIS assinados ou validação de
+upgrade/recovery de produção.
 
 ## Auditoria do runtime atual
 
 1. Tauri 2 (`tauri`/`tauri-build` major 2) está em `apps/desktop/src-tauri`.
 2. Produção usa `apps/desktop/ui`, um estado local de recuperação, não URL remota.
-3. Desenvolvimento inicia Next em `127.0.0.1:3000`; o bundle ainda não inicia Next, mas a pipeline já monta o runtime standalone com Node 22.17.1.
+3. Desenvolvimento inicia Next em `127.0.0.1:3000`; o bundle inicia Next standalone com Node 22.17.1 empacotado.
 4. O frontend usa Next standalone para preservar SSR, rotas dinâmicas e handlers.
-5. As 102 rotas compilam, mas navegação packaged completa ainda não foi provada.
-6. FastAPI não era iniciado pela shell; agora possui sidecar PyInstaller validado isoladamente.
-7. PostgreSQL continua externo ao bundle; o host nativo de bootstrap/persistência foi validado com PostgreSQL 16.14 local; SQLite é rejeitado.
-8. Redis/Valkey continua externo ao bundle; o host usa pipe e password obrigatória; apenas compatibilidade Redis 8.8 foi exercitada localmente.
-9. Dramatiq tem sidecar empacotado e plano de lançamento allowlisted, mas a shell ainda não gere o seu lifecycle.
+5. As 102 rotas compilam e a shell nativa abriu a rota real `/setup` do bundle.
+6. FastAPI e worker são sidecars PyInstaller ARM64 iniciados pela shell.
+7. PostgreSQL 16.15 está no bundle; o host cria o cluster, roles, base, checksums e preserva dados após restart. SQLite é rejeitado.
+8. Valkey 8.1.10 está no bundle; o host fornece configuração autenticada por pipe e persistência local.
+9. Dramatiq tem sidecar empacotado e lifecycle gerido pelo supervisor.
 10. Alembic está incluído no sidecar API e exposto apenas pela operação fixa `migrate`.
-11. O setup real e CRUD de utilizadores/clientes existem no backend, mas não foram validados numa app instalada.
-12. Evidências e modelos já usam paths configuráveis; a ligação final aos diretórios Tauri está pendente.
-13. Artefactos atuais: shell Rust release sem bundle e sidecars temporários macOS ARM64.
+11. Setup e CRUD de organização, utilizador, cliente, auditoria, ativo e relatório foram validados no runtime local.
+12. Dados mutáveis usam diretórios OS-specific sob Application Support; recursos do bundle permanecem imutáveis.
+13. Artefacto atual: `.app` debug macOS ARM64 com runtime integral verificado (não distribuível).
 14. CI real: Linux valida Tauri e passa a construir sidecars Python; não prova Windows/macOS.
-15. Implementado parcialmente: segredos de instalação via cofre do SO, reserva loopback e launch plan fixo.
-16. Simulado/incompleto: readiness/shutdown do supervisor, serviços de dados, first-run nativo, installers, offline E2E, upgrade e recovery.
+15. Implementado: segredos via cofre do SO, loopback estrito, launch plan fixo, readiness, shutdown e lock Unix.
+16. Incompleto: installers assinados, Windows Job Objects/lock equivalente, clean-machine, upgrade e recovery de release.
 
 ## Respostas à auditoria obrigatória
 
 ### 1. Trabalho desktop já existente
 
-Não existe Tauri, Electron, AppKit, SwiftUI, WinUI ou packaging nativo. Existe
-um launcher shell para Docker Compose, binding loopback por omissão, uma página
-de setup web, runtime de IA soberano, gestor de modelos, validação de pacotes de
-update e documentação de instalação local. Estes elementos são reutilizáveis,
-mas não constituem uma aplicação desktop.
+Existe uma shell Tauri 2, hosts Rust fixos, sidecars empacotados e um runtime
+macOS ARM64 integral. O launcher Docker Compose, a página de setup web, o runtime
+de IA soberano, o gestor de modelos e a validação de pacotes de update foram
+reutilizados. A lacuna já não é a existência da aplicação desktop, mas a sua
+industrialização multi-plataforma, assinatura e validação de instalação limpa.
 
 ### 2. Frontend mais reutilizável
 
@@ -164,13 +164,12 @@ endpoint NODUS hardcoded. O contrato está em
 - Cobertura backend observada após D2: 76,43%, acima do gate de 75%.
 - Runtime Python desktop: 12 testes focados passaram; dois sidecars macOS ARM64
   foram construídos e executaram smoke tests com ambiente vazio.
-- Runtime Rust após D5 parcial: 13 testes passaram, incluindo estabilidade e
-  rejeição de segredos inválidos, sequência fixa, sessão confinada e quatro
-  portas loopback distintas, ordem da máquina de estados e rejeição de saltos.
-  O teste de portas foi executado fora do sandbox.
-- Runtime hosts Rust: 8 testes passaram. PostgreSQL 16.14 macOS ARM64 criou um
+- Runtime Rust: as suites unitárias passaram e o teste integrado D6 arrancou o
+  runtime real duas vezes em 87,81 s. Validou migrações até `0019`, first-run,
+  login local, CRUD representativo, shutdown e persistência após restart.
+- Runtime hosts Rust: 8 testes passaram. PostgreSQL 16.15 macOS ARM64 criou um
   cluster com checksums/SCRAM, a base `cyberaudit`, roles separados de migration
-  e runtime, aplicou migrations até `0018`, fez shutdown e restart preservando
+  e runtime, aplicou migrations até `0019`, fez shutdown e restart preservando
   140 tabelas. O login de aplicação foi confirmado sem superuser nem bypass de
   RLS. O host de broker respondeu `PONG` autenticado e
   fez `SHUTDOWN SAVE` com Redis 8.8; isto não é validação Valkey.
@@ -180,28 +179,29 @@ endpoint NODUS hardcoded. O contrato está em
   22.17.1. O CI Linux executou o Node oficial copiado e publicou com sucesso o
   runtime web (114 641 865 bytes), os hosts nativos (698 569 bytes) e os
   sidecars Python (163 098 786 bytes) no run `42461371672`.
-- Assembly integral D4: 8 testes passaram para composição atómica dos cinco
+- Assembly integral D4: os testes passaram para composição atómica dos cinco
   sidecars, web/Node, PostgreSQL, Valkey, licenças e proveniência; também cobrem
   overwrite, target incompatível, link externo e sidecar ausente. São fixtures
-  estruturais e não substituem um build com redistribuíveis reais por target.
+  estruturais. A execução macOS ARM64 usou os redistribuíveis reais e o runtime
+  dentro do `.app` voltou a passar hashes, árvore, sidecars e symlink gate.
+- Bundle Tauri: `tauri build --debug --bundles app` produziu
+  `CyberAudit OS.app` (484,41 MiB reportados pelo bundler). A aplicação abriu a
+  página real de configuração inicial e expôs os campos de organização e
+  administrador através da árvore de acessibilidade nativa.
 
 ## Bloqueadores confirmados
 
-- toolchain Rust 1.90 disponível e fixada no repositório; `cargo check` e 11
-  testes Rust passam no incremento atual;
-- a matriz de sidecars de produção por target ainda não está construída;
+- toolchain Rust 1.90 disponível e fixada no repositório;
+- a matriz de sidecars de produção ainda não cobre todos os targets;
 - macOS ARM64 possui agora PostgreSQL 16.15, Valkey 8.1.10 e Node 22.17.1
   verificados, assembly real de 520 MB, 11 175 recursos manifestados e zero
   symlinks. A validação equivalente ainda falta em macOS x64 e Windows x64;
-- o binário Rust release sem `custom-protocol` compilou, mas
-  `tauri build --no-bundle` falhou com `E0463` ao resolver proc-macros
-  (`tauri_macros` e, num `CARGO_TARGET_DIR` limpo, `phf_macros`). `cargo check` e
-  os testes permanecem verdes; a toolchain/packaging precisa de diagnóstico
-  antes de produzir `.app`/`.dmg`;
+- o `.app` debug macOS ARM64 existe; falta repetir em release, assinar, notarizar
+  e produzir DMG/PKG;
 - inexistência de Windows limpo para validação x64;
 - inexistência de macOS Intel para validação x64;
 - assinatura Windows e Apple notarization sem credenciais confirmadas;
-- nenhum installer desktop produzido nesta auditoria.
+- nenhum installer assinado ou release candidate foi produzido nesta auditoria.
 
 ## QA visual do shell
 
@@ -210,4 +210,6 @@ O estado de recuperação foi aberto num browser integrado em 2026-11-06. A
 de componentes e botão “Verificar novamente”. A captura confirmou contraste,
 hierarquia e ausência de overflow. O CLI Playwright não concluiu porque as
 revisões locais de browser não correspondiam à versão exigida; esta limitação
-não é contada como teste Playwright aprovado.
+não é contada como teste Playwright aprovado. Em 2026-11-09, o `.app` real foi
+aberto e a árvore acessível confirmou a página `/setup`, heading, explicação e
+os campos de organização, slug, administrador, email e palavra-passe.

@@ -60,6 +60,7 @@ jobs:
           pnpm --filter @cyberaudit/web build
           node apps/desktop/scripts/assemble-web-runtime.mjs artifacts/desktop-web/linux-x64
         env:
+          CYBERAUDIT_DESKTOP_BUILD: "1"
           NEXT_PUBLIC_API_URL: /api/v1
       - name: Build fixed native runtime hosts
         run: |

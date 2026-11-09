@@ -136,12 +136,12 @@ portáveis. PostgreSQL 16.15, Valkey 8.1.10 e Node 22.17.1 foram compilados ou
 extraídos de fontes oficiais com SHA-256 fixado para macOS ARM64. A distribuição
 PostgreSQL é relocável via `@rpath`; o host Valkey validou autenticação,
 persistência e restart. O assembler atómico produziu um runtime completo sem
-symlinks, com licenças, proveniência e manifesto recursivo. Isto ainda não é um
-installer suportado: faltam os artefactos equivalentes de macOS x64 e Windows
-x64, nenhum bundle assinado foi produzido e o lifecycle completo ainda não está
-ligado ao arranque da shell. Docker
-continua a ser o arranque funcional completo enquanto D4–D10 não forem
-validados.
+symlinks, com licenças, proveniência e manifesto recursivo. O supervisor está
+ligado à shell e foi validado em macOS ARM64 com migrações, first-run, CRUD real,
+shutdown e restart sobre os mesmos dados. Um bundle Tauri debug `.app` também
+foi construído e abriu a configuração inicial real. Isto ainda não é um
+installer suportado: faltam macOS x64 e Windows x64, assinatura, notarização e
+validação em máquinas limpas.
 
 ```bash
 pnpm desktop:check
@@ -158,6 +158,8 @@ make desktop-runtime-assemble DESKTOP_TARGET=macos-arm64 \
   POSTGRESQL_PROVENANCE=/artefactos/postgresql-16.json \
   VALKEY_RUNTIME_ROOT=/artefactos/valkey \
   VALKEY_PROVENANCE=/artefactos/valkey.json
+# copia e verifica o runtime antes do bundle Tauri
+make desktop-build DESKTOP_RUNTIME_DIR=/artefactos/runtime-completo
 ```
 
 Ver `docs/architecture/desktop-reality-audit.md`,

@@ -5,6 +5,8 @@ import {
   lstat,
   mkdir,
   readFile,
+  readdir,
+  realpath,
   writeFile,
 } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
@@ -81,6 +83,7 @@ export async function assembleWebRuntime({
     force: false,
   });
   const applicationRoot = join(webDestination, "apps", "web");
+  await materializeNextRuntimeDependencies(standaloneRoot, applicationRoot);
   await mkdir(join(applicationRoot, ".next"), { recursive: true, mode: 0o700 });
   await cp(staticRoot, join(applicationRoot, ".next", "static"), {
     recursive: true,
@@ -130,6 +133,40 @@ export async function assembleWebRuntime({
     { encoding: "utf8", mode: 0o600, flag: "wx" },
   );
   return metadata;
+}
+
+async function materializeNextRuntimeDependencies(
+  standaloneRoot,
+  applicationRoot,
+) {
+  const sourceNext = join(
+    standaloneRoot,
+    "apps",
+    "web",
+    "node_modules",
+    "next",
+  );
+  const resolvedNext = await realpath(sourceNext);
+  const dependencyRoot = dirname(resolvedNext);
+  const destinationRoot = join(applicationRoot, "node_modules");
+  const entries = await readdir(dependencyRoot, { withFileTypes: true });
+  for (const entry of entries) {
+    if (entry.name === "next") continue;
+    const source = join(dependencyRoot, entry.name);
+    const destination = join(destinationRoot, entry.name);
+    try {
+      await lstat(destination);
+      continue;
+    } catch (error) {
+      if (error?.code !== "ENOENT") throw error;
+    }
+    await cp(source, destination, {
+      recursive: true,
+      dereference: true,
+      errorOnExist: true,
+      force: false,
+    });
+  }
 }
 
 function validateNode(nodeExecutable, runtimeRoot, windows) {

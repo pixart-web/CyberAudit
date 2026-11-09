@@ -1,6 +1,6 @@
 # Packaging do runtime Python desktop
 
-Estado: D2 parcial, validado em macOS ARM64 em 2026-11-07.
+Estado: runtime completo e bundle debug validados em macOS ARM64 em 2026-11-09.
 
 ## Decisão
 
@@ -71,14 +71,19 @@ No runner local macOS ARM64:
 - nenhum serviço externo foi iniciado durante o smoke test;
 - assinatura Apple/notarização: não efetuadas.
 
-Os hashes desta execução temporária não são publicados como artefactos de
-release, pois o build ainda não integra PostgreSQL, Valkey, Next ou Tauri.
+O assembly completo integra PostgreSQL 16.15, Valkey 8.1.10, Node 22.17.1,
+Next, API e worker. O staging pré-build verifica novamente manifesto, hashes,
+árvore, ausência de symlinks e sidecars obrigatórios, e só depois copia o
+runtime para os resources Tauri. Foi produzido um `.app` debug de 484,41 MiB;
+o runtime dentro do bundle voltou a passar a verificação de integridade.
+
+Os hashes desta execução local não são artefactos de release e o bundle não foi
+assinado nem notarizado.
 
 ## Trabalho ainda obrigatório
 
-- adquirir e validar PostgreSQL e Valkey redistribuíveis por target;
-- executar o assembler completo em cada target nativo e publicar o runtime como
-  recurso do bundle Tauri;
-- ligar ao arranque da shell a abstração já criada para Keychain/Credential Manager;
-- completar readiness, retry limitado e shutdown ordenado do supervisor Tauri;
-- construir instaladores nativos e validar em máquinas limpas.
+- reproduzir o assembly em macOS x64 e Windows x64;
+- gerar SBOM e assinar os artefactos por target;
+- construir DMG/NSIS, notarizar o artefacto Apple e validar upgrades;
+- validar cada instalador em máquinas limpas e sem Node, Python, PostgreSQL,
+  Redis/Valkey ou acesso obrigatório à Internet.

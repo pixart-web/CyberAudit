@@ -1,8 +1,7 @@
 # Supervisor do runtime desktop
 
-Estado: D5 parcial, 2026-11-08. Este contrato está implementado e testado, mas
-ainda não inicia o produto completo porque faltam sidecars redistribuíveis de
-PostgreSQL, Valkey e Next standalone.
+Estado: implementado e validado em macOS ARM64, 2026-11-09. A paridade e a
+validação de máquina limpa para Windows x64 e macOS x64 continuam pendentes.
 
 ## Fronteira implementada
 
@@ -42,15 +41,25 @@ capability fora desse diretório ou que não seja um ficheiro regular.
 Uma máquina de estados explícita impede saltos na ordem de dependências:
 verificação, PostgreSQL, migrações, Valkey, API, worker e web. Falhas podem
 transitar para limpeza, mas estados terminados não regressam a `ready`. Esta
-máquina já tem testes positivos e de transições inválidas; ainda falta ligá-la
-à criação e monitorização efetiva dos processos na shell Tauri.
+máquina está ligada ao arranque Tauri. Readiness usa deadlines por serviço; o
+monitor deteta a saída inesperada de filhos; o shutdown termina os serviços em
+ordem inversa e aplica um limite antes de forçar a terminação. Em Unix, os filhos
+usam process groups e um lock exclusivo impede duas instâncias sobre os mesmos
+dados.
 
-## Próximo incremento obrigatório
+## Evidência executada
 
-- manter cada reserva até ao spawn do serviço correspondente;
-- verificar readiness de PostgreSQL, Valkey, API e web com deadlines;
-- aplicar migrações sob lock exclusivo;
-- implementar restart budget e estados sanitizados;
-- terminar filhos conhecidos pela ordem inversa, com timeout;
-- ligar o supervisor à shell apenas quando todos os sidecars assinados estiverem presentes;
-- testar crash, processos órfãos e clean install em Windows x64 e macOS ARM64/x64.
+O teste integrado ignorado por omissão arrancou o runtime empacotado real duas
+vezes. Confirmou migrações até `0019`, API, worker e Next, criou o primeiro
+administrador e dados de cliente/auditoria/ativo/utilizador/relatório, fez
+shutdown limpo e confirmou a persistência após restart. Um `.app` debug abriu a
+página real de configuração inicial através da shell nativa.
+
+## Limites atuais
+
+- o controlo de process tree e o lock têm implementação reforçada em Unix; a
+  implementação Windows ainda precisa de Job Objects e lock nativo equivalente;
+- faltam testes de crash, processos órfãos e clean install em Windows x64 e
+  macOS ARM64/x64;
+- readiness do worker prova o entrypoint; a saúde funcional do consumidor deve
+  evoluir para um heartbeat explícito antes de release.

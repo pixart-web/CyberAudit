@@ -17,6 +17,7 @@ uploads/
 dist/
 target/
 apps/desktop/src-tauri/gen/
+apps/desktop/src-tauri/resources/runtime/
 *.log
 dump.rdb
 *.tsbuildinfo

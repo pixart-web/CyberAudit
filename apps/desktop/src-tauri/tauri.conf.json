@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "identifier": "com.pixart.cyberaudit",
   "build": {
+    "beforeBuildCommand": "node scripts/stage-runtime.mjs",
     "beforeDevCommand": "pnpm --dir ../.. --filter @cyberaudit/web dev --hostname 127.0.0.1 --port 3000",
     "devUrl": "http://127.0.0.1:3000",
     "frontendDist": "../ui"
@@ -29,6 +30,9 @@
   },
   "bundle": {
     "active": true,
+    "resources": {
+      "resources/runtime/": "runtime/"
+    },
     "targets": "all",
     "createUpdaterArtifacts": false,
     "macOS": {

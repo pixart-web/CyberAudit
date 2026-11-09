@@ -7,7 +7,7 @@ import {
 
 test("shows verified resources as progress without claiming service readiness", () => {
   const result = runtimePresentation({
-    ready: true,
+    ready: false,
     state: "resources_verified",
     missing_resources: [],
     invalid_resources: [],
@@ -15,6 +15,19 @@ test("shows verified resources as progress without claiming service readiness", 
   assert.equal(result.kind, "progress");
   assert.equal(result.retry, false);
   assert.match(result.message, /supervisor pode iniciar/);
+});
+
+test("shows resource verification and service readiness as progress", () => {
+  const verifying = runtimePresentation({
+    ready: false,
+    state: "verifying_resources",
+  });
+  const ready = runtimePresentation({ ready: true, state: "ready" });
+
+  assert.equal(verifying.kind, "progress");
+  assert.equal(verifying.retry, false);
+  assert.equal(ready.kind, "progress");
+  assert.equal(ready.retry, false);
 });
 
 test("shows a sanitized recoverable error for missing or unknown resources", () => {
