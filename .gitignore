@@ -17,7 +17,8 @@ uploads/
 dist/
 target/
 apps/desktop/src-tauri/gen/
-apps/desktop/src-tauri/resources/runtime/
+apps/desktop/src-tauri/resources/runtime/*
+!apps/desktop/src-tauri/resources/runtime/.gitkeep
 *.log
 dump.rdb
 *.tsbuildinfo

@@ -22,12 +22,15 @@ test("stages only a complete verified runtime", async () => {
   const destination = join(root, "resources", "runtime");
   try {
     await fixture(source);
+    await mkdir(destination, { recursive: true });
+    await writeFile(join(destination, ".gitkeep"), "");
     await stageRuntime(source, destination);
     await verifyRuntime(destination);
     assert.equal(
       await readFile(join(destination, "bin", "cyberaudit-api"), "utf8"),
       "cyberaudit-api",
     );
+    await assert.rejects(readFile(join(destination, ".gitkeep")), /ENOENT/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
