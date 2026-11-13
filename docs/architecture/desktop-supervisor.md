@@ -1,6 +1,6 @@
 # Supervisor do runtime desktop
 
-Estado: implementado e validado em macOS ARM64, 2026-11-09. A paridade e a
+Estado: implementado e validado em macOS ARM64, 2026-11-13. A paridade e a
 validação de máquina limpa para Windows x64 e macOS x64 continuam pendentes.
 
 ## Fronteira implementada
@@ -47,19 +47,27 @@ ordem inversa e aplica um limite antes de forçar a terminação. Em Unix, os fi
 usam process groups e um lock exclusivo impede duas instâncias sobre os mesmos
 dados.
 
+SIGTERM e SIGINT são convertidos por um handler mínimo num pedido de shutdown
+com acknowledgement limitado a 30 segundos; o processo Tauri só termina depois
+da tentativa de limpeza. O ensaio nativo confirmou que PostgreSQL, Valkey, API,
+worker e Next não sobrevivem ao sinal coordenado.
+
 ## Evidência executada
 
 O teste integrado ignorado por omissão arrancou o runtime empacotado real duas
 vezes. Confirmou migrações até `0019`, API, worker e Next, criou o primeiro
-administrador e dados de cliente/auditoria/ativo/utilizador/relatório, fez
-shutdown limpo e confirmou a persistência após restart. Um `.app` debug abriu a
-página real de configuração inicial através da shell nativa.
+administrador e dados de cliente/auditoria/ativo/utilizador/relatório, executou
+um job real `cyberaudit.asset_inventory`, persistiu o raw result sanitizado e
+provou que um segundo tenant recebe `404` ao consultar o job. Fez shutdown
+limpo e confirmou os registos após restart. O fluxo final D7 passou em 83,98 s
+dentro de um sandbox que bloqueava rede externa e permitia apenas loopback. Um
+`.app` debug abriu a página `/setup` real através da shell nativa.
 
 ## Limites atuais
 
 - o controlo de process tree e o lock têm implementação reforçada em Unix; a
   implementação Windows ainda precisa de Job Objects e lock nativo equivalente;
-- faltam testes de crash, processos órfãos e clean install em Windows x64 e
-  macOS ARM64/x64;
-- readiness do worker prova o entrypoint; a saúde funcional do consumidor deve
-  evoluir para um heartbeat explícito antes de release.
+- faltam clean install em Windows x64 e macOS ARM64/x64 e testes de crash por
+  `SIGKILL`, que não pode executar cleanup cooperativo;
+- o job real valida a saúde funcional do consumidor; um heartbeat contínuo
+  ainda é recomendável antes de release.

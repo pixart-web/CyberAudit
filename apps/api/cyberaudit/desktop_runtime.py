@@ -158,6 +158,19 @@ def worker_arguments() -> Namespace:
     return arguments
 
 
+def verify_worker_package() -> None:
+    """Fail closed when required Dramatiq broker resources were not bundled."""
+
+    from dramatiq.brokers.redis import _scripts
+
+    required_scripts = {"dispatch", "maxstack"}
+    missing = sorted(required_scripts.difference(_scripts))
+    if missing:
+        raise DesktopRuntimeConfigurationError(
+            f"packaged worker broker resources are missing: {', '.join(missing)}"
+        )
+
+
 def run_worker() -> int:
     from dramatiq.cli import main as dramatiq_main
 
@@ -212,7 +225,11 @@ def worker_main(argv: Sequence[str] | None = None) -> int:
     # interpreter arguments. Intercept those before our closed CLI parser.
     multiprocessing.freeze_support()
     parser = argparse.ArgumentParser(prog="cyberaudit-worker", allow_abbrev=False)
-    parser.parse_args(argv)
+    parser.add_argument("--verify-package", action="store_true")
+    arguments = parser.parse_args(argv)
+    if arguments.verify_package:
+        verify_worker_package()
+        return 0
     return run_worker()
 
 

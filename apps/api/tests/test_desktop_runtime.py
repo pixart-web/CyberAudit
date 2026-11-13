@@ -44,6 +44,21 @@ def test_worker_configuration_is_fixed_and_bounded(monkeypatch: pytest.MonkeyPat
         desktop_runtime.worker_arguments()
 
 
+def test_worker_package_contains_required_broker_resources() -> None:
+    desktop_runtime.verify_worker_package()
+
+
+def test_worker_package_fails_closed_without_dispatch(monkeypatch: pytest.MonkeyPatch) -> None:
+    import dramatiq.brokers.redis
+
+    monkeypatch.delitem(dramatiq.brokers.redis._scripts, "dispatch")  # noqa: SLF001
+    with pytest.raises(
+        desktop_runtime.DesktopRuntimeConfigurationError,
+        match="dispatch",
+    ):
+        desktop_runtime.verify_worker_package()
+
+
 def test_worker_readiness_capability_is_private_and_scoped(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

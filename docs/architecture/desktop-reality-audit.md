@@ -1,6 +1,6 @@
 # CyberAudit desktop reality audit
 
-Estado da auditoria: atualizada em 2026-11-09 sobre
+Estado da auditoria: atualizada em 2026-11-13 sobre
 `codex/cyberaudit-desktop-first`. Esta página contém evidência executada até D6;
 não é uma declaração de prontidão de release.
 
@@ -10,12 +10,13 @@ O produto possui um núcleo funcional extenso e uma shell Tauri 2 real em
 `apps/desktop`. Em macOS ARM64, o bundle debug contém PostgreSQL, Valkey, Node,
 Next, API, worker e migrações, sem depender das instalações de sistema desses
 componentes. O supervisor aplica integridade recursiva, segredos no cofre do SO,
-readiness, monitorização, shutdown e restart. O first-run e o customer journey
-local com persistência foram exercitados sobre o runtime empacotado.
+readiness, monitorização, shutdown e restart. O first-run, o customer journey
+local, um job real, isolamento multi-tenant, persistência e operação sem rede
+externa foram exercitados sobre o runtime empacotado.
 
-Ainda não há release suportada: o `.app` produzido é debug, não foi
-assinado/notarizado nem validado numa máquina limpa. Não existem ainda bundles
-equivalentes de macOS x64 ou Windows x64, DMG/PKG/NSIS assinados ou validação de
+Ainda não há release suportada: os bundles locais não foram assinados,
+notarizados nem validados numa máquina limpa. Não existem ainda equivalentes de
+macOS x64 ou Windows x64, DMG/PKG/NSIS assinados ou validação de
 upgrade/recovery de produção.
 
 ## Auditoria do runtime atual
@@ -32,7 +33,7 @@ upgrade/recovery de produção.
 10. Alembic está incluído no sidecar API e exposto apenas pela operação fixa `migrate`.
 11. Setup e CRUD de organização, utilizador, cliente, auditoria, ativo e relatório foram validados no runtime local.
 12. Dados mutáveis usam diretórios OS-specific sob Application Support; recursos do bundle permanecem imutáveis.
-13. Artefacto atual: `.app` debug macOS ARM64 com runtime integral verificado (não distribuível).
+13. Artefactos atuais: `.app` e `.dmg` locais ARM64 com runtime integral verificado (não distribuíveis).
 14. CI real: Linux valida Tauri e passa a construir sidecars Python; não prova Windows/macOS.
 15. Implementado: segredos via cofre do SO, loopback estrito, launch plan fixo, readiness, shutdown e lock Unix.
 16. Incompleto: installers assinados, Windows Job Objects/lock equivalente, clean-machine, upgrade e recovery de release.
@@ -159,14 +160,15 @@ endpoint NODUS hardcoded. O contrato está em
 - Backend Ruff: passou.
 - Backend Black check: passou, 182 ficheiros sem alterações.
 - Backend mypy strict: passou, 98 ficheiros.
-- Backend pytest após D2: 348 passaram, 1 foi ignorado; a suite foi executada
-  fora do sandbox para permitir os testes loopback.
-- Cobertura backend observada após D2: 76,43%, acima do gate de 75%.
-- Runtime Python desktop: 12 testes focados passaram; dois sidecars macOS ARM64
-  foram construídos e executaram smoke tests com ambiente vazio.
-- Runtime Rust: as suites unitárias passaram e o teste integrado D6 arrancou o
-  runtime real duas vezes em 87,81 s. Validou migrações até `0019`, first-run,
-  login local, CRUD representativo, shutdown e persistência após restart.
+- Backend pytest final: 352 passaram, 1 foi ignorado; a suite foi executada fora
+  do sandbox para permitir os testes loopback. Cobertura observada: 72%.
+- Runtime Python desktop: 9 testes focados passaram; dois sidecars macOS ARM64
+  foram construídos e o worker passou `--verify-package`, carregando os recursos
+  Dramatiq `dispatch` e `maxstack` do próprio binário.
+- Runtime Rust: as suites unitárias passaram e o teste integrado D7 arrancou o
+  runtime real duas vezes em 83,98 s sem rede externa. Validou migrações até
+  `0019`, first-run, login, CRUD, job real, isolamento de tenant, shutdown e
+  persistência após restart.
 - Runtime hosts Rust: 8 testes passaram. PostgreSQL 16.15 macOS ARM64 criou um
   cluster com checksums/SCRAM, a base `cyberaudit`, roles separados de migration
   e runtime, aplicou migrations até `0019`, fez shutdown e restart preservando
@@ -184,20 +186,21 @@ endpoint NODUS hardcoded. O contrato está em
   overwrite, target incompatível, link externo e sidecar ausente. São fixtures
   estruturais. A execução macOS ARM64 usou os redistribuíveis reais e o runtime
   dentro do `.app` voltou a passar hashes, árvore, sidecars e symlink gate.
-- Bundle Tauri: `tauri build --debug --bundles app` produziu
-  `CyberAudit OS.app` (484,41 MiB reportados pelo bundler). A aplicação abriu a
-  página real de configuração inicial e expôs os campos de organização e
-  administrador através da árvore de acessibilidade nativa.
+- Bundle Tauri: o debug `.app` abriu o frontend real; a build release local sem
+  strip produziu `CyberAudit OS.app` (468,49 MiB) e
+  `CyberAudit OS_0.1.0_aarch64.dmg` (208,18 MiB). A imagem passou
+  `hdiutil verify`. A identidade ad-hoc release não recebeu automaticamente
+  acesso aos segredos Keychain criados pelo debug.
 
 ## Bloqueadores confirmados
 
 - toolchain Rust 1.90 disponível e fixada no repositório;
 - a matriz de sidecars de produção ainda não cobre todos os targets;
 - macOS ARM64 possui agora PostgreSQL 16.15, Valkey 8.1.10 e Node 22.17.1
-  verificados, assembly real de 520 MB, 11 175 recursos manifestados e zero
+  verificados, assembly real de 520 MB, 11 850 recursos manifestados e zero
   symlinks. A validação equivalente ainda falta em macOS x64 e Windows x64;
-- o `.app` debug macOS ARM64 existe; falta repetir em release, assinar, notarizar
-  e produzir DMG/PKG;
+- `.app` e `.dmg` ARM64 locais existem; falta assinar, notarizar e validar em
+  máquina/utilizador limpos;
 - inexistência de Windows limpo para validação x64;
 - inexistência de macOS Intel para validação x64;
 - assinatura Windows e Apple notarization sem credenciais confirmadas;

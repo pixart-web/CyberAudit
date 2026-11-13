@@ -6,6 +6,8 @@ use runtime::{inspect_resources, provision_session_secret, RuntimeLayout};
 use secrets::{provision_installation_secrets, OsSecretStore};
 use serde::Serialize;
 use std::path::PathBuf;
+#[cfg(unix)]
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 use std::time::Duration;
@@ -64,15 +66,58 @@ struct SupervisorControl {
 }
 
 enum SupervisorCommand {
-    Stop,
+    Stop(Option<mpsc::SyncSender<()>>),
 }
 
 impl SupervisorControl {
     fn stop(&self) {
         if let Ok(sender) = self.sender.lock() {
-            let _ = sender.send(SupervisorCommand::Stop);
+            let _ = sender.send(SupervisorCommand::Stop(None));
         }
     }
+}
+
+#[cfg(unix)]
+static TERMINATION_REQUESTED: AtomicBool = AtomicBool::new(false);
+
+#[cfg(unix)]
+extern "C" fn request_termination(_signal: libc::c_int) {
+    TERMINATION_REQUESTED.store(true, Ordering::Release);
+}
+
+#[cfg(unix)]
+fn install_termination_handlers() -> Result<(), std::io::Error> {
+    for signal in [libc::SIGTERM, libc::SIGINT] {
+        let previous = unsafe { libc::signal(signal, request_termination as libc::sighandler_t) };
+        if previous == libc::SIG_ERR {
+            return Err(std::io::Error::last_os_error());
+        }
+    }
+    Ok(())
+}
+
+#[cfg(unix)]
+fn spawn_termination_watcher(
+    app: tauri::AppHandle,
+    sender: mpsc::Sender<SupervisorCommand>,
+) -> Result<(), std::io::Error> {
+    thread::Builder::new()
+        .name("cyberaudit-termination-watcher".to_owned())
+        .spawn(move || loop {
+            if TERMINATION_REQUESTED.swap(false, Ordering::AcqRel) {
+                let (completion_sender, completion_receiver) = mpsc::sync_channel(1);
+                if sender
+                    .send(SupervisorCommand::Stop(Some(completion_sender)))
+                    .is_ok()
+                {
+                    let _ = completion_receiver.recv_timeout(Duration::from_secs(30));
+                }
+                app.exit(0);
+                break;
+            }
+            thread::sleep(Duration::from_millis(100));
+        })?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -161,7 +206,14 @@ fn launch_runtime(
 
     loop {
         match receiver.recv_timeout(Duration::from_millis(500)) {
-            Ok(SupervisorCommand::Stop) | Err(mpsc::RecvTimeoutError::Disconnected) => {
+            Ok(SupervisorCommand::Stop(completion)) => {
+                let _ = supervisor.stop();
+                if let Some(sender) = completion {
+                    let _ = sender.send(());
+                }
+                break;
+            }
+            Err(mpsc::RecvTimeoutError::Disconnected) => {
                 let _ = supervisor.stop();
                 break;
             }
@@ -178,15 +230,21 @@ fn launch_runtime(
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[cfg(unix)]
+    install_termination_handlers().expect("CyberAudit termination handlers failed to initialize");
     let status = Arc::new(Mutex::new(DesktopRuntimeStatus::starting()));
     let command_status = Arc::clone(&status);
     let (sender, receiver) = mpsc::channel();
+    #[cfg(unix)]
+    let termination_sender = sender.clone();
     let builder = tauri::Builder::default()
         .manage(command_status)
         .manage(SupervisorControl {
             sender: Mutex::new(sender),
         })
         .setup(move |app| {
+            #[cfg(unix)]
+            spawn_termination_watcher(app.handle().clone(), termination_sender)?;
             let data_root = app.path().app_local_data_dir()?;
             let layout = RuntimeLayout::initialize(&data_root)?;
             let session_file = provision_session_secret(&layout.configuration)?;

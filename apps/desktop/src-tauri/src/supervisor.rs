@@ -1453,7 +1453,11 @@ mod tests {
 
         let administrator_email = "desktop.admin@example.com";
         let administrator_password = "DesktopTest!2026Strong";
+        let tenant_admin_email = "desktop.admin@tenant-boundary.example.com";
+        let tenant_admin_password = "TenantBoundary!2026Strong";
+        let tenant_admin_active_password = "TenantBoundary!2026Rotated";
         let mut engagement_id = String::new();
+        let mut job_id = String::new();
 
         for cycle in 0..2 {
             let session = provision_session_secret(&layout.configuration)
@@ -1518,6 +1522,46 @@ mod tests {
                     .as_str()
                     .expect("engagement response should contain an id")
                     .to_owned();
+                let scope = authenticated_json_request(
+                    web_port,
+                    "POST",
+                    "/api/v1/scopes",
+                    &serde_json::json!({
+                        "engagement_id": engagement_id,
+                        "name": "Desktop Local Scope",
+                        "maximum_intensity": "passive",
+                        "allowed_techniques": ["asset-inventory"]
+                    })
+                    .to_string(),
+                    &token,
+                    201,
+                );
+                let scope_id = scope["id"]
+                    .as_str()
+                    .expect("scope response should contain an id");
+                authenticated_json_request(
+                    web_port,
+                    "POST",
+                    "/api/v1/scope-targets",
+                    &serde_json::json!({
+                        "scope_id": scope_id,
+                        "target_type": "ip",
+                        "target_value": "127.0.0.1"
+                    })
+                    .to_string(),
+                    &token,
+                    201,
+                );
+                for status in ["pending_authorization", "authorized"] {
+                    authenticated_json_request(
+                        web_port,
+                        "PATCH",
+                        &format!("/api/v1/engagements/{engagement_id}/status"),
+                        &serde_json::json!({"status": status}).to_string(),
+                        &token,
+                        200,
+                    );
+                }
                 let asset_payload = serde_json::json!({
                     "engagement_id": engagement_id,
                     "name": "Persistent Desktop Host",
@@ -1535,6 +1579,89 @@ mod tests {
                     &asset_payload.to_string(),
                     &token,
                     201,
+                );
+                let profiles = http_request(
+                    web_port,
+                    "GET",
+                    "/api/v1/scan-profiles?page_size=100",
+                    None,
+                    Some(&token),
+                )
+                .expect("scan profile query should complete");
+                assert_http_status(&profiles, 200, "scan profile query");
+                let profiles = response_json(&profiles);
+                let profile_id = profiles["items"]
+                    .as_array()
+                    .expect("scan profile response should contain items")
+                    .iter()
+                    .find(|profile| {
+                        profile["adapter_code"].as_str() == Some("cyberaudit.asset_inventory")
+                    })
+                    .and_then(|profile| profile["id"].as_str())
+                    .expect("safe local inventory profile should be provisioned")
+                    .to_owned();
+                let job = authenticated_json_request(
+                    web_port,
+                    "POST",
+                    "/api/v1/jobs",
+                    &serde_json::json!({
+                        "engagement_id": engagement_id,
+                        "scope_id": scope_id,
+                        "scan_profile_id": profile_id,
+                        "target_type": "ip",
+                        "target_value": "127.0.0.1",
+                        "technique": "asset-inventory",
+                        "intensity": "passive",
+                        "configuration": {"sources": ["platform"]}
+                    })
+                    .to_string(),
+                    &token,
+                    201,
+                );
+                job_id = job["id"]
+                    .as_str()
+                    .expect("job response should contain an id")
+                    .to_owned();
+                wait_for_completed_job(web_port, &job_id, &token);
+                let results = http_request(
+                    web_port,
+                    "GET",
+                    &format!("/api/v1/jobs/{job_id}/results"),
+                    None,
+                    Some(&token),
+                )
+                .expect("job results should be available");
+                assert_http_status(&results, 200, "job results");
+                let results = response_json(&results);
+                assert_eq!(results["summary"]["evidence_created"], 1);
+                assert_eq!(results["raw_result"]["sanitized"], true);
+
+                authenticated_json_request(
+                    web_port,
+                    "POST",
+                    "/api/v1/platform/organizations",
+                    &serde_json::json!({
+                        "name": "Desktop Tenant Boundary",
+                        "slug": "desktop-tenant-boundary",
+                        "admin_name": "Tenant Boundary Administrator",
+                        "admin_email": tenant_admin_email,
+                        "admin_password": tenant_admin_password
+                    })
+                    .to_string(),
+                    &token,
+                    201,
+                );
+                change_password(
+                    web_port,
+                    tenant_admin_email,
+                    tenant_admin_password,
+                    tenant_admin_active_password,
+                );
+                assert_tenant_isolation(
+                    web_port,
+                    tenant_admin_email,
+                    tenant_admin_active_password,
+                    &job_id,
                 );
                 authenticated_json_request(
                     web_port,
@@ -1588,6 +1715,22 @@ mod tests {
                 .expect("persisted report query should complete");
                 assert_http_status(&reports, 200, "persisted reports");
                 assert!(reports.contains("technical_findings"));
+                let job = http_request(
+                    web_port,
+                    "GET",
+                    &format!("/api/v1/jobs/{job_id}"),
+                    None,
+                    Some(&token),
+                )
+                .expect("persisted job query should complete");
+                assert_http_status(&job, 200, "persisted job");
+                assert_eq!(response_json(&job)["status"], "completed");
+                assert_tenant_isolation(
+                    web_port,
+                    tenant_admin_email,
+                    tenant_admin_active_password,
+                    &job_id,
+                );
             }
             supervisor.stop().expect("runtime should stop cleanly");
             assert_eq!(supervisor.state(), SupervisorState::Stopped);
@@ -1629,6 +1772,24 @@ mod tests {
             .to_owned()
     }
 
+    fn change_password(port: u16, email: &str, current_password: &str, new_password: &str) {
+        let token = desktop_login(port, email, current_password);
+        let payload = serde_json::json!({
+            "current_password": current_password,
+            "new_password": new_password,
+        });
+        let response = http_request_with_timeout(
+            port,
+            "POST",
+            "/api/v1/auth/change-password",
+            Some(&payload.to_string()),
+            Some(&token),
+            Duration::from_secs(30),
+        )
+        .expect("forced password change should complete");
+        assert_http_status(&response, 204, "forced password change");
+    }
+
     fn authenticated_json_request(
         port: u16,
         method: &str,
@@ -1648,5 +1809,52 @@ mod tests {
         .expect("authenticated request should complete");
         assert_http_status(&response, expected_status, path);
         response_json(&response)
+    }
+
+    fn wait_for_completed_job(port: u16, job_id: &str, token: &str) {
+        let deadline = Instant::now() + Duration::from_secs(45);
+        loop {
+            let response = http_request(
+                port,
+                "GET",
+                &format!("/api/v1/jobs/{job_id}"),
+                None,
+                Some(token),
+            )
+            .expect("job status query should complete");
+            assert_http_status(&response, 200, "job status");
+            let job = response_json(&response);
+            match job["status"].as_str() {
+                Some("completed" | "completed_with_warnings") => return,
+                Some("denied" | "failed" | "timed_out" | "cancelled") => {
+                    panic!("local worker job failed: {job}")
+                }
+                _ if Instant::now() < deadline => thread::sleep(PROBE_INTERVAL),
+                _ => panic!("local worker job did not complete before its deadline: {job}"),
+            }
+        }
+    }
+
+    fn assert_tenant_isolation(port: u16, email: &str, password: &str, foreign_job_id: &str) {
+        let token = desktop_login(port, email, password);
+        let clients = http_request(
+            port,
+            "GET",
+            "/api/v1/clients?q=Persistent%20Desktop",
+            None,
+            Some(&token),
+        )
+        .expect("second tenant client query should complete");
+        assert_http_status(&clients, 200, "second tenant client query");
+        assert_eq!(response_json(&clients)["total"], 0);
+        let foreign_job = http_request(
+            port,
+            "GET",
+            &format!("/api/v1/jobs/{foreign_job_id}"),
+            None,
+            Some(&token),
+        )
+        .expect("cross-tenant job query should complete");
+        assert_http_status(&foreign_job, 404, "cross-tenant job query");
     }
 }

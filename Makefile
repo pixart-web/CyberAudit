@@ -182,6 +182,7 @@ desktop-python-sidecars:
 desktop-python-smoke: desktop-python-sidecars
 	.artifacts/desktop-python/dist/cyberaudit-api --help
 	.artifacts/desktop-python/dist/cyberaudit-worker --help
+	.artifacts/desktop-python/dist/cyberaudit-worker --verify-package
 
 desktop-runtime-hosts:
 	infrastructure/scripts/rust-cargo.sh build --release --manifest-path apps/desktop/runtime-host/Cargo.toml

@@ -81,6 +81,7 @@ jobs:
         run: |
           artifacts/desktop-python/linux-x64/cyberaudit-api --help
           artifacts/desktop-python/linux-x64/cyberaudit-worker --help
+          artifacts/desktop-python/linux-x64/cyberaudit-worker --verify-package
       - uses: actions/upload-artifact@v6
         with:
           name: desktop-python-sidecars-linux-x64

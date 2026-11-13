@@ -138,10 +138,12 @@ PostgreSQL é relocável via `@rpath`; o host Valkey validou autenticação,
 persistência e restart. O assembler atómico produziu um runtime completo sem
 symlinks, com licenças, proveniência e manifesto recursivo. O supervisor está
 ligado à shell e foi validado em macOS ARM64 com migrações, first-run, CRUD real,
-shutdown e restart sobre os mesmos dados. Um bundle Tauri debug `.app` também
-foi construído e abriu a configuração inicial real. Isto ainda não é um
-installer suportado: faltam macOS x64 e Windows x64, assinatura, notarização e
-validação em máquinas limpas.
+um job Dramatiq concluído, isolamento entre duas organizações, shutdown e
+restart sobre os mesmos dados. O mesmo fluxo passou com rede externa bloqueada
+e apenas loopback permitido. Bundles Tauri `.app` e `.dmg` ARM64 foram
+construídos localmente; o `.app` debug abriu o frontend real. Isto ainda não é
+um installer suportado: faltam macOS x64 e Windows x64, assinatura, notarização
+e validação em máquinas limpas.
 
 ```bash
 pnpm desktop:check

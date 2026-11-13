@@ -12,6 +12,7 @@ common_hidden_imports = collect_submodules("cyberaudit")
 common_hidden_imports += collect_submodules("uvicorn")
 common_hidden_imports += collect_submodules("dramatiq")
 common_hidden_imports += collect_submodules("passlib.handlers")
+common_data += collect_data_files("dramatiq")
 common_data += collect_data_files("reportlab")
 
 
