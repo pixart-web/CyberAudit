@@ -4,6 +4,7 @@ import {
   access,
   chmod,
   cp,
+  copyFile,
   lstat,
   mkdir,
   readFile,
@@ -11,6 +12,7 @@ import {
   realpath,
   rename,
   rm,
+  stat,
   writeFile,
 } from "node:fs/promises";
 import { constants } from "node:fs";
@@ -119,6 +121,46 @@ async function rejectOutputLinks(root, directory = root) {
       );
     }
     if (metadata.isDirectory()) await rejectOutputLinks(root, path);
+  }
+}
+
+async function copyTreeSequential(
+  source,
+  destination,
+  ancestors = new Set(),
+  destinationExists = false,
+) {
+  const canonicalSource = await realpath(source);
+  if (ancestors.has(canonicalSource)) {
+    throw new Error("runtime source contains a symbolic-link directory cycle");
+  }
+  const nextAncestors = new Set(ancestors).add(canonicalSource);
+  if (!destinationExists) {
+    await mkdir(destination, { recursive: false, mode: 0o700 });
+  }
+  const entries = await readdir(source, { withFileTypes: true });
+  entries.sort((left, right) => left.name.localeCompare(right.name, "en"));
+  for (const entry of entries) {
+    const sourcePath = join(source, entry.name);
+    const destinationPath = join(destination, entry.name);
+    const sourceMetadata = await lstat(sourcePath);
+    let copySource = sourcePath;
+    let copyMetadata = sourceMetadata;
+    if (sourceMetadata.isSymbolicLink()) {
+      copySource = await realpath(sourcePath);
+      copyMetadata = await stat(copySource);
+    }
+    if (copyMetadata.isDirectory()) {
+      await copyTreeSequential(copySource, destinationPath, nextAncestors);
+      continue;
+    }
+    if (!copyMetadata.isFile()) {
+      throw new Error("runtime source contains a special file");
+    }
+    await copyFile(copySource, destinationPath, constants.COPYFILE_EXCL);
+    if (process.platform !== "win32") {
+      await chmod(destinationPath, copyMetadata.mode & 0o777);
+    }
   }
 }
 
@@ -319,12 +361,7 @@ export async function assembleRuntime({
   try {
     await mkdir(parent, { recursive: true, mode: 0o700 });
     await mkdir(staging, { recursive: false, mode: 0o700 });
-    await cp(webRuntimeRoot, staging, {
-      recursive: true,
-      dereference: true,
-      errorOnExist: false,
-      force: false,
-    });
+    await copyTreeSequential(webRuntimeRoot, staging, new Set(), true);
     const bin = join(staging, "bin");
     await mkdir(bin, { recursive: true, mode: 0o700 });
     await copySidecars(runtimeHostRoot, bin, HOST_SIDECARS, windows);
@@ -332,18 +369,11 @@ export async function assembleRuntime({
 
     const tools = join(staging, "tools");
     await mkdir(tools, { recursive: true, mode: 0o700 });
-    await cp(postgresqlDistributionRoot, join(tools, "postgresql"), {
-      recursive: true,
-      dereference: true,
-      errorOnExist: true,
-      force: false,
-    });
-    await cp(valkeyDistributionRoot, join(tools, "valkey"), {
-      recursive: true,
-      dereference: true,
-      errorOnExist: true,
-      force: false,
-    });
+    await copyTreeSequential(
+      postgresqlDistributionRoot,
+      join(tools, "postgresql"),
+    );
+    await copyTreeSequential(valkeyDistributionRoot, join(tools, "valkey"));
 
     const licenses = join(staging, "licenses");
     const provenance = join(staging, "provenance");

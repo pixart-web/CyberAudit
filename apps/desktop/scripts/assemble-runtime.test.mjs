@@ -135,6 +135,27 @@ test("atomically assembles every runtime component and its provenance", async ()
   }
 });
 
+test("assembles a large runtime without opening the complete tree concurrently", async () => {
+  const paths = await fixture();
+  try {
+    const largeDirectory = join(paths.web, "web", "apps", "web", "chunks");
+    await mkdir(largeDirectory, { recursive: true });
+    for (let index = 0; index < 1_500; index += 1) {
+      await writeFile(join(largeDirectory, `chunk-${index}.js`), `${index}\n`);
+    }
+
+    const manifest = await assembleRuntime(options(paths));
+
+    assert.equal(
+      manifest.resources.filter(({ path }) => path.includes("/chunks/chunk-"))
+        .length,
+      1_500,
+    );
+  } finally {
+    await rm(paths.root, { recursive: true, force: true });
+  }
+});
+
 test("normalizes relative source paths before complete assembly", async () => {
   const paths = await fixture();
   try {

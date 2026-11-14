@@ -69,12 +69,13 @@ export async function generateRuntimeManifest(
 
   const files = await runtimeFiles(root);
   files.sort((left, right) => left.path.localeCompare(right.path, "en"));
-  const resources = await Promise.all(
-    files.map(async ({ path, absolutePath }) => ({
-      path,
-      sha256: await sha256(absolutePath),
-    })),
-  );
+  // Hash sequentially. Production runtimes contain thousands of files and a
+  // Promise per file can exhaust the conservative descriptor limit on macOS
+  // runners before streams have a chance to close.
+  const resources = [];
+  for (const { path, absolutePath } of files) {
+    resources.push({ path, sha256: await sha256(absolutePath) });
+  }
   const manifest = { version: 2, resources };
   const temporary = join(root, ".manifest.json.tmp");
   const destination = join(root, "manifest.json");
