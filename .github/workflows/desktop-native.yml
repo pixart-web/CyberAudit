@@ -257,8 +257,8 @@ jobs:
             python apps/desktop/windows-broker-host/verify_dramatiq.py
           } finally {
             if (!$process.HasExited) {
-              Stop-Process -Id $process.Id -Force
-              Wait-Process -Id $process.Id
+              $process.Kill()
+              $process.WaitForExit()
             }
           }
 
@@ -269,8 +269,8 @@ jobs:
             python apps/desktop/windows-broker-host/verify_dramatiq.py
           } finally {
             if (!$process.HasExited) {
-              Stop-Process -Id $process.Id -Force
-              Wait-Process -Id $process.Id
+              $process.Kill()
+              $process.WaitForExit()
             }
             Remove-Item Env:CYBERAUDIT_BROKER_PASSWORD
           }
