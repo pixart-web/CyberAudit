@@ -61,11 +61,12 @@ confirma a arquitetura x86_64 do binding Rust e rejeita dependências dinâmicas
 de `libssl` ou `libcrypto`. O run nativo `43577870610` validou a correção até ao
 smoke test dos sidecars e ao package final.
 
-O package Windows continua **BLOCKED**. Não foi encontrado um broker Windows
-suportado que simultaneamente satisfaça o contrato Dramatiq/Redis e aceite a
-password da instalação sem a expor nos argumentos ou persistir fora de
-Credential Manager. O job publica um relatório estruturado do blocker e não
-gera um installer inseguro ou incompleto.
+O package Windows continua **BLOCKED**, mas o D13 acrescenta um candidato de
+broker Garnet self-contained, autenticado e alimentado por stdin. A gate nativa
+Windows valida o contrato Dramatiq/Lua e recuperação AOF antes de permitir
+qualquer integração num installer. Consultar
+`desktop-native-readiness-d13.md`; um resultado positivo apenas do broker não
+equivale a um package Windows completo.
 
 ## Backup e restore offline
 

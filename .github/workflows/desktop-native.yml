@@ -136,10 +136,18 @@ jobs:
           test "$(lipo -archs "$APP/Contents/MacOS/cyberaudit-desktop")" = "${{ matrix.machine_arch }}"
           codesign --verify --deep --strict "$APP"
           hdiutil verify "$(find "$BUNDLE/dmg" -name '*.dmg' -type f -print -quit)"
-          find "$BUNDLE" -type f -print0 | sort -z | xargs -0 shasum -a 256 > "$BUNDLE/SHA256SUMS"
           node apps/desktop/scripts/write-native-build-report.mjs \
             "$BUNDLE/native-build-report.json" \
             "macos" "${{ matrix.arch }}" "ad-hoc" "not-notarized" "$BUNDLE"
+          (
+            cd "$BUNDLE"
+            CHECKSUM_FILE="$RUNNER_TEMP/cyberaudit-${{ matrix.target }}-SHA256SUMS"
+            find . -type f ! -name SHA256SUMS -print0 \
+              | sort -z \
+              | xargs -0 shasum -a 256 > "$CHECKSUM_FILE"
+            shasum -a 256 -c "$CHECKSUM_FILE"
+            mv "$CHECKSUM_FILE" SHA256SUMS
+          )
       - uses: actions/upload-artifact@v6
         with:
           name: cyberaudit-desktop-${{ matrix.target }}-unsigned
@@ -149,9 +157,9 @@ jobs:
           retention-days: 7
 
   windows-x64:
-    name: Windows x64 native package gate
+    name: Windows x64 broker compatibility gate
     runs-on: windows-2025
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
       - name: Assert x64 runner architecture
@@ -160,22 +168,132 @@ jobs:
           if ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -ne "X64") {
             throw "The Windows desktop package requires a native x64 runner."
           }
-      - name: Record authenticated broker integration blocker
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "10.0.x"
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install the pinned Dramatiq compatibility client
+        run: python -m pip install "dramatiq[redis]==1.17.1"
+      - name: Publish the fixed-purpose self-contained broker
+        run: >-
+          dotnet publish
+          apps/desktop/windows-broker-host/CyberAudit.WindowsBroker.csproj
+          --configuration Release
+          --runtime win-x64
+          --self-contained true
+          --property:RestoreLockedMode=true
+          --output artifacts/windows-x64/broker
+          --nologo
+      - name: Exercise authentication, Dramatiq Lua protocol and AOF recovery
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path artifacts/windows-x64 | Out-Null
+          $ErrorActionPreference = "Stop"
+          $broker = Resolve-Path "artifacts/windows-x64/broker/cyberaudit-valkey.exe"
+          & $broker --verify-package
+
+          $listener = [System.Net.Sockets.TcpListener]::new(
+            [System.Net.IPAddress]::Loopback,
+            0
+          )
+          $listener.Start()
+          $port = ([System.Net.IPEndPoint]$listener.LocalEndpoint).Port
+          $listener.Stop()
+
+          $secretBytes = [byte[]]::new(32)
+          [System.Security.Cryptography.RandomNumberGenerator]::Fill($secretBytes)
+          $password = [Convert]::ToHexString($secretBytes).ToLowerInvariant()
+          $dataDirectory = Join-Path $env:RUNNER_TEMP "cyberaudit-garnet"
+          New-Item -ItemType Directory -Path $dataDirectory | Out-Null
+          $env:CYBERAUDIT_BROKER_DIRECTORY = $dataDirectory
+          $env:CYBERAUDIT_BROKER_PORT = $port.ToString()
+          $env:CYBERAUDIT_BROKER_PASSWORD = $password
+
+          function Start-CyberAuditBroker {
+            $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+            $startInfo.FileName = $broker
+            $startInfo.UseShellExecute = $false
+            $startInfo.CreateNoWindow = $true
+            $startInfo.RedirectStandardInput = $true
+            [void]$startInfo.Environment.Remove("CYBERAUDIT_BROKER_PASSWORD")
+            $child = [System.Diagnostics.Process]::new()
+            $child.StartInfo = $startInfo
+            [void]$child.Start()
+            $child.StandardInput.WriteLine($password)
+            $child.StandardInput.Close()
+            return $child
+          }
+
+          function Wait-CyberAuditBroker([System.Diagnostics.Process]$process) {
+            $deadline = [DateTime]::UtcNow.AddSeconds(30)
+            do {
+              if ($process.HasExited) {
+                throw "The broker exited before becoming ready."
+              }
+              try {
+                $client = [System.Net.Sockets.TcpClient]::new()
+                $client.Connect("127.0.0.1", $port)
+                $client.Dispose()
+                return
+              } catch {
+                Start-Sleep -Milliseconds 100
+              }
+            } while ([DateTime]::UtcNow -lt $deadline)
+            throw "The broker did not become ready before its deadline."
+          }
+
+          $process = Start-CyberAuditBroker
+          try {
+            Wait-CyberAuditBroker $process
+            $listeners = Get-NetTCPConnection -State Listen -OwningProcess $process.Id
+            if ($listeners.Count -ne 1 -or $listeners[0].LocalAddress -ne "127.0.0.1") {
+              throw "The broker is not restricted to a single IPv4 loopback listener."
+            }
+            $env:CYBERAUDIT_D13_BROKER_STAGE = "core"
+            python apps/desktop/windows-broker-host/verify_dramatiq.py
+            $env:CYBERAUDIT_D13_BROKER_STAGE = "persist"
+            python apps/desktop/windows-broker-host/verify_dramatiq.py
+          } finally {
+            if (!$process.HasExited) {
+              Stop-Process -Id $process.Id -Force
+              Wait-Process -Id $process.Id
+            }
+          }
+
+          $process = Start-CyberAuditBroker
+          try {
+            Wait-CyberAuditBroker $process
+            $env:CYBERAUDIT_D13_BROKER_STAGE = "recover"
+            python apps/desktop/windows-broker-host/verify_dramatiq.py
+          } finally {
+            if (!$process.HasExited) {
+              Stop-Process -Id $process.Id -Force
+              Wait-Process -Id $process.Id
+            }
+            Remove-Item Env:CYBERAUDIT_BROKER_PASSWORD
+          }
+
+          $hash = (Get-FileHash $broker -Algorithm SHA256).Hash.ToLowerInvariant()
           @{
             platform = "windows"
             architecture = "x64"
-            build_result = "BLOCKED"
-            native_smoke_test = "NOT TESTED"
+            broker_build_result = "PASS"
+            dramatiq_compatibility = "PASS"
+            authenticated_loopback = "PASS"
+            abrupt_restart_recovery = "PASS"
+            broker_sha256 = $hash
             signing_status = "not-signed"
             installer = $null
-            blocker = "No supported Windows broker integration currently accepts the installation password without exposing it in process arguments or persisting it outside Credential Manager. An insecure package is intentionally not produced."
+            package_result = "BLOCKED"
+            blocker = "The complete PostgreSQL, Python, Node, Tauri and NSIS runtime has not yet been assembled and exercised on Windows. This gate proves only the broker boundary."
           } | ConvertTo-Json | Set-Content -Encoding utf8 artifacts/windows-x64/native-build-report.json
       - uses: actions/upload-artifact@v6
         with:
-          name: cyberaudit-desktop-windows-x64-blocker-evidence
-          path: artifacts/windows-x64/native-build-report.json
+          name: cyberaudit-desktop-windows-x64-broker-evidence
+          path: |
+            artifacts/windows-x64/broker/cyberaudit-valkey.exe
+            artifacts/windows-x64/native-build-report.json
           if-no-files-found: error
           retention-days: 7

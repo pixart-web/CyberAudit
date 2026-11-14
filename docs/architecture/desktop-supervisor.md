@@ -27,12 +27,17 @@ integridade dos entrypoints.
 
 Quatro portas são reservadas pelo sistema operativo exclusivamente em
 `127.0.0.1`. As credenciais PostgreSQL do owner de migrações e do login de
-aplicação, a password Valkey, o segredo JWT, a chave de cifragem e o token de
+aplicação, a password do broker, o segredo JWT, a chave de cifragem e o token de
 bootstrap são independentes e persistem no macOS Keychain ou Windows Credential
 Manager através de `keyring` 4.2. Migrações usam exclusivamente o owner; API e
 worker autenticam como `cyberaudit_app` e assumem o role RLS limitado
 `cyberaudit_runtime`. Um valor existente malformado não é rodado
 silenciosamente: o arranque falha fechado para evitar perda de dados.
+
+A password do broker não entra em argv, environment do processo ou ficheiro de
+configuração: o supervisor envia-a uma vez por stdin herdado e fecha o pipe. A
+readiness usa RESP `AUTH` seguido de `PING` diretamente por loopback, sem
+executar um cliente CLI adicional e sem expor a credencial na linha de comandos.
 
 A capability API continua diferente: é efémera, roda a cada arranque e fica num
 ficheiro privado dentro de `configuration`. O launch plan rejeita qualquer

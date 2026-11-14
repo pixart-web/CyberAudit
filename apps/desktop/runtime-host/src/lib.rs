@@ -1,5 +1,6 @@
 use std::ffi::OsString;
 use std::fs;
+use std::io::Read;
 use std::path::{Component, Path, PathBuf};
 use std::process::{Command, ExitStatus};
 
@@ -75,6 +76,25 @@ pub fn validated_port(name: &'static str) -> Result<u16, HostError> {
 
 pub fn validated_secret(name: &'static str) -> Result<String, HostError> {
     let value = required_utf8_env(name)?;
+    validate_secret(value, name)
+}
+
+pub fn validated_secret_from_stdin() -> Result<String, HostError> {
+    let mut value = String::new();
+    std::io::stdin()
+        .take(66)
+        .read_to_string(&mut value)
+        .map_err(HostError::Io)?;
+    if value.ends_with('\n') {
+        value.pop();
+        if value.ends_with('\r') {
+            value.pop();
+        }
+    }
+    validate_secret(value, "standard input")
+}
+
+fn validate_secret(value: String, name: &'static str) -> Result<String, HostError> {
     if value.len() != 64 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
         return Err(HostError::InvalidConfiguration(name));
     }
@@ -219,5 +239,17 @@ mod tests {
         assert_eq!(first.len(), 64);
         assert_eq!(second.len(), 64);
         assert_ne!(first, second);
+    }
+
+    #[test]
+    fn validates_only_fixed_length_hexadecimal_secrets() {
+        let valid = "0123456789abcdef".repeat(4);
+        assert_eq!(
+            validate_secret(valid.clone(), "test").expect("secret should validate"),
+            valid
+        );
+        assert!(validate_secret("a".repeat(63), "test").is_err());
+        assert!(validate_secret(format!("{}g", "a".repeat(63)), "test").is_err());
+        assert!(validate_secret(format!("{}\n", "a".repeat(64)), "test").is_err());
     }
 }

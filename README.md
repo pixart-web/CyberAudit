@@ -141,9 +141,13 @@ ligado à shell e foi validado em macOS ARM64 com migrações, first-run, CRUD r
 um job Dramatiq concluído, isolamento entre duas organizações, shutdown e
 restart sobre os mesmos dados. O mesmo fluxo passou com rede externa bloqueada
 e apenas loopback permitido. Bundles Tauri `.app` e `.dmg` ARM64 foram
-construídos localmente; o `.app` debug abriu o frontend real. Isto ainda não é
-um installer suportado: faltam macOS x64 e Windows x64, assinatura, notarização
-e validação em máquinas limpas.
+construídos localmente; o `.app` debug abriu o frontend real. Os builds nativos
+macOS ARM64 e x64 passam em CI, mas continuam ad-hoc e não notarizados. O D13
+acrescenta uma gate Windows para um broker Garnet self-contained: a password
+proveniente do Credential Manager é entregue ao processo apenas por stdin e a
+gate exerce o protocolo Lua real do Dramatiq e recuperação AOF. Isto ainda não
+é um installer suportado: o NSIS Windows, assinatura, notarização e validação em
+máquinas limpas permanecem bloqueados.
 
 ```bash
 pnpm desktop:check
@@ -168,6 +172,7 @@ make desktop-build DESKTOP_RUNTIME_DIR=/artefactos/runtime-completo
 Ver `docs/architecture/desktop-reality-audit.md`,
 `docs/architecture/adr-035-desktop-first-runtime.md`,
 `docs/architecture/desktop-native-readiness-d8-d12.md`,
+`docs/architecture/desktop-native-readiness-d13.md`,
 `docs/development/desktop-development.md` e
 `docs/security/desktop-threat-model.md`.
 

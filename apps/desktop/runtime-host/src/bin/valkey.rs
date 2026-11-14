@@ -1,6 +1,6 @@
 use cyberaudit_runtime_host::{
     packaged_tool, replace_process, runtime_root, validated_directory, validated_port,
-    validated_secret, HostError,
+    validated_secret_from_stdin, HostError,
 };
 use os_pipe::pipe;
 use std::io::Write;
@@ -18,7 +18,7 @@ fn run() -> Result<(), HostError> {
     let server = packaged_tool(&root, &["valkey", "bin", "valkey-server"])?;
     let data_directory = validated_directory("CYBERAUDIT_BROKER_DIRECTORY")?;
     let port = validated_port("CYBERAUDIT_BROKER_PORT")?;
-    let password = validated_secret("CYBERAUDIT_BROKER_PASSWORD")?;
+    let password = validated_secret_from_stdin()?;
     let directory = quote_config_value(data_directory.to_str().ok_or(
         HostError::InvalidConfiguration("CYBERAUDIT_BROKER_DIRECTORY"),
     )?)?;

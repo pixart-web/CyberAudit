@@ -3,7 +3,7 @@ use crate::secrets::InstallationSecrets;
 use serde::Serialize;
 use std::collections::BTreeMap;
 use std::fs::{self, File};
-use std::io::{Read, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{Ipv4Addr, SocketAddrV4, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, ExitStatus, Stdio};
@@ -227,6 +227,7 @@ pub struct LaunchStep {
     executable: PathBuf,
     arguments: &'static [&'static str],
     environment: BTreeMap<&'static str, String>,
+    standard_input: Option<String>,
     log_directory: PathBuf,
 }
 
@@ -250,11 +251,16 @@ impl LaunchStep {
         let stdout = secure_log_file(&self.log_directory, self.process, "stdout")?;
         let stderr = secure_log_file(&self.log_directory, self.process, "stderr")?;
         let mut command = Command::new(&self.executable);
+        let has_standard_input = self.standard_input.is_some();
         command
             .args(self.arguments)
             .env_clear()
             .envs(&self.environment)
-            .stdin(Stdio::null())
+            .stdin(if has_standard_input {
+                Stdio::piped()
+            } else {
+                Stdio::null()
+            })
             .stdout(Stdio::from(stdout))
             .stderr(Stdio::from(stderr));
         #[cfg(unix)]
@@ -262,12 +268,27 @@ impl LaunchStep {
             use std::os::unix::process::CommandExt;
             command.process_group(0);
         }
-        let child = command
+        let mut child = command
             .spawn()
             .map_err(|source| SupervisorError::ProcessStart {
                 process: self.process,
                 source,
             })?;
+        if let Some(payload) = &self.standard_input {
+            let write_result = child
+                .stdin
+                .take()
+                .ok_or_else(|| std::io::Error::other("child standard input is unavailable"))
+                .and_then(|mut input| input.write_all(payload.as_bytes()));
+            if let Err(source) = write_result {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(SupervisorError::ProcessControl {
+                    process: self.process,
+                    source,
+                });
+            }
+        }
         Ok(ManagedChild {
             process: self.process,
             child,
@@ -552,18 +573,12 @@ impl RuntimeSupervisor {
     }
 
     fn wait_valkey(&mut self, password: &str, timeout: Duration) -> Result<(), SupervisorError> {
-        let runtime_root = runtime_root(self.step(RuntimeProcess::Broker)?.executable())?;
-        let cli = runtime_root
-            .join("tools")
-            .join("valkey")
-            .join("bin")
-            .join(executable_name("valkey-cli"));
         wait_for_probe(
             self.children
                 .get_mut(&RuntimeProcess::Broker)
                 .ok_or(SupervisorError::MissingLaunchStep(RuntimeProcess::Broker))?,
             timeout,
-            || valkey_identity(&cli, self.plan.ports.broker, password),
+            || broker_identity(self.plan.ports.broker, password),
         )
     }
 
@@ -771,6 +786,8 @@ pub fn build_launch_plan(
             executable,
             arguments: process.fixed_arguments(),
             environment: runtime_environment(process, layout, session_secret_file, secrets, ports),
+            standard_input: (process == RuntimeProcess::Broker)
+                .then(|| format!("{}\n", secrets.broker_password())),
             log_directory: layout.logs.clone(),
         });
     }
@@ -874,17 +891,26 @@ fn postgres_identity(program: &Path, port: u16, password: &str) -> Result<bool, 
         ))
 }
 
-fn valkey_identity(program: &Path, port: u16, password: &str) -> Result<bool, std::io::Error> {
-    if !is_regular_nonsymlink(program) {
+fn broker_identity(port: u16, password: &str) -> Result<bool, std::io::Error> {
+    if password.len() != 64 || !password.bytes().all(|byte| byte.is_ascii_hexdigit()) {
         return Ok(false);
     }
-    let output = Command::new(program)
-        .env_clear()
-        .env("REDISCLI_AUTH", password)
-        .args(["-h", "127.0.0.1", "-p", &port.to_string(), "PING"])
-        .stdin(Stdio::null())
-        .output()?;
-    Ok(output.status.success() && matches!(output.stdout.as_slice(), b"PONG\n" | b"PONG\r\n"))
+    let address = SocketAddrV4::new(Ipv4Addr::LOCALHOST, port);
+    let mut stream = TcpStream::connect_timeout(&address.into(), Duration::from_secs(1))?;
+    stream.set_read_timeout(Some(Duration::from_secs(1)))?;
+    stream.set_write_timeout(Some(Duration::from_secs(1)))?;
+    write!(
+        stream,
+        "*2\r\n$4\r\nAUTH\r\n$64\r\n{password}\r\n*1\r\n$4\r\nPING\r\n"
+    )?;
+    stream.flush()?;
+
+    let mut response = BufReader::new(stream);
+    let mut authentication = String::new();
+    let mut ping = String::new();
+    response.read_line(&mut authentication)?;
+    response.read_line(&mut ping)?;
+    Ok(authentication == "+OK\r\n" && ping == "+PONG\r\n")
 }
 
 fn http_identity(port: u16, path: &str, expected: &str) -> Result<bool, std::io::Error> {
@@ -979,10 +1005,6 @@ fn runtime_environment(
             environment.insert(
                 "CYBERAUDIT_BROKER_DIRECTORY",
                 layout.broker.to_string_lossy().into_owned(),
-            );
-            environment.insert(
-                "CYBERAUDIT_BROKER_PASSWORD",
-                secrets.broker_password().to_owned(),
             );
             environment.insert("CYBERAUDIT_BROKER_PORT", ports.broker.to_string());
         }
@@ -1315,6 +1337,14 @@ mod tests {
             Some(&"http://127.0.0.1:18000/api/v1".to_owned())
         );
         assert!(!plan.steps()[2].environment.contains_key("DATABASE_URL"));
+        assert!(!plan.steps()[2]
+            .environment
+            .contains_key("CYBERAUDIT_BROKER_PASSWORD"));
+        let expected_broker_input = format!("{}\n", secrets.broker_password());
+        assert_eq!(
+            plan.steps()[2].standard_input.as_deref(),
+            Some(expected_broker_input.as_str())
+        );
         assert!(!plan.steps()[0].environment.contains_key("REDIS_URL"));
         let serialized = serde_json::to_string(&plan.sanitized_steps())
             .expect("sanitized plan should serialize");
@@ -1433,6 +1463,31 @@ mod tests {
             .graceful_stop(Duration::from_secs(2))
             .expect("owned process group should stop");
         assert!(child.try_wait().expect("wait should succeed").is_some());
+    }
+
+    #[test]
+    fn broker_probe_authenticates_over_resp_without_a_cli_process() {
+        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).expect("listener should bind");
+        let port = listener.local_addr().expect("listener address").port();
+        let password = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+        let expected = format!(
+            "*2\r\n$4\r\nAUTH\r\n$64\r\n{password}\r\n*1\r\n$4\r\nPING\r\n"
+        );
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("probe should connect");
+            let mut request = vec![0_u8; expected.len()];
+            stream
+                .read_exact(&mut request)
+                .expect("probe request should be complete");
+            assert_eq!(request, expected.as_bytes());
+            stream
+                .write_all(b"+OK\r\n+PONG\r\n")
+                .expect("probe response should write");
+        });
+
+        assert!(broker_identity(port, password).expect("probe should complete"));
+        server.join().expect("server fixture should finish");
+        assert!(!broker_identity(port, "not-a-secret").expect("invalid secret should fail closed"));
     }
 
     #[test]
