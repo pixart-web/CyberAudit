@@ -1,0 +1,181 @@
+name: desktop-native
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/desktop-native.yml"
+      - "apps/api/**"
+      - "apps/desktop/**"
+      - "apps/web/**"
+      - "infrastructure/scripts/build-desktop-runtime-macos.sh"
+      - "pnpm-lock.yaml"
+      - "Makefile"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-native-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos-native:
+    name: macOS ${{ matrix.arch }} native package
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+            machine_arch: arm64
+            target: macos-arm64
+          - runner: macos-15-intel
+            arch: x64
+            machine_arch: x86_64
+            target: macos-x64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+      - name: Assert native runner architecture
+        run: test "$(uname -m)" = "${{ matrix.machine_arch }}"
+      - uses: dtolnay/rust-toolchain@1.90.0
+        with:
+          components: clippy, rustfmt
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22.17.1"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: python -m pip install --upgrade "pip>=26.1.2"
+      - name: Install desktop Python dependencies
+        if: matrix.arch != 'x64'
+        run: python -m pip install -e "apps/api[desktop]"
+      - name: Install Intel dependencies with a single static OpenSSL
+        if: matrix.arch == 'x64'
+        run: |
+          OPENSSL_PREFIX="$(brew --prefix openssl@3)"
+          test -f "$OPENSSL_PREFIX/lib/libssl.a"
+          test -f "$OPENSSL_PREFIX/lib/libcrypto.a"
+          OPENSSL_DIR="$OPENSSL_PREFIX" OPENSSL_STATIC=1 \
+            python -m pip install --no-cache-dir --no-binary cryptography \
+            -e "apps/api[desktop]"
+      - name: Verify cryptography native dependency boundary
+        run: |
+          BINDING="$(python -c 'import cryptography.hazmat.bindings._rust as binding; print(binding.__file__)')"
+          test "$(lipo -archs "$BINDING")" = "${{ matrix.machine_arch }}"
+          if otool -L "$BINDING" | tail -n +2 | grep -E '/lib(ssl|crypto)\.[^/ ]*dylib'; then
+            echo "cryptography must not depend on a mutable runner OpenSSL dylib" >&2
+            exit 1
+          fi
+      - name: Build pinned native PostgreSQL, Valkey and Node
+        run: >-
+          infrastructure/scripts/build-desktop-runtime-macos.sh
+          "${{ matrix.machine_arch }}"
+          "${{ github.workspace }}/artifacts/native/${{ matrix.target }}"
+      - name: Build same-origin Next standalone runtime
+        run: |
+          pnpm --filter @cyberaudit/web build
+          node apps/desktop/scripts/assemble-web-runtime.mjs \
+            "artifacts/web/${{ matrix.target }}" \
+            "artifacts/native/${{ matrix.target }}/node"
+        env:
+          CYBERAUDIT_DESKTOP_BUILD: "1"
+          NEXT_PUBLIC_API_URL: /api/v1
+      - name: Build fixed native runtime hosts
+        run: |
+          cargo build --release --manifest-path apps/desktop/runtime-host/Cargo.toml
+          mkdir -p "artifacts/hosts/${{ matrix.target }}"
+          cp apps/desktop/runtime-host/target/release/cyberaudit-postgres "artifacts/hosts/${{ matrix.target }}/"
+          cp apps/desktop/runtime-host/target/release/cyberaudit-valkey "artifacts/hosts/${{ matrix.target }}/"
+          cp apps/desktop/runtime-host/target/release/cyberaudit-web "artifacts/hosts/${{ matrix.target }}/"
+      - name: Build packaged API and worker sidecars
+        run: >-
+          pyinstaller --noconfirm
+          --distpath "artifacts/python/${{ matrix.target }}"
+          --workpath "${RUNNER_TEMP}/cyberaudit-pyinstaller"
+          apps/api/desktop/cyberaudit-runtime.spec
+        env:
+          PYINSTALLER_CONFIG_DIR: ${{ runner.temp }}/pyinstaller-config
+      - name: Smoke-test packaged sidecars
+        run: |
+          "artifacts/python/${{ matrix.target }}/cyberaudit-api" --help
+          "artifacts/python/${{ matrix.target }}/cyberaudit-worker" --help
+          "artifacts/python/${{ matrix.target }}/cyberaudit-worker" --verify-package
+      - name: Assemble and verify the complete native runtime
+        run: >-
+          node apps/desktop/scripts/assemble-runtime.mjs
+          "artifacts/runtime/${{ matrix.target }}"
+          "artifacts/web/${{ matrix.target }}"
+          "artifacts/hosts/${{ matrix.target }}"
+          "artifacts/python/${{ matrix.target }}"
+          "artifacts/native/${{ matrix.target }}/postgresql"
+          "artifacts/native/${{ matrix.target }}/provenance/postgresql.json"
+          "artifacts/native/${{ matrix.target }}/valkey"
+          "artifacts/native/${{ matrix.target }}/provenance/valkey.json"
+          "${{ matrix.target }}"
+          --smoke
+      - name: Build the native application and DMG
+        run: pnpm --filter @cyberaudit/desktop build
+        env:
+          APPLE_SIGNING_IDENTITY: "-"
+          CYBERAUDIT_DESKTOP_RUNTIME_DIR: artifacts/runtime/${{ matrix.target }}
+          CARGO_PROFILE_RELEASE_STRIP: none
+      - name: Verify package architecture, integrity and signing state
+        run: |
+          BUNDLE="apps/desktop/src-tauri/target/release/bundle"
+          APP="$BUNDLE/macos/CyberAudit OS.app"
+          test -d "$APP"
+          test -n "$(find "$BUNDLE/dmg" -name '*.dmg' -type f -print -quit)"
+          test "$(lipo -archs "$APP/Contents/MacOS/cyberaudit-desktop")" = "${{ matrix.machine_arch }}"
+          codesign --verify --deep --strict "$APP"
+          hdiutil verify "$(find "$BUNDLE/dmg" -name '*.dmg' -type f -print -quit)"
+          find "$BUNDLE" -type f -print0 | sort -z | xargs -0 shasum -a 256 > "$BUNDLE/SHA256SUMS"
+          node apps/desktop/scripts/write-native-build-report.mjs \
+            "$BUNDLE/native-build-report.json" \
+            "macos" "${{ matrix.arch }}" "ad-hoc" "not-notarized" "$BUNDLE"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: cyberaudit-desktop-${{ matrix.target }}-unsigned
+          path: apps/desktop/src-tauri/target/release/bundle/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+
+  windows-x64:
+    name: Windows x64 native package gate
+    runs-on: windows-2025
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - name: Assert x64 runner architecture
+        shell: pwsh
+        run: |
+          if ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -ne "X64") {
+            throw "The Windows desktop package requires a native x64 runner."
+          }
+      - name: Record authenticated broker integration blocker
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts/windows-x64 | Out-Null
+          @{
+            platform = "windows"
+            architecture = "x64"
+            build_result = "BLOCKED"
+            native_smoke_test = "NOT TESTED"
+            signing_status = "not-signed"
+            installer = $null
+            blocker = "No supported Windows broker integration currently accepts the installation password without exposing it in process arguments or persisting it outside Credential Manager. An insecure package is intentionally not produced."
+          } | ConvertTo-Json | Set-Content -Encoding utf8 artifacts/windows-x64/native-build-report.json
+      - uses: actions/upload-artifact@v6
+        with:
+          name: cyberaudit-desktop-windows-x64-blocker-evidence
+          path: artifacts/windows-x64/native-build-report.json
+          if-no-files-found: error
+          retention-days: 7

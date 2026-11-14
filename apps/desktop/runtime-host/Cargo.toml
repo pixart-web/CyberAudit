@@ -1,0 +1,23 @@
+[package]
+name = "cyberaudit-runtime-host"
+version = "0.1.0"
+edition = "2021"
+license = "UNLICENSED"
+publish = false
+
+[dependencies]
+getrandom = "0.3"
+os_pipe = "1.2"
+thiserror = "2"
+
+[[bin]]
+name = "cyberaudit-postgres"
+path = "src/bin/postgres.rs"
+
+[[bin]]
+name = "cyberaudit-valkey"
+path = "src/bin/valkey.rs"
+
+[[bin]]
+name = "cyberaudit-web"
+path = "src/bin/web.rs"

@@ -262,7 +262,11 @@ const socFixtures: Record<string, unknown> = {
     expires_at: "2099-01-01T00:00:00Z", grace_until: null, days_remaining: 900, verified_at: "2026-10-01T00:00:00Z",
     read_only: false, trusted_keys_configured: true,
   },
-  "/setup/status": { initialized: false, bootstrap_enabled: true },
+  "/setup/status": {
+    initialized: false,
+    bootstrap_enabled: true,
+    bootstrap_token_required: true,
+  },
   "/users?page_size=100": {
     items: [{ id: "u1", name: "Maria", email: "m@x.example.com", status: "active", roles: ["Auditor"], mfa_enabled: false, last_login_at: null }],
     total: 1,

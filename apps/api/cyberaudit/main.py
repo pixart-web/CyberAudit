@@ -20,7 +20,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
-from sqlalchemy import case, func, or_, select, update
+from sqlalchemy import case, func, or_, select, text, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.middleware.trustedhost import TrustedHostMiddleware
@@ -32,6 +32,7 @@ from cyberaudit.ai_runtime_api import router as ai_runtime_router
 from cyberaudit.audit import write_audit
 from cyberaudit.config import get_settings
 from cyberaudit.db import Base, engine, get_db
+from cyberaudit.desktop_security import DESKTOP_SESSION_HEADER, desktop_request_authorized
 from cyberaudit.diagnostics_api import router as diagnostics_router
 from cyberaudit.domain_expansion_api import router as domain_expansion_router
 from cyberaudit.engagement_api import reports_router as engagement_reports_router
@@ -69,6 +70,7 @@ from cyberaudit.phase4_api import router as phase4_router
 from cyberaudit.phase5_api import router as phase5_router
 from cyberaudit.policy import ScopePolicyEngine, normalized_target
 from cyberaudit.rate_limit import enforce_rate_limit
+from cyberaudit.rls import set_tenant_context
 from cyberaudit.schemas import (
     AssetCreate,
     AssetRead,
@@ -169,6 +171,22 @@ def error_response(
 async def request_context(request: Request, call_next):
     started_at = time.perf_counter()
     request.state.request_id = request.headers.get("x-request-id", str(uuid.uuid4()))
+    if not desktop_request_authorized(
+        settings,
+        request.url.path,
+        request.headers.get(DESKTOP_SESSION_HEADER),
+    ):
+        structured_event(
+            "desktop_session_rejected",
+            request_id=request.state.request_id,
+            path=request.url.path,
+        )
+        return error_response(
+            request,
+            403,
+            "DESKTOP_SESSION_REQUIRED",
+            "Desktop session capability is missing or invalid",
+        )
     trace = trace_context(request.headers.get("traceparent"))
     request.state.trace_id = trace.trace_id
     content_length = request.headers.get("content-length")
@@ -260,6 +278,10 @@ async def readiness(db: AsyncSession = Depends(get_db)):
     dependencies: dict[str, str] = {}
     try:
         await db.execute(select(1))
+        if settings.rls_required:
+            current_role = await db.scalar(text("SELECT current_user"))
+            if current_role != settings.database_runtime_role:
+                raise RuntimeError("database runtime role is not active")
         dependencies["postgresql"] = "ok"
     except Exception as exc:
         dependencies["postgresql"] = "unavailable"
@@ -292,6 +314,13 @@ async def login(
     await enforce_rate_limit(request, category="login", limit=10, window_seconds=60)
     if not settings.local_auth_enabled:
         raise HTTPException(403, "Local authentication is disabled")
+    if db.get_bind().dialect.name == "postgresql":
+        organization_id = await db.scalar(
+            text("SELECT cyberaudit_resolve_local_user_organization(:email)"),
+            {"email": payload.email.lower()},
+        )
+        if organization_id:
+            await set_tenant_context(db, str(organization_id))
     user = await db.scalar(select(User).where(func.lower(User.email) == payload.email.lower()))
     now = datetime.now(timezone.utc)
     if not user:

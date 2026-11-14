@@ -7,6 +7,7 @@ Plataforma profissional para gestão e execução segura de auditorias de cibers
 - Docker 24+ e Docker Compose v2
 - pnpm 9+ e Node.js 22+ (desenvolvimento local)
 - Python 3.12 (desenvolvimento local)
+- Rust 1.90 via rustup (apenas para desenvolvimento desktop)
 
 ## Arranque
 
@@ -74,6 +75,7 @@ workflow protegido e só é alcançável depois do gate.
 
 - `apps/web`: Next.js App Router, Tailwind, React Query, RHF/Zod e gráficos.
 - `apps/api`: FastAPI, SQLAlchemy assíncrono, Alembic, autenticação e políticas.
+- `apps/desktop`: shell Tauri 2 e fronteira do runtime local em implementação.
 - `apps/worker`: processo Dramatiq isolado logicamente, sem ferramentas ofensivas.
 - `packages`: UI, tipos, configuração e helpers de segurança.
 - `infrastructure`: imagens Docker e espaço para nginx/scripts.
@@ -117,6 +119,57 @@ make test
 ```
 
 O backend usa Ruff, Black, mypy, pytest e coverage. O frontend usa TypeScript strict, ESLint, Prettier, Vitest e Testing Library.
+
+### Desktop-first (em implementação)
+
+A branch desktop preserva o core existente e acrescenta Tauri 2, layout local
+de dados, capability efémera API, proxy same-origin e verificação SHA-256 dos
+recursos. A API FastAPI e o worker já possuem entrypoints PyInstaller fechados,
+migrações Alembic incluídas e validação desktop fail-closed. A fronteira Rust
+também possui uma abstração de Keychain/Credential Manager, reserva de portas
+loopback e um plano de arranque estritamente allowlisted, sem shell nem
+argumentos escolhidos pelo renderer. Hosts nativos fixos inicializam PostgreSQL,
+alimentam a configuração autenticada do broker por pipe e lançam Next com Node
+empacotado. A pipeline desktop monta o output Next standalone, assets e uma
+distribuição Node 22.17.1 completa, rejeitando versões ou executáveis não
+portáveis. PostgreSQL 16.15, Valkey 8.1.10 e Node 22.17.1 foram compilados ou
+extraídos de fontes oficiais com SHA-256 fixado para macOS ARM64. A distribuição
+PostgreSQL é relocável via `@rpath`; o host Valkey validou autenticação,
+persistência e restart. O assembler atómico produziu um runtime completo sem
+symlinks, com licenças, proveniência e manifesto recursivo. O supervisor está
+ligado à shell e foi validado em macOS ARM64 com migrações, first-run, CRUD real,
+um job Dramatiq concluído, isolamento entre duas organizações, shutdown e
+restart sobre os mesmos dados. O mesmo fluxo passou com rede externa bloqueada
+e apenas loopback permitido. Bundles Tauri `.app` e `.dmg` ARM64 foram
+construídos localmente; o `.app` debug abriu o frontend real. Isto ainda não é
+um installer suportado: faltam macOS x64 e Windows x64, assinatura, notarização
+e validação em máquinas limpas.
+
+```bash
+pnpm desktop:check
+pnpm desktop:test
+pnpm --filter @cyberaudit/desktop lint
+make desktop-python-smoke
+make desktop-runtime-hosts
+make desktop-native-dependencies-macos-arm64
+make desktop-native-dependencies-macos-x64
+# requer a distribuição oficial Node 22.17.1
+make desktop-web-runtime
+# requer distribuições PostgreSQL/Valkey e proveniência explícitas por target
+make desktop-runtime-assemble DESKTOP_TARGET=macos-arm64 \
+  POSTGRESQL_RUNTIME_ROOT=/artefactos/postgresql-16 \
+  POSTGRESQL_PROVENANCE=/artefactos/postgresql-16.json \
+  VALKEY_RUNTIME_ROOT=/artefactos/valkey \
+  VALKEY_PROVENANCE=/artefactos/valkey.json
+# copia e verifica o runtime antes do bundle Tauri
+make desktop-build DESKTOP_RUNTIME_DIR=/artefactos/runtime-completo
+```
+
+Ver `docs/architecture/desktop-reality-audit.md`,
+`docs/architecture/adr-035-desktop-first-runtime.md`,
+`docs/architecture/desktop-native-readiness-d8-d12.md`,
+`docs/development/desktop-development.md` e
+`docs/security/desktop-threat-model.md`.
 
 ## Laboratório controlado
 

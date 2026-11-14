@@ -19,34 +19,7 @@ async def provision_assessment_catalog(
     demo-only adapter is never provisioned. Returns the number of profiles added.
     """
     registry = AdapterRegistry()
-    for metadata in registry.metadata():
-        if metadata.code == "cyberaudit.demo_assessment":
-            continue
-        if await db.scalar(
-            select(ToolAdapterDefinition).where(ToolAdapterDefinition.code == metadata.code)
-        ):
-            continue
-        db.add(
-            ToolAdapterDefinition(
-                code=metadata.code,
-                name=metadata.name,
-                version=metadata.version,
-                category=metadata.category,
-                description=metadata.description,
-                supported_target_types=[t.value for t in metadata.supported_target_types],
-                supported_intensities=[i.value for i in metadata.supported_intensities],
-                requires_network=metadata.requires_network,
-                requires_approval=False,
-                default_timeout=metadata.default_timeout,
-                enabled=True,
-                health_status="online",
-                adapter_metadata={
-                    "phase": 3,
-                    "safe": True,
-                    "configuration_schema": metadata.configuration_schema,
-                },
-            )
-        )
+    await provision_builtin_adapters(db, registry)
     added = 0
     for (
         name,
@@ -84,6 +57,46 @@ async def provision_assessment_catalog(
                 configuration_schema=metadata.configuration_schema,
                 default_configuration=configuration,
                 created_by=created_by,
+            )
+        )
+        added += 1
+    await db.flush()
+    return added
+
+
+async def provision_builtin_adapters(
+    db: AsyncSession, registry: AdapterRegistry | None = None
+) -> int:
+    """Reconcile global built-in adapters; execute with a catalogue owner."""
+
+    registry = registry or AdapterRegistry()
+    added = 0
+    for metadata in registry.metadata():
+        if metadata.code == "cyberaudit.demo_assessment":
+            continue
+        if await db.scalar(
+            select(ToolAdapterDefinition).where(ToolAdapterDefinition.code == metadata.code)
+        ):
+            continue
+        db.add(
+            ToolAdapterDefinition(
+                code=metadata.code,
+                name=metadata.name,
+                version=metadata.version,
+                category=metadata.category,
+                description=metadata.description,
+                supported_target_types=[t.value for t in metadata.supported_target_types],
+                supported_intensities=[i.value for i in metadata.supported_intensities],
+                requires_network=metadata.requires_network,
+                requires_approval=False,
+                default_timeout=metadata.default_timeout,
+                enabled=True,
+                health_status="online",
+                adapter_metadata={
+                    "phase": 3,
+                    "safe": True,
+                    "configuration_schema": metadata.configuration_schema,
+                },
             )
         )
         added += 1
