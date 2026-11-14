@@ -53,6 +53,14 @@ hosts Rust no próprio runner, monta o runtime manifestado e produz `.app` e
 SHA-256 e tamanho. Os artefactos têm retenção curta e sufixo `unsigned`; não são
 releases de produção.
 
+No runner Intel, `cryptography` não disponibilizou uma wheel compatível e o
+primeiro build a partir de source misturou headers e uma `libssl.3.dylib`
+incompatível. A pipeline Intel força agora uma compilação sem cache contra um
+único prefixo OpenSSL, com ligação estática. Antes do PyInstaller, um gate
+confirma a arquitetura x86_64 do binding Rust e rejeita dependências dinâmicas
+de `libssl` ou `libcrypto`. Esta correção permanece pendente de validação no
+runner nativo.
+
 O package Windows continua **BLOCKED**. Não foi encontrado um broker Windows
 suportado que simultaneamente satisfaça o contrato Dramatiq/Redis e aceite a
 password da instalação sem a expor nos argumentos ou persistir fora de
@@ -85,8 +93,8 @@ recovery separada.
 
 | Gate                            | macOS ARM64                                   | macOS x64             | Windows x64                                     |
 | ------------------------------- | --------------------------------------------- | --------------------- | ----------------------------------------------- |
-| código/pipeline de build nativo | PASS local / CI pendente                      | CI pendente           | BLOCKED pelo broker                             |
-| package nativo                  | PASS local D8, ad-hoc                         | NOT TESTED            | BLOCKED                                         |
+| código/pipeline de build nativo | PASS local e CI nativo                        | CI pendente           | BLOCKED pelo broker                             |
+| package nativo                  | PASS local e CI, ad-hoc                       | NOT TESTED            | BLOCKED                                         |
 | máquina limpa                   | NOT TESTED                                    | NOT TESTED            | NOT TESTED                                      |
 | assinatura de distribuição      | BLOCKED                                       | BLOCKED               | BLOCKED                                         |
 | notarização                     | BLOCKED                                       | BLOCKED               | N/A                                             |
@@ -113,3 +121,12 @@ recovery e todas as plataformas declaradas; não é o estado atual.
 
 O package local é `NATIVE_BUILD_READY` para avaliação técnica ARM64. Não é
 `DESKTOP_EVALUATION_READY` nem `PRODUCTION_RELEASE_READY`.
+
+### Evidência CI ARM64 de 2026-11-14
+
+O job nativo ARM64 do run `43576308459` concluiu com sucesso em runner
+`macos-15`: dependências nativas, runtime Next standalone, hosts Rust, sidecars
+PyInstaller, smoke tests, montagem integral sem symlinks, `.app`, `.dmg`, gates
+de arquitetura/integridade/assinatura e upload do artefacto unsigned. Esta
+evidência promove apenas o target ARM64 a `NATIVE_BUILD_READY`; instalação numa
+máquina limpa, assinatura Developer ID e notarização continuam por validar.

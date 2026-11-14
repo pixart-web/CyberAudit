@@ -54,7 +54,26 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: python -m pip install --upgrade "pip>=26.1.2"
-      - run: python -m pip install -e "apps/api[desktop]"
+      - name: Install desktop Python dependencies
+        if: matrix.arch != 'x64'
+        run: python -m pip install -e "apps/api[desktop]"
+      - name: Install Intel dependencies with a single static OpenSSL
+        if: matrix.arch == 'x64'
+        run: |
+          OPENSSL_PREFIX="$(brew --prefix openssl@3)"
+          test -f "$OPENSSL_PREFIX/lib/libssl.a"
+          test -f "$OPENSSL_PREFIX/lib/libcrypto.a"
+          OPENSSL_DIR="$OPENSSL_PREFIX" OPENSSL_STATIC=1 \
+            python -m pip install --no-cache-dir --no-binary cryptography \
+            -e "apps/api[desktop]"
+      - name: Verify cryptography native dependency boundary
+        run: |
+          BINDING="$(python -c 'import cryptography.hazmat.bindings._rust as binding; print(binding.__file__)')"
+          test "$(lipo -archs "$BINDING")" = "${{ matrix.machine_arch }}"
+          if otool -L "$BINDING" | tail -n +2 | grep -E '/lib(ssl|crypto)\.[^/ ]*dylib'; then
+            echo "cryptography must not depend on a mutable runner OpenSSL dylib" >&2
+            exit 1
+          fi
       - name: Build pinned native PostgreSQL, Valkey and Node
         run: >-
           infrastructure/scripts/build-desktop-runtime-macos.sh
