@@ -58,8 +58,8 @@ primeiro build a partir de source misturou headers e uma `libssl.3.dylib`
 incompatível. A pipeline Intel força agora uma compilação sem cache contra um
 único prefixo OpenSSL, com ligação estática. Antes do PyInstaller, um gate
 confirma a arquitetura x86_64 do binding Rust e rejeita dependências dinâmicas
-de `libssl` ou `libcrypto`. Esta correção permanece pendente de validação no
-runner nativo.
+de `libssl` ou `libcrypto`. O run nativo `43577870610` validou a correção até ao
+smoke test dos sidecars e ao package final.
 
 O package Windows continua **BLOCKED**. Não foi encontrado um broker Windows
 suportado que simultaneamente satisfaça o contrato Dramatiq/Redis e aceite a
@@ -93,8 +93,8 @@ recovery separada.
 
 | Gate                            | macOS ARM64                                   | macOS x64             | Windows x64                                     |
 | ------------------------------- | --------------------------------------------- | --------------------- | ----------------------------------------------- |
-| código/pipeline de build nativo | PASS local e CI nativo                        | CI pendente           | BLOCKED pelo broker                             |
-| package nativo                  | PASS local e CI, ad-hoc                       | NOT TESTED            | BLOCKED                                         |
+| código/pipeline de build nativo | PASS local e CI nativo                        | PASS CI nativo        | BLOCKED pelo broker                             |
+| package nativo                  | PASS local e CI, ad-hoc                       | PASS CI, ad-hoc       | BLOCKED                                         |
 | máquina limpa                   | NOT TESTED                                    | NOT TESTED            | NOT TESTED                                      |
 | assinatura de distribuição      | BLOCKED                                       | BLOCKED               | BLOCKED                                         |
 | notarização                     | BLOCKED                                       | BLOCKED               | N/A                                             |
@@ -130,3 +130,15 @@ PyInstaller, smoke tests, montagem integral sem symlinks, `.app`, `.dmg`, gates
 de arquitetura/integridade/assinatura e upload do artefacto unsigned. Esta
 evidência promove apenas o target ARM64 a `NATIVE_BUILD_READY`; instalação numa
 máquina limpa, assinatura Developer ID e notarização continuam por validar.
+
+### Evidência CI Intel x64 de 2026-11-14
+
+O job nativo Intel do run `43577870610` concluiu com sucesso em runner
+`macos-15-intel`. A compilação estática de `cryptography` passou o gate x86_64 e
+não apresentou dependências dinâmicas de `libssl` ou `libcrypto`; os sidecars
+PyInstaller passaram o smoke test que anteriormente falhava. O runtime integral,
+`.app`, `.dmg`, gates de arquitetura/integridade/assinatura e upload do artefacto
+unsigned também passaram. O artefacto CI `cyberaudit-desktop-macos-x64-unsigned`
+tem 450 412 904 bytes. Isto promove apenas o target x64 a
+`NATIVE_BUILD_READY`; instalação numa máquina limpa, assinatura Developer ID e
+notarização continuam por validar.
