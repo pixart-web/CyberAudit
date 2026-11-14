@@ -1,9 +1,12 @@
+pub mod backup;
 pub mod runtime;
 pub mod secrets;
 pub mod supervisor;
 
 use runtime::{inspect_resources, provision_session_secret, RuntimeLayout};
-use secrets::{provision_installation_secrets, OsSecretStore};
+use secrets::{
+    migrate_installation_secrets, resolve_installation_secrets, OsSecretStore, SecretStoreError,
+};
 use serde::Serialize;
 use std::path::PathBuf;
 #[cfg(unix)]
@@ -54,6 +57,31 @@ impl DesktopRuntimeStatus {
             missing_resources: Vec::new(),
             invalid_resources: Vec::new(),
             message: None,
+            web_url: None,
+        }
+    }
+
+    fn credential_migration_required() -> Self {
+        Self {
+            ready: false,
+            state: "credential_migration_required".to_owned(),
+            missing_resources: Vec::new(),
+            invalid_resources: Vec::new(),
+            message: Some(
+                "existing data was found, but its legacy credentials require explicit migration"
+                    .to_owned(),
+            ),
+            web_url: None,
+        }
+    }
+
+    fn credentials_migrated() -> Self {
+        Self {
+            ready: false,
+            state: "credentials_migrated_restart_required".to_owned(),
+            missing_resources: Vec::new(),
+            invalid_resources: Vec::new(),
+            message: Some("credentials migrated; restart CyberAudit OS to continue".to_owned()),
             web_url: None,
         }
     }
@@ -128,6 +156,27 @@ fn desktop_runtime_status(status: State<'_, SharedRuntimeStatus>) -> DesktopRunt
         .unwrap_or_else(|_| DesktopRuntimeStatus::failed("runtime status is unavailable"))
 }
 
+#[tauri::command]
+fn desktop_migrate_legacy_credentials(
+    status: State<'_, SharedRuntimeStatus>,
+) -> Result<DesktopRuntimeStatus, String> {
+    let migration_allowed = status
+        .lock()
+        .map(|value| value.state == "credential_migration_required")
+        .unwrap_or(false);
+    if !migration_allowed {
+        return Err(
+            "credential migration is not available in the current runtime state".to_owned(),
+        );
+    }
+
+    migrate_installation_secrets(&OsSecretStore::legacy(), &OsSecretStore::current())
+        .map_err(|_| "legacy credentials could not be migrated securely".to_owned())?;
+    let migrated = DesktopRuntimeStatus::credentials_migrated();
+    update_status(&status, migrated.clone());
+    Ok(migrated)
+}
+
 fn configured_resource_directory(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     #[cfg(debug_assertions)]
     if let Some(path) = std::env::var_os("CYBERAUDIT_DESKTOP_RESOURCE_DIR") {
@@ -168,16 +217,36 @@ fn launch_runtime(
         return;
     }
     update_status(&status, DesktopRuntimeStatus::resources_verified());
-    let secrets = match provision_installation_secrets(&OsSecretStore) {
+    let persistent_data_exists = match layout.has_persistent_data() {
         Ok(value) => value,
         Err(_) => {
             update_status(
                 &status,
-                DesktopRuntimeStatus::failed("operating-system credential storage is unavailable"),
+                DesktopRuntimeStatus::failed("local installation data could not be inspected"),
             );
             return;
         }
     };
+    let secrets =
+        match resolve_installation_secrets(&OsSecretStore::current(), persistent_data_exists) {
+            Ok(value) => value,
+            Err(SecretStoreError::MigrationRequired) => {
+                update_status(
+                    &status,
+                    DesktopRuntimeStatus::credential_migration_required(),
+                );
+                return;
+            }
+            Err(_) => {
+                update_status(
+                    &status,
+                    DesktopRuntimeStatus::failed(
+                        "operating-system credential storage is unavailable",
+                    ),
+                );
+                return;
+            }
+        };
     let mut supervisor =
         match RuntimeSupervisor::start(&resource_directory, &layout, &session_file, &secrets) {
             Ok(value) => value,
@@ -266,7 +335,10 @@ pub fn run() {
                 })?;
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![desktop_runtime_status]);
+        .invoke_handler(tauri::generate_handler![
+            desktop_runtime_status,
+            desktop_migrate_legacy_credentials
+        ]);
     let app = builder
         .build(tauri::generate_context!())
         .expect("CyberAudit desktop shell failed to initialize");

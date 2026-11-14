@@ -17,6 +17,7 @@ export function runtimePresentation(status) {
       statusText: "Verificação em curso",
       resources: [],
       retry: false,
+      action: null,
     };
   }
 
@@ -29,6 +30,7 @@ export function runtimePresentation(status) {
       statusText: "Integridade confirmada",
       resources: [],
       retry: false,
+      action: null,
     };
   }
 
@@ -40,6 +42,33 @@ export function runtimePresentation(status) {
       statusText: "Serviços locais disponíveis",
       resources: [],
       retry: false,
+      action: null,
+    };
+  }
+
+  if (status?.state === "credential_migration_required") {
+    return {
+      kind: "error",
+      title: "Migração segura necessária",
+      message:
+        "Foram encontrados dados de uma instalação anterior. Migre explicitamente as credenciais do Keychain; os valores existentes não serão eliminados nem substituídos.",
+      statusText: "A aguardar autorização do Keychain",
+      resources: [],
+      retry: false,
+      action: "migrate_credentials",
+    };
+  }
+
+  if (status?.state === "credentials_migrated_restart_required") {
+    return {
+      kind: "progress",
+      title: "Credenciais migradas",
+      message:
+        "A cópia segura foi concluída e o conjunto legado foi preservado. Reinicie o CyberAudit OS para validar e iniciar os serviços.",
+      statusText: "Reinício necessário",
+      resources: [],
+      retry: false,
+      action: null,
     };
   }
 
@@ -63,6 +92,7 @@ export function runtimePresentation(status) {
     statusText: "Arranque bloqueado de forma segura",
     resources,
     retry: true,
+    action: "retry",
   };
 }
 
@@ -75,5 +105,6 @@ export function runtimeFailurePresentation() {
     statusText: "Falha de verificação",
     resources: [],
     retry: true,
+    action: "retry",
   };
 }

@@ -1,7 +1,9 @@
 # Packaging do runtime Python desktop
 
 Estado: runtime completo e bundles local debug/release validados em macOS ARM64
-até 2026-11-13.
+até 2026-11-13. A matriz nativa ARM64/x64 está em
+`desktop-native.yml`; resultados devem ser confirmados no CI antes de promover
+qualquer target.
 
 ## Decisão
 
@@ -95,3 +97,10 @@ aprovada automaticamente nem usada como prova de instalação limpa.
 - construir NSIS, assinar/notarizar o artefacto Apple e validar upgrades;
 - validar cada instalador em máquinas limpas e sem Node, Python, PostgreSQL,
   Redis/Valkey ou acesso obrigatório à Internet.
+
+O build de dependências macOS é comum aos dois targets e recusa cross-build:
+`build-desktop-runtime-macos.sh arm64` só corre num host ARM64 e
+`build-desktop-runtime-macos.sh x86_64` só corre num host Intel. Os hashes Node
+são específicos do arquivo oficial de cada arquitetura. Ver
+`desktop-native-readiness-d8-d12.md` para o diagnóstico Keychain, backup/restore
+e estado exato dos gates.

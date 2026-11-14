@@ -12,13 +12,26 @@ VALKEY_SHA256="c74e50cd83f6d398a3dc570e04ac2fe538249585d021f76ee2449bbf9ebd04ed"
 VALKEY_URL="https://github.com/valkey-io/valkey/archive/refs/tags/${VALKEY_VERSION}.tar.gz"
 
 NODE_VERSION="22.17.1"
-NODE_ARCHIVE="node-v${NODE_VERSION}-darwin-arm64.tar.gz"
-NODE_SHA256="a983f4f2a7b71512b78d7935b9ccf6b72120a255810070afd635c4146bca7b31"
+TARGET_ARCH="${1:-$(uname -m)}"
+case "${TARGET_ARCH}" in
+  arm64)
+    NODE_SHA256="a983f4f2a7b71512b78d7935b9ccf6b72120a255810070afd635c4146bca7b31"
+    ;;
+  x86_64)
+    NODE_SHA256="b925103150fac0d23a44a45b2d88a01b73e5fff101e5dcfbae98d32c08d4bee3"
+    ;;
+  *)
+    echo "desktop runtime build failed: unsupported macOS architecture ${TARGET_ARCH}" >&2
+    exit 1
+    ;;
+esac
+TARGET_NAME="macos-${TARGET_ARCH/x86_64/x64}"
+NODE_ARCHIVE="node-v${NODE_VERSION}-darwin-${TARGET_ARCH/x86_64/x64}.tar.gz"
 NODE_URL="https://nodejs.org/download/release/v${NODE_VERSION}/${NODE_ARCHIVE}"
 
 SCRIPT_DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 REPOSITORY_ROOT="$(cd "${SCRIPT_DIRECTORY}/../.." && pwd -P)"
-OUTPUT_ROOT="${1:-${REPOSITORY_ROOT}/.artifacts/desktop-native/macos-arm64}"
+OUTPUT_ROOT="${2:-${REPOSITORY_ROOT}/.artifacts/desktop-native/${TARGET_NAME}}"
 
 fail() {
   echo "desktop runtime build failed: $1" >&2
@@ -26,7 +39,7 @@ fail() {
 }
 
 [[ "$(uname -s)" == "Darwin" ]] || fail "macOS is required"
-[[ "$(uname -m)" == "arm64" ]] || fail "an ARM64 host is required"
+[[ "$(uname -m)" == "${TARGET_ARCH}" ]] || fail "a native ${TARGET_ARCH} host is required"
 [[ "${OUTPUT_ROOT}" == /* ]] || fail "output path must be absolute"
 [[ "${OUTPUT_ROOT}" != "/" ]] || fail "output path cannot be the filesystem root"
 [[ ! -e "${OUTPUT_ROOT}" ]] || fail "output path already exists"
@@ -37,7 +50,7 @@ done
 
 OUTPUT_PARENT="$(dirname "${OUTPUT_ROOT}")"
 mkdir -p "${OUTPUT_PARENT}"
-STAGING_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/cyberaudit-macos-arm64-runtime.XXXXXX")"
+STAGING_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/cyberaudit-${TARGET_NAME}-runtime.XXXXXX")"
 STAGING_ROOT="$(cd "${STAGING_ROOT}" && pwd -P)"
 SOURCE_ROOT="${STAGING_ROOT}/sources"
 DIST_ROOT="${STAGING_ROOT}/distribution"
@@ -61,11 +74,12 @@ download_verified() {
   [[ "${actual}" == "${digest}" ]] || fail "checksum mismatch for $(basename "${destination}")"
 }
 
-assert_arm64_macho() {
+assert_native_macho() {
   local binary="$1"
-  file "${binary}" | grep -q 'Mach-O 64-bit executable arm64' || \
-    fail "$(basename "${binary}") is not a macOS ARM64 executable"
-  lipo -archs "${binary}" | grep -qw arm64 || fail "$(basename "${binary}") lacks ARM64"
+  file "${binary}" | grep -q 'Mach-O 64-bit' || \
+    fail "$(basename "${binary}") is not a 64-bit Mach-O executable"
+  lipo -archs "${binary}" | grep -qw "${TARGET_ARCH}" || \
+    fail "$(basename "${binary}") lacks ${TARGET_ARCH}"
 }
 
 assert_portable_macho_tree() {
@@ -127,7 +141,7 @@ POSTGRESQL_PREFIX="${DIST_ROOT}/postgresql"
 )
 cp "${SOURCE_ROOT}/postgresql-${POSTGRESQL_VERSION}/COPYRIGHT" "${POSTGRESQL_PREFIX}/COPYRIGHT"
 relocate_macho_tree "${POSTGRESQL_PREFIX}"
-assert_arm64_macho "${POSTGRESQL_PREFIX}/bin/postgres"
+assert_native_macho "${POSTGRESQL_PREFIX}/bin/postgres"
 assert_portable_macho_tree "${POSTGRESQL_PREFIX}"
 "${POSTGRESQL_PREFIX}/bin/postgres" --version | grep -q "PostgreSQL) ${POSTGRESQL_VERSION}"
 
@@ -143,15 +157,15 @@ VALKEY_PREFIX="${DIST_ROOT}/valkey"
     make -s PREFIX="${VALKEY_PREFIX}" BUILD_TLS=no MALLOC=libc install
 )
 cp "${SOURCE_ROOT}/valkey-${VALKEY_VERSION}/COPYING" "${VALKEY_PREFIX}/COPYING"
-assert_arm64_macho "${VALKEY_PREFIX}/bin/valkey-server"
+assert_native_macho "${VALKEY_PREFIX}/bin/valkey-server"
 assert_portable_macho_tree "${VALKEY_PREFIX}"
 "${VALKEY_PREFIX}/bin/valkey-server" --version | grep -q "v=${VALKEY_VERSION}"
 
 NODE_SOURCE_ARCHIVE="${SOURCE_ROOT}/${NODE_ARCHIVE}"
 download_verified "${NODE_URL}" "${NODE_SHA256}" "${NODE_SOURCE_ARCHIVE}"
 tar -xzf "${NODE_SOURCE_ARCHIVE}" -C "${SOURCE_ROOT}"
-mv "${SOURCE_ROOT}/node-v${NODE_VERSION}-darwin-arm64" "${DIST_ROOT}/node"
-assert_arm64_macho "${DIST_ROOT}/node/bin/node"
+mv "${SOURCE_ROOT}/node-v${NODE_VERSION}-darwin-${TARGET_ARCH/x86_64/x64}" "${DIST_ROOT}/node"
+assert_native_macho "${DIST_ROOT}/node/bin/node"
 assert_portable_macho_tree "${DIST_ROOT}/node"
 [[ "$(env -i "${DIST_ROOT}/node/bin/node" --version)" == "v${NODE_VERSION}" ]] || \
   fail "Node version validation failed"
@@ -162,7 +176,7 @@ cat >"${DIST_ROOT}/node/PROVENANCE.json" <<EOF
   "component": "node",
   "license": "MIT",
   "source_url": "${NODE_URL}",
-  "target": "macos-arm64",
+  "target": "${TARGET_NAME}",
   "version": "${NODE_VERSION}"
 }
 EOF
@@ -173,7 +187,7 @@ cat >"${DIST_ROOT}/provenance/postgresql.json" <<EOF
   "component": "postgresql",
   "license": "PostgreSQL",
   "source_url": "${POSTGRESQL_URL}",
-  "target": "macos-arm64",
+  "target": "${TARGET_NAME}",
   "version": "${POSTGRESQL_VERSION}"
 }
 EOF
@@ -184,7 +198,7 @@ cat >"${DIST_ROOT}/provenance/valkey.json" <<EOF
   "component": "valkey",
   "license": "BSD-3-Clause",
   "source_url": "${VALKEY_URL}",
-  "target": "macos-arm64",
+  "target": "${TARGET_NAME}",
   "version": "${VALKEY_VERSION}"
 }
 EOF
@@ -201,4 +215,4 @@ assert_portable_macho_tree "${OUTPUT_ROOT}/node"
 trap - EXIT
 rm -rf "${STAGING_ROOT}"
 
-echo "macOS ARM64 runtime dependencies built at ${OUTPUT_ROOT}"
+echo "${TARGET_NAME} runtime dependencies built at ${OUTPUT_ROOT}"

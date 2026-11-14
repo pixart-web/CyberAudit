@@ -152,6 +152,7 @@ pnpm --filter @cyberaudit/desktop lint
 make desktop-python-smoke
 make desktop-runtime-hosts
 make desktop-native-dependencies-macos-arm64
+make desktop-native-dependencies-macos-x64
 # requer a distribuição oficial Node 22.17.1
 make desktop-web-runtime
 # requer distribuições PostgreSQL/Valkey e proveniência explícitas por target
@@ -166,6 +167,7 @@ make desktop-build DESKTOP_RUNTIME_DIR=/artefactos/runtime-completo
 
 Ver `docs/architecture/desktop-reality-audit.md`,
 `docs/architecture/adr-035-desktop-first-runtime.md`,
+`docs/architecture/desktop-native-readiness-d8-d12.md`,
 `docs/development/desktop-development.md` e
 `docs/security/desktop-threat-model.md`.
 

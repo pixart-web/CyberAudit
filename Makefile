@@ -191,7 +191,10 @@ desktop-runtime-host-test:
 	infrastructure/scripts/rust-cargo.sh test --manifest-path apps/desktop/runtime-host/Cargo.toml
 
 desktop-native-dependencies-macos-arm64:
-	infrastructure/scripts/build-desktop-runtime-macos-arm64.sh
+	infrastructure/scripts/build-desktop-runtime-macos.sh arm64
+
+desktop-native-dependencies-macos-x64:
+	infrastructure/scripts/build-desktop-runtime-macos.sh x86_64
 
 desktop-web-runtime:
 	CYBERAUDIT_DESKTOP_BUILD=1 NEXT_PUBLIC_API_URL=/api/v1 pnpm --filter @cyberaudit/web build

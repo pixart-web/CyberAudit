@@ -51,3 +51,26 @@ test("native bridge failures do not expose exception details", () => {
   assert.equal(result.retry, true);
   assert.deepEqual(result.resources, []);
 });
+
+test("legacy credentials require an explicit migration action", () => {
+  const result = runtimePresentation({
+    ready: false,
+    state: "credential_migration_required",
+  });
+
+  assert.equal(result.kind, "error");
+  assert.equal(result.retry, false);
+  assert.equal(result.action, "migrate_credentials");
+  assert.match(result.message, /não serão eliminados nem substituídos/);
+});
+
+test("successful migration requires restart without claiming runtime readiness", () => {
+  const result = runtimePresentation({
+    ready: false,
+    state: "credentials_migrated_restart_required",
+  });
+
+  assert.equal(result.kind, "progress");
+  assert.equal(result.action, null);
+  assert.match(result.statusText, /Reinício necessário/);
+});

@@ -28,8 +28,8 @@ pub struct RuntimeLayout {
 }
 
 impl RuntimeLayout {
-    pub fn initialize(root: &Path) -> Result<Self, RuntimeError> {
-        let layout = Self {
+    fn for_root(root: &Path) -> Self {
+        Self {
             configuration: root.join("configuration"),
             database: root.join("database"),
             broker: root.join("broker"),
@@ -39,10 +39,25 @@ impl RuntimeLayout {
             logs: root.join("logs"),
             backups: root.join("backups"),
             temporary: root.join("temporary"),
-        };
+        }
+    }
+
+    pub fn initialize(root: &Path) -> Result<Self, RuntimeError> {
+        let layout = Self::for_root(root);
         for directory in layout.directories() {
             fs::create_dir_all(directory)?;
             restrict_directory(directory)?;
+        }
+        Ok(layout)
+    }
+
+    pub fn open_existing(root: &Path) -> Result<Self, RuntimeError> {
+        let layout = Self::for_root(root);
+        for directory in layout.directories() {
+            let metadata = fs::symlink_metadata(directory)?;
+            if !metadata.is_dir() || metadata.file_type().is_symlink() {
+                return Err(RuntimeError::UnsafeResourceTree);
+            }
         }
         Ok(layout)
     }
@@ -59,6 +74,21 @@ impl RuntimeLayout {
             &self.backups,
             &self.temporary,
         ]
+    }
+
+    pub fn has_persistent_data(&self) -> Result<bool, RuntimeError> {
+        for directory in [
+            &self.database,
+            &self.broker,
+            &self.evidence,
+            &self.models,
+            &self.knowledge_packs,
+        ] {
+            if fs::read_dir(directory)?.next().transpose()?.is_some() {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 }
 
@@ -383,6 +413,24 @@ mod tests {
             assert!(directory.starts_with(&root));
         }
         fs::remove_dir_all(root).expect("temporary layout should be removable");
+    }
+
+    #[test]
+    fn detects_persistent_data_without_treating_session_files_as_installations() {
+        let root = temp_root("persistent-data");
+        let layout = RuntimeLayout::initialize(&root).expect("layout should initialize");
+        provision_session_secret(&layout.configuration).expect("session should provision");
+        assert!(!layout
+            .has_persistent_data()
+            .expect("empty layout should be inspectable"));
+
+        fs::write(layout.database.join("PG_VERSION"), "16")
+            .expect("database marker should be written");
+        assert!(layout
+            .has_persistent_data()
+            .expect("populated layout should be inspectable"));
+
+        fs::remove_dir_all(root).expect("fixture should be removed");
     }
 
     #[test]
