@@ -171,6 +171,13 @@ jobs:
       - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: "10.0.403"
+      - name: Assert pinned .NET SDK
+        shell: pwsh
+        run: |
+          $sdkVersion = dotnet --version
+          if ($sdkVersion -ne "10.0.403") {
+            throw "Expected .NET SDK 10.0.403, got $sdkVersion."
+          }
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
