@@ -12,19 +12,32 @@ import {
   WifiOff,
 } from "lucide-react";
 
-export function Card({ className = "", ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={`rounded-xl border border-border bg-card shadow-panel ${className}`} {...props} />;
+export function Card({
+  className = "",
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      className={`rounded-lg border border-border bg-card ${className}`}
+      {...props}
+    />
+  );
 }
 
 export function Badge({
   tone = "neutral",
   className = "",
   ...props
-}: React.HTMLAttributes<HTMLSpanElement> & { tone?: "success" | "warning" | "danger" | "info" | "neutral" }) {
+}: React.HTMLAttributes<HTMLSpanElement> & {
+  tone?: "success" | "warning" | "danger" | "info" | "neutral";
+}) {
   return <span className={`badge badge-${tone} ${className}`} {...props} />;
 }
 
-export function Button({ className = "", ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) {
+export function Button({
+  className = "",
+  ...props
+}: React.ButtonHTMLAttributes<HTMLButtonElement>) {
   return <button className={`button ${className}`} {...props} />;
 }
 
@@ -50,7 +63,11 @@ export type SecurityState =
 
 const SECURITY_STATE_META: Record<
   SecurityState,
-  { label: string; tone: "success" | "warning" | "danger" | "info" | "neutral"; icon: React.ElementType }
+  {
+    label: string;
+    tone: "success" | "warning" | "danger" | "info" | "neutral";
+    icon: React.ElementType;
+  }
 > = {
   critical: { label: "Crítico", tone: "danger", icon: ShieldAlert },
   high: { label: "Elevado", tone: "danger", icon: AlertTriangle },
@@ -68,20 +85,37 @@ const SECURITY_STATE_META: Record<
 export function toSecurityState(value: unknown): SecurityState {
   const normalized = String(value ?? "").toLowerCase();
   if (normalized in SECURITY_STATE_META) return normalized as SecurityState;
-  if (["active", "open", "valid", "covered", "success", "passed", "installed"].includes(normalized)) {
+  if (
+    [
+      "active",
+      "open",
+      "valid",
+      "covered",
+      "success",
+      "passed",
+      "installed",
+    ].includes(normalized)
+  ) {
     return "healthy";
   }
   if (
-    ["pending", "pending_authorization", "draft", "downloading", "not_installed", "unverified"].includes(
-      normalized,
-    )
+    [
+      "pending",
+      "pending_authorization",
+      "draft",
+      "downloading",
+      "not_installed",
+      "unverified",
+    ].includes(normalized)
   ) {
     return "warning";
   }
   if (["verified"].includes(normalized)) {
     return "healthy";
   }
-  if (["blocked", "denied", "error", "corrupt", "revoked"].includes(normalized)) {
+  if (
+    ["blocked", "denied", "error", "corrupt", "revoked"].includes(normalized)
+  ) {
     return "failed";
   }
   return "unknown";
@@ -94,7 +128,9 @@ export function SeverityBadge({
   state: SecurityState | string;
   className?: string;
 }) {
-  const resolved = (state in SECURITY_STATE_META ? state : toSecurityState(state)) as SecurityState;
+  const resolved = (
+    state in SECURITY_STATE_META ? state : toSecurityState(state)
+  ) as SecurityState;
   const meta = SECURITY_STATE_META[resolved];
   const Icon = meta.icon;
   return (
@@ -120,9 +156,14 @@ export function EmptyState({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="grid place-items-center gap-2 p-12 text-center" role="status">
+    <div
+      className="grid place-items-center gap-2 p-12 text-center"
+      role="status"
+    >
       <p className="font-semibold text-foreground">{title}</p>
-      {description && <p className="max-w-md text-sm text-muted">{description}</p>}
+      {description && (
+        <p className="max-w-md text-sm text-muted">{description}</p>
+      )}
       {action}
     </div>
   );
@@ -136,17 +177,25 @@ export function ErrorState({
   description?: string;
 }) {
   return (
-    <div className="grid place-items-center gap-2 p-12 text-center" role="alert">
+    <div
+      className="grid place-items-center gap-2 p-12 text-center"
+      role="alert"
+    >
       <ShieldAlert className="text-critical" aria-hidden />
       <p className="font-semibold text-foreground">{title}</p>
-      {description && <p className="max-w-md text-sm text-muted">{description}</p>}
+      {description && (
+        <p className="max-w-md text-sm text-muted">{description}</p>
+      )}
     </div>
   );
 }
 
 export function LoadingState({ label = "A carregar…" }: { label?: string }) {
   return (
-    <div className="flex items-center justify-center gap-2 p-12 text-sm text-muted" role="status">
+    <div
+      className="flex items-center justify-center gap-2 p-12 text-sm text-muted"
+      role="status"
+    >
       <Loader2 className="animate-spin" size={16} aria-hidden />
       {label}
     </div>
@@ -184,7 +233,11 @@ export function Tabs({
   }
 
   return (
-    <div role="tablist" aria-label="Secções" className="flex gap-1 overflow-x-auto border-b border-border px-4 pt-3">
+    <div
+      role="tablist"
+      aria-label="Secções"
+      className="flex gap-0 overflow-x-auto border-b border-border px-3 pt-1"
+    >
       {items.map((item, index) => {
         const selected = item.id === active;
         const Icon = item.icon;
@@ -201,8 +254,10 @@ export function Tabs({
             tabIndex={selected ? 0 : -1}
             onKeyDown={(event) => onKeyDown(event, index)}
             onClick={() => onChange(item.id)}
-            className={`flex items-center gap-1.5 whitespace-nowrap border-b-2 px-4 py-3 text-sm transition ${
-              selected ? "border-primary text-primary" : "border-transparent text-muted hover:text-foreground"
+            className={`flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2 text-xs font-medium transition ${
+              selected
+                ? "border-primary text-primary"
+                : "border-transparent text-muted hover:text-foreground"
             }`}
           >
             {Icon && <Icon size={14} aria-hidden />}
@@ -225,7 +280,12 @@ export function TabPanel({
 }) {
   if (id !== active) return null;
   return (
-    <div role="tabpanel" id={`tabpanel-${id}`} aria-labelledby={`tab-${id}`} tabIndex={0}>
+    <div
+      role="tabpanel"
+      id={`tabpanel-${id}`}
+      aria-labelledby={`tab-${id}`}
+      tabIndex={0}
+    >
       {children}
     </div>
   );
@@ -275,7 +335,7 @@ export function Drawer({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="relative flex h-full w-full max-w-md flex-col border-l border-border bg-surface p-5 shadow-panel"
+        className="inspection-panel relative flex h-full w-full max-w-xl flex-col border-l border-border bg-surface p-4"
       >
         <div className="mb-4 flex items-center justify-between">
           <h2 className="font-semibold">{title}</h2>
@@ -308,12 +368,14 @@ export function MetricCard({
   icon?: React.ElementType;
 }) {
   return (
-    <div className="rounded-lg border border-border p-4">
+    <div className="border-l border-border px-4 py-3 first:border-l-0">
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted">{label}</p>
         {Icon && <Icon size={14} className="text-muted" aria-hidden />}
       </div>
-      <p className="mt-1 text-lg font-semibold">{value}</p>
+      <p className="mt-1 font-mono text-xl font-semibold tabular-nums">
+        {value}
+      </p>
       {tone && <SeverityBadge state={tone} className="mt-2" />}
     </div>
   );
@@ -362,23 +424,35 @@ export function ConfirmationDialog({
 
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center" role="presentation">
-      <button aria-label="Fechar" className="absolute inset-0 bg-black/50" onClick={onCancel} />
+    <div
+      className="fixed inset-0 z-50 grid place-items-center"
+      role="presentation"
+    >
+      <button
+        aria-label="Fechar"
+        className="absolute inset-0 bg-black/50"
+        onClick={onCancel}
+      />
       <div
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="confirmation-dialog-title"
-        className="relative w-full max-w-sm rounded-xl border border-border bg-surface p-5 shadow-panel"
+        className="relative w-full max-w-sm rounded-lg border border-border bg-surface p-5 shadow-panel"
       >
         <h2 id="confirmation-dialog-title" className="font-semibold">
           {title}
         </h2>
-        {description && <p className="mt-2 text-sm text-muted">{description}</p>}
+        {description && (
+          <p className="mt-2 text-sm text-muted">{description}</p>
+        )}
         <div className="mt-5 flex justify-end gap-2">
           <Button className="bg-transparent" onClick={onCancel}>
             {cancelLabel}
           </Button>
-          <Button className={destructive ? "bg-critical text-white" : ""} onClick={onConfirm}>
+          <Button
+            className={destructive ? "bg-critical text-white" : ""}
+            onClick={onConfirm}
+          >
             {confirmLabel}
           </Button>
         </div>

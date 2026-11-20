@@ -40,6 +40,12 @@ importers:
       '@cyberaudit/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      '@fontsource/ibm-plex-mono':
+        specifier: 5.2.6
+        version: 5.2.6
+      '@fontsource/ibm-plex-sans':
+        specifier: 5.2.6
+        version: 5.2.6
       '@hookform/resolvers':
         specifier: ^3.9.1
         version: 3.10.0(react-hook-form@7.82.0(react@19.2.8))
@@ -468,6 +474,12 @@ packages:
   '@eslint/plugin-kit@0.4.1':
     resolution: {integrity: sha512-43/qtrDUokr7LJqoF2c3+RInu/t4zfrpYdoSDfYyhg52rwLV6TnOvdG4fXm7IkSB3wErkcmJS9iEhjVtOSEjjA==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+
+  '@fontsource/ibm-plex-mono@5.2.6':
+    resolution: {integrity: sha512-LTZJNTcpoT19fmwERZNMDI+ljHueuyhF2Qn+bICJ4Y4hxBLAAoJ2MRsGnyp0QNutW6t/25eyZpvaUK1LDrCo7Q==}
+
+  '@fontsource/ibm-plex-sans@5.2.6':
+    resolution: {integrity: sha512-yclktpagJncROwdWHHEfPsrIfoo3uiIeDFchvmjNmTW/YMBfLYWJnUv19EAqPNhGizdtmcH9FjzOR2094Z2uPg==}
 
   '@hookform/resolvers@3.10.0':
     resolution: {integrity: sha512-79Dv+3mDF7i+2ajj7SkypSKHhl1cbln1OGavqrsF7p6mbUv11xpqpacPsGDCTRvCSjEEIez2ef1NveSVL3b0Ag==}
@@ -3341,6 +3353,10 @@ snapshots:
     dependencies:
       '@eslint/core': 0.17.0
       levn: 0.4.1
+
+  '@fontsource/ibm-plex-mono@5.2.6': {}
+
+  '@fontsource/ibm-plex-sans@5.2.6': {}
 
   '@hookform/resolvers@3.10.0(react-hook-form@7.82.0(react@19.2.8))':
     dependencies:
