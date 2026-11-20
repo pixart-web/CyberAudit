@@ -203,6 +203,7 @@ async def test_bootstrap_is_token_gated_and_one_shot(
         assert (await c.get("/api/v1/setup/status")).json() == {
             "initialized": False,
             "bootstrap_enabled": False,
+            "bootstrap_token_required": True,
         }
         assert (
             await c.post("/api/v1/setup/initialize", json={**payload, "bootstrap_token": token})
@@ -222,9 +223,38 @@ async def test_bootstrap_is_token_gated_and_one_shot(
         assert (await c.get("/api/v1/setup/status")).json() == {
             "initialized": True,
             "bootstrap_enabled": False,
+            "bootstrap_token_required": True,
         }
     root = await db.scalar(select(User).where(User.email == "root@acme.example.com"))
     assert root is not None and [r.name for r in root.roles] == ["Platform Administrator"]
+
+
+@pytest.mark.asyncio
+async def test_desktop_bootstrap_uses_private_session_capability_instead_of_renderer_token(
+    db: AsyncSession, monkeypatch: pytest.MonkeyPatch
+):
+    token = "x" * 32
+    monkeypatch.setattr(
+        admin_api,
+        "get_settings",
+        lambda: SimpleNamespace(bootstrap_token=token, desktop_mode=True),
+    )
+    payload = {
+        "name": "Desktop Org",
+        "slug": "desktop-org",
+        "admin_name": "Desktop Admin",
+        "admin_email": "admin@desktop.example.com",
+        "admin_password": STRONG,
+    }
+    async with _Client(db, None) as client:
+        status = (await client.get("/api/v1/setup/status")).json()
+        assert status == {
+            "initialized": False,
+            "bootstrap_enabled": True,
+            "bootstrap_token_required": False,
+        }
+        created = await client.post("/api/v1/setup/initialize", json=payload)
+        assert created.status_code == 201, created.text
 
 
 @pytest.mark.asyncio

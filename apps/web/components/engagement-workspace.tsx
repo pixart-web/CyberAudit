@@ -1,6 +1,16 @@
 "use client";
 
-import { Badge, Button, Card, EmptyState, ErrorState, LoadingState, SeverityBadge, Tabs, TabPanel } from "@cyberaudit/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  ErrorState,
+  LoadingState,
+  SeverityBadge,
+  Tabs,
+  TabPanel,
+} from "@cyberaudit/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BrainCircuit, FileText, ShieldAlert } from "lucide-react";
 import Link from "next/link";
@@ -22,12 +32,45 @@ type Engagement = {
 };
 
 type Items<T> = { items: T[]; total?: number };
-type Scope = { id: string; name: string; status: string; maximum_intensity: string; emergency_stop_enabled: boolean };
-type Finding = { id: string; title: string; category: string; technical_severity: string; status: string };
-type Evidence = { id: string; title: string; evidence_type: string; collected_at: string };
-type EngagementNote = { id: string; body: string; pinned: boolean; created_at: string };
-type TimelineEntry = { id: string; event_type: string; summary: string; occurred_at: string };
-type Report = { id: string; report_type: string; status: string; title: string; created_at: string };
+type Scope = {
+  id: string;
+  name: string;
+  status: string;
+  maximum_intensity: string;
+  emergency_stop_enabled: boolean;
+};
+type Finding = {
+  id: string;
+  title: string;
+  category: string;
+  technical_severity: string;
+  status: string;
+};
+type Evidence = {
+  id: string;
+  title: string;
+  evidence_type: string;
+  collected_at: string;
+};
+type EngagementNote = {
+  id: string;
+  body: string;
+  pinned: boolean;
+  created_at: string;
+};
+type TimelineEntry = {
+  id: string;
+  event_type: string;
+  summary: string;
+  occurred_at: string;
+};
+type Report = {
+  id: string;
+  report_type: string;
+  status: string;
+  title: string;
+  created_at: string;
+};
 
 const TABS = [
   { id: "overview", label: "Visão Geral" },
@@ -81,29 +124,49 @@ export function EngagementWorkspace({ id }: { id: string }) {
 
   const addNote = useMutation({
     mutationFn: (body: string) =>
-      api(`/engagements/${id}/notes`, { method: "POST", body: JSON.stringify({ body, pinned: false }) }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["engagement-notes", id] }),
+      api(`/engagements/${id}/notes`, {
+        method: "POST",
+        body: JSON.stringify({ body, pinned: false }),
+      }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["engagement-notes", id] }),
   });
 
   const generateReport = useMutation({
     mutationFn: () =>
       api(`/engagements/${id}/reports`, {
         method: "POST",
-        body: JSON.stringify({ report_type: "executive_summary", include_ai_summary: true }),
+        body: JSON.stringify({
+          report_type: "executive_summary",
+          include_ai_summary: true,
+        }),
       }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["engagement-reports", id] }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["engagement-reports", id] }),
   });
 
-  if (engagement.isLoading) return <Shell title="Auditoria"><LoadingState /></Shell>;
-  if (engagement.error || !engagement.data) return <Shell title="Auditoria"><ErrorState title="Auditoria não encontrada ou sem autorização." /></Shell>;
+  if (engagement.isLoading)
+    return (
+      <Shell title="Auditoria">
+        <LoadingState />
+      </Shell>
+    );
+  if (engagement.error || !engagement.data)
+    return (
+      <Shell title="Auditoria">
+        <ErrorState title="Auditoria não encontrada ou sem autorização." />
+      </Shell>
+    );
 
   const item = engagement.data;
 
   return (
     <Shell title={item.name} eyebrow={`Auditoria ${item.code}`}>
-      <div className="mb-5 flex flex-wrap items-center gap-3">
+      <div className="mb-3 flex flex-wrap items-center gap-2 border-b border-border pb-3">
         <SeverityBadge state={item.status} />
-        <Badge tone="info">{item.mode === "client" ? "Cliente" : "Laboratório"}</Badge>
+        <Badge tone="info">
+          {item.mode === "client" ? "Cliente" : "Laboratório"}
+        </Badge>
         <SeverityBadge state={item.risk_level} />
         <Button
           className="ml-auto gap-2"
@@ -116,17 +179,35 @@ export function EngagementWorkspace({ id }: { id: string }) {
       </div>
       <Card className="overflow-hidden">
         <Tabs items={TABS} active={tab} onChange={setTab} />
-        <div className="p-5">
+        <div className="p-3">
           <TabPanel id="overview" active={tab}>
-            <div className="grid gap-4 md:grid-cols-3">
-              <Stat label="Âmbito autorizado" value={String(scope.data?.total ?? scope.data?.items.length ?? "—")} />
-              <Stat label="Findings" value={String(findings.data?.total ?? findings.data?.items.length ?? "—")} />
-              <Stat label="Eventos na cronologia" value={String(timeline.data?.items.length ?? "—")} />
+            <div className="grid overflow-hidden rounded-lg border border-border md:grid-cols-3 md:divide-x md:divide-border">
+              <Stat
+                label="Âmbito autorizado"
+                value={String(
+                  scope.data?.total ?? scope.data?.items.length ?? "—",
+                )}
+              />
+              <Stat
+                label="Findings"
+                value={String(
+                  findings.data?.total ?? findings.data?.items.length ?? "—",
+                )}
+              />
+              <Stat
+                label="Eventos na cronologia"
+                value={String(timeline.data?.items.length ?? "—")}
+              />
             </div>
-            {item.description && <p className="mt-4 text-sm text-muted">{item.description}</p>}
-            <p className="mt-4 text-xs text-muted">
-              Um analista deve sempre saber sob que âmbito e autorização está a operar: consulte a
-              secção &ldquo;Âmbito&rdquo; antes de qualquer avaliação.
+            {item.description && (
+              <p className="mt-4 text-sm leading-6 text-muted">
+                {item.description}
+              </p>
+            )}
+            <p className="mt-4 border-l-2 border-warning px-3 py-2 text-xs leading-5 text-muted">
+              Um analista deve sempre saber sob que âmbito e autorização está a
+              operar: consulte a secção &ldquo;Âmbito&rdquo; antes de qualquer
+              avaliação.
             </p>
           </TabPanel>
 
@@ -140,12 +221,17 @@ export function EngagementWorkspace({ id }: { id: string }) {
             )}
             <ul className="space-y-2">
               {scope.data?.items.map((row) => (
-                <li key={row.id} className="flex items-center justify-between rounded-lg border border-border p-3 text-sm">
+                <li
+                  key={row.id}
+                  className="flex items-center justify-between rounded-lg border border-border p-3 text-sm"
+                >
                   <span>{row.name}</span>
                   <div className="flex items-center gap-2">
                     <Badge tone="neutral">{row.maximum_intensity}</Badge>
                     <SeverityBadge state={row.status} />
-                    {row.emergency_stop_enabled && <Badge tone="warning">Emergency stop</Badge>}
+                    {row.emergency_stop_enabled && (
+                      <Badge tone="warning">Emergency stop</Badge>
+                    )}
                   </div>
                 </li>
               ))}
@@ -154,11 +240,19 @@ export function EngagementWorkspace({ id }: { id: string }) {
 
           <TabPanel id="findings" active={tab}>
             {findings.isLoading && <LoadingState />}
-            {findings.data?.items.length === 0 && <EmptyState title="Ainda não existem findings." />}
+            {findings.data?.items.length === 0 && (
+              <EmptyState title="Ainda não existem findings." />
+            )}
             <ul className="space-y-2">
               {findings.data?.items.map((row) => (
-                <li key={row.id} className="flex items-center justify-between rounded-lg border border-border p-3 text-sm">
-                  <span className="flex items-center gap-2"><ShieldAlert size={14} className="text-muted" />{row.title}</span>
+                <li
+                  key={row.id}
+                  className="flex items-center justify-between rounded-lg border border-border p-3 text-sm"
+                >
+                  <span className="flex items-center gap-2">
+                    <ShieldAlert size={14} className="text-muted" />
+                    {row.title}
+                  </span>
                   <SeverityBadge state={row.technical_severity} />
                 </li>
               ))}
@@ -167,10 +261,15 @@ export function EngagementWorkspace({ id }: { id: string }) {
 
           <TabPanel id="evidence" active={tab}>
             {evidence.isLoading && <LoadingState />}
-            {evidence.data?.items.length === 0 && <EmptyState title="Ainda não existe evidência registada." />}
+            {evidence.data?.items.length === 0 && (
+              <EmptyState title="Ainda não existe evidência registada." />
+            )}
             <ul className="space-y-2">
               {evidence.data?.items.map((row) => (
-                <li key={row.id} className="flex items-center justify-between rounded-lg border border-border p-3 text-sm">
+                <li
+                  key={row.id}
+                  className="flex items-center justify-between rounded-lg border border-border p-3 text-sm"
+                >
                   <span>{row.title}</span>
                   <Badge tone="neutral">{row.evidence_type}</Badge>
                 </li>
@@ -179,14 +278,24 @@ export function EngagementWorkspace({ id }: { id: string }) {
           </TabPanel>
 
           <TabPanel id="notes" active={tab}>
-            <NoteForm onSubmit={(body) => addNote.mutate(body)} pending={addNote.isPending} />
+            <NoteForm
+              onSubmit={(body) => addNote.mutate(body)}
+              pending={addNote.isPending}
+            />
             {notes.isLoading && <LoadingState />}
-            {notes.data?.items.length === 0 && <EmptyState title="Ainda não existem notas." />}
+            {notes.data?.items.length === 0 && (
+              <EmptyState title="Ainda não existem notas." />
+            )}
             <ul className="mt-4 space-y-2">
               {notes.data?.items.map((row) => (
-                <li key={row.id} className="rounded-lg border border-border p-3 text-sm">
+                <li
+                  key={row.id}
+                  className="rounded-lg border border-border p-3 text-sm"
+                >
                   <p>{row.body}</p>
-                  <p className="mt-1 text-xs text-muted">{new Date(row.created_at).toLocaleString("pt-PT")}</p>
+                  <p className="mt-1 text-xs text-muted">
+                    {new Date(row.created_at).toLocaleString("pt-PT")}
+                  </p>
                 </li>
               ))}
             </ul>
@@ -194,14 +303,17 @@ export function EngagementWorkspace({ id }: { id: string }) {
 
           <TabPanel id="timeline" active={tab}>
             {timeline.isLoading && <LoadingState />}
-            {timeline.data?.items.length === 0 && <EmptyState title="Sem eventos registados." />}
+            {timeline.data?.items.length === 0 && (
+              <EmptyState title="Sem eventos registados." />
+            )}
             <ol className="space-y-3 border-l border-border pl-4">
               {timeline.data?.items.map((row) => (
                 <li key={row.id} className="relative text-sm">
                   <span className="absolute -left-[21px] top-1 h-2 w-2 rounded-full bg-primary" />
                   <p className="font-medium">{row.summary}</p>
                   <p className="text-xs text-muted">
-                    {row.event_type} · {new Date(row.occurred_at).toLocaleString("pt-PT")}
+                    {row.event_type} ·{" "}
+                    {new Date(row.occurred_at).toLocaleString("pt-PT")}
                   </p>
                 </li>
               ))}
@@ -223,7 +335,10 @@ export function EngagementWorkspace({ id }: { id: string }) {
                     href={`/reports/${row.id}`}
                     className="flex items-center justify-between rounded-lg border border-border p-3 text-sm hover:border-primary/40"
                   >
-                    <span className="flex items-center gap-2"><FileText size={14} className="text-muted" />{row.title}</span>
+                    <span className="flex items-center gap-2">
+                      <FileText size={14} className="text-muted" />
+                      {row.title}
+                    </span>
                     <SeverityBadge state={row.status} />
                   </Link>
                 </li>
@@ -238,14 +353,22 @@ export function EngagementWorkspace({ id }: { id: string }) {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-border p-4">
+    <div className="p-4">
       <p className="text-xs text-muted">{label}</p>
-      <p className="mt-1 text-2xl font-semibold">{value}</p>
+      <p className="mt-1 font-mono text-2xl font-semibold tabular-nums">
+        {value}
+      </p>
     </div>
   );
 }
 
-function NoteForm({ onSubmit, pending }: { onSubmit: (body: string) => void; pending: boolean }) {
+function NoteForm({
+  onSubmit,
+  pending,
+}: {
+  onSubmit: (body: string) => void;
+  pending: boolean;
+}) {
   const [value, setValue] = useState("");
   function submit(event: FormEvent) {
     event.preventDefault();

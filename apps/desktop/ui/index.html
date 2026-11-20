@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="pt-PT">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <title>CyberAudit OS</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: ui-sans-serif, system-ui, sans-serif;
+        background: #05090d;
+        color: #f2f7f9;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        min-height: 100dvh;
+        margin: 0;
+        display: grid;
+        place-items: center;
+        background: #05090d;
+      }
+      main {
+        width: min(38rem, calc(100% - 2rem));
+        border: 1px solid #17262f;
+        border-radius: 12px;
+        background: #0b151c;
+        padding: 2rem;
+        box-shadow: 0 24px 80px rgb(0 0 0 / 28%);
+      }
+      .eyebrow {
+        margin-bottom: 0.75rem;
+        color: #31f27c;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+      h1 {
+        margin: 0 0 0.5rem;
+        font-size: 1.25rem;
+        letter-spacing: -0.02em;
+      }
+      p {
+        margin: 0;
+        color: #a5b5bc;
+        line-height: 1.55;
+      }
+      .status {
+        margin-top: 1.5rem;
+        display: flex;
+        gap: 0.75rem;
+        align-items: center;
+        color: #31f27c;
+        font-size: 0.875rem;
+      }
+      .status[data-kind="error"] {
+        color: #ff6b73;
+      }
+      .indicator {
+        width: 0.625rem;
+        height: 0.625rem;
+        flex: 0 0 auto;
+        border-radius: 999px;
+        background: currentColor;
+      }
+      .resources {
+        margin: 1rem 0 0;
+        padding: 0;
+        display: grid;
+        gap: 0.4rem;
+        color: #a5b5bc;
+        font:
+          0.78rem ui-monospace,
+          SFMono-Regular,
+          Consolas,
+          monospace;
+        list-style: none;
+      }
+      button {
+        margin-top: 1.25rem;
+        border: 1px solid #31505e;
+        border-radius: 7px;
+        background: #0d1b22;
+        color: #f2f7f9;
+        padding: 0.65rem 0.9rem;
+        font: inherit;
+        cursor: pointer;
+      }
+      button:hover {
+        border-color: #31f27c;
+      }
+      button:focus-visible {
+        outline: 2px solid #20d9ff;
+        outline-offset: 3px;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      @media (prefers-reduced-motion: no-preference) {
+        .status[data-kind="progress"] .indicator {
+          animation: pulse 1.4s ease-in-out infinite;
+        }
+      }
+      @keyframes pulse {
+        50% {
+          opacity: 0.35;
+          transform: scale(0.75);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="eyebrow">Runtime desktop</div>
+      <h1 id="title">A verificar o CyberAudit OS</h1>
+      <p id="message">
+        A validar a integridade dos componentes locais antes do arranque.
+      </p>
+      <div class="status" data-kind="progress" role="status" aria-live="polite">
+        <span class="indicator" aria-hidden="true"></span>
+        <span id="status-text">Verificação em curso</span>
+      </div>
+      <ul
+        class="resources"
+        id="resources"
+        aria-label="Componentes afetados"
+      ></ul>
+      <button type="button" id="retry" hidden>Verificar novamente</button>
+    </main>
+    <script type="module" src="./runtime.js"></script>
+  </body>
+</html>

@@ -19,7 +19,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -35,7 +35,6 @@ from cyberaudit.models import (
     Evidence,
     EvidenceSensitivity,
     Organization,
-    Permission,
     RefreshToken,
     Role,
     User,
@@ -44,12 +43,8 @@ from cyberaudit.password_policy import validate_password_policy
 from cyberaudit.product_services import EDITIONS, LicenseService
 from cyberaudit.provisioning import provision_assessment_catalog
 from cyberaudit.rate_limit import enforce_rate_limit
-from cyberaudit.rbac_catalog import (
-    ALL_PERMISSIONS,
-    PLATFORM_PERMISSION,
-    PLATFORM_ROLE,
-    ROLE_DEFINITIONS,
-)
+from cyberaudit.rbac_catalog import PLATFORM_PERMISSION, PLATFORM_ROLE
+from cyberaudit.rbac_provisioning import ensure_rbac
 from cyberaudit.rls import set_tenant_context
 from cyberaudit.security import (
     authenticated_user,
@@ -57,8 +52,6 @@ from cyberaudit.security import (
     require_permission,
     verify_password,
 )
-from cyberaudit.seed import ROLE_CODES
-from cyberaudit.seed_phase3 import ROLE_PERMISSIONS as PHASE3_ROLE_PERMISSIONS
 
 router = APIRouter(prefix="/api/v1", tags=["administration"])
 
@@ -70,34 +63,6 @@ def _password(value: str, email: str) -> str:
         return validate_password_policy(value, email=email)
     except ValueError as exc:
         raise ValueError(str(exc)) from exc
-
-
-async def ensure_rbac(db: AsyncSession) -> None:
-    """Idempotently make sure every known permission and role exists."""
-    existing = {p.code: p for p in (await db.scalars(select(Permission))).all()}
-    for code in (*ALL_PERMISSIONS, PLATFORM_PERMISSION):
-        if code not in existing:
-            existing[code] = Permission(code=code, description=code.replace(".", " ").title())
-            db.add(existing[code])
-    await db.flush()
-    definitions: dict[str, set[str]] = {n: set(c) for n, c in ROLE_DEFINITIONS.items()}
-    # Legacy built-in roles keep their historical permission sets (plus phase-3 additions).
-    for legacy in ("Auditor", "Reviewer", "Client"):
-        definitions[legacy] = set(ROLE_CODES.get(legacy, [])) | set(
-            PHASE3_ROLE_PERMISSIONS.get(legacy, [])
-        )
-    roles = {r.name: r for r in (await db.scalars(select(Role))).all()}
-    for name, codes in definitions.items():
-        role = roles.get(name)
-        if role is None:
-            role = Role(name=name, description=f"CyberAudit {name}")
-            db.add(role)
-            roles[name] = role
-        have = {p.code for p in role.permissions}
-        for code in sorted(codes - have):
-            if code in existing:
-                role.permissions.append(existing[code])
-    await db.flush()
 
 
 class RoleRead(BaseModel):
@@ -347,9 +312,13 @@ async def create_organization(
 class SetupStatus(BaseModel):
     initialized: bool
     bootstrap_enabled: bool
+    bootstrap_token_required: bool
 
 
 async def _user_count(db: AsyncSession) -> int:
+    if db.get_bind().dialect.name == "postgresql":
+        initialized = await db.scalar(text("SELECT cyberaudit_is_initialized()"))
+        return int(bool(initialized))
     return int(await db.scalar(select(func.count()).select_from(User)) or 0)
 
 
@@ -360,11 +329,12 @@ async def setup_status(db: AsyncSession = Depends(get_db)):
     return SetupStatus(
         initialized=initialized,
         bootstrap_enabled=(not initialized) and bool(settings.bootstrap_token),
+        bootstrap_token_required=not getattr(settings, "desktop_mode", False),
     )
 
 
 class SetupPayload(TenantCreate):
-    bootstrap_token: str = Field(min_length=16, max_length=256)
+    bootstrap_token: str | None = Field(default=None, min_length=16, max_length=256)
 
 
 @router.post("/setup/initialize", status_code=201)
@@ -375,7 +345,10 @@ async def initialize(payload: SetupPayload, db: AsyncSession = Depends(get_db)):
     denied = HTTPException(403, "Setup is not available")
     if not expected or await _user_count(db) > 0:
         raise denied
-    if not hmac.compare_digest(payload.bootstrap_token.encode(), expected.encode()):
+    if not getattr(settings, "desktop_mode", False) and (
+        payload.bootstrap_token is None
+        or not hmac.compare_digest(payload.bootstrap_token.encode(), expected.encode())
+    ):
         raise denied
     await ensure_rbac(db)
     organization, admin = await _create_tenant(db, payload, PLATFORM_ROLE)

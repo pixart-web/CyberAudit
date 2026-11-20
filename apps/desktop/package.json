@@ -1,0 +1,20 @@
+{
+  "name": "@cyberaudit/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "check": "../../infrastructure/scripts/rust-cargo.sh check --manifest-path src-tauri/Cargo.toml && ../../infrastructure/scripts/rust-cargo.sh check --manifest-path runtime-host/Cargo.toml",
+    "lint": "../../infrastructure/scripts/rust-cargo.sh clippy --manifest-path src-tauri/Cargo.toml -- -D warnings && ../../infrastructure/scripts/rust-cargo.sh clippy --manifest-path runtime-host/Cargo.toml -- -D warnings",
+    "test": "../../infrastructure/scripts/rust-cargo.sh test --manifest-path src-tauri/Cargo.toml && ../../infrastructure/scripts/rust-cargo.sh test --manifest-path runtime-host/Cargo.toml && node --test scripts/*.test.mjs",
+    "runtime:host:build": "../../infrastructure/scripts/rust-cargo.sh build --release --manifest-path runtime-host/Cargo.toml",
+    "runtime:web:assemble": "node scripts/assemble-web-runtime.mjs",
+    "runtime:assemble": "node scripts/assemble-runtime.mjs",
+    "runtime:stage": "node scripts/stage-runtime.mjs",
+    "runtime:manifest": "node scripts/generate-runtime-manifest.mjs"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.12.0"
+  }
+}

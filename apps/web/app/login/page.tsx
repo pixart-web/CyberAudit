@@ -48,7 +48,9 @@ export default function LoginPage() {
       sessionStorage.setItem("refresh_token", token.refresh_token);
       router.push("/dashboard");
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Falha na autenticação.");
+      setError(
+        cause instanceof Error ? cause.message : "Falha na autenticação.",
+      );
     }
   };
 
@@ -74,26 +76,30 @@ export default function LoginPage() {
       sessionStorage.setItem("oidc_organization", normalizedOrganization);
       window.location.assign(transaction.authorization_url);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Falha ao iniciar SSO.");
+      setError(
+        cause instanceof Error ? cause.message : "Falha ao iniciar SSO.",
+      );
       setOidcLoading(false);
     }
   };
 
   return (
-    <main className="relative grid min-h-screen place-items-center overflow-hidden px-4">
-      <div className="absolute left-1/2 top-1/2 h-[560px] w-[560px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/[.035] blur-3xl" />
-      <section className="relative w-full max-w-md rounded-2xl border border-border bg-card/95 p-8 shadow-2xl">
+    <main className="relative grid min-h-screen place-items-center overflow-hidden bg-[#080d13] px-4 py-8">
+      <section className="relative w-full max-w-md rounded-lg border border-border bg-card p-7 shadow-panel">
         <Image
           src="/logo.svg"
           width={220}
           height={48}
           alt="CyberAudit"
-          className="mx-auto mb-8"
+          className="mx-auto mb-7"
           priority
         />
         <div className="mb-6 text-center">
-          <h1 className="text-2xl font-semibold">Acesso seguro</h1>
-          <p className="mt-2 text-sm text-muted">Gestão de auditorias autorizadas</p>
+          <p className="blacksite-kicker mb-2">Local security workstation</p>
+          <h1 className="text-xl font-semibold">Acesso seguro</h1>
+          <p className="mt-2 text-xs text-muted">
+            Autenticação auditada para operações autorizadas
+          </p>
         </div>
         {error && (
           <div
@@ -127,19 +133,32 @@ export default function LoginPage() {
           <span>ou com credenciais locais</span>
           <span className="h-px flex-1 bg-border" />
         </div>
-        <form method="post" onSubmit={handleSubmit(submit)} className="space-y-4">
+        <form
+          method="post"
+          onSubmit={handleSubmit(submit)}
+          className="space-y-4"
+        >
           <label className="block text-sm">
             <span className="mb-1.5 block text-muted">Email</span>
             <span className="relative block">
               <Mail size={17} className="absolute left-3 top-3 text-muted" />
-              <input {...register("email")} className="field pl-10" autoComplete="email" />
+              <input
+                {...register("email")}
+                className="field pl-10"
+                autoComplete="email"
+              />
             </span>
-            {errors.email && <small className="text-critical">{errors.email.message}</small>}
+            {errors.email && (
+              <small className="text-critical">{errors.email.message}</small>
+            )}
           </label>
           <label className="block text-sm">
             <span className="mb-1.5 block text-muted">Password</span>
             <span className="relative block">
-              <LockKeyhole size={17} className="absolute left-3 top-3 text-muted" />
+              <LockKeyhole
+                size={17}
+                className="absolute left-3 top-3 text-muted"
+              />
               <input
                 {...register("password")}
                 className="field pl-10"
@@ -151,7 +170,11 @@ export default function LoginPage() {
               <small className="text-critical">{errors.password.message}</small>
             )}
           </label>
-          <button type="submit" className="button-secondary w-full" disabled={isSubmitting}>
+          <button
+            type="submit"
+            className="button-secondary w-full"
+            disabled={isSubmitting}
+          >
             {isSubmitting ? "A autenticar…" : "Entrar na plataforma"}
           </button>
         </form>

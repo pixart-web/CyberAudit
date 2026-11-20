@@ -1,0 +1,306 @@
+name: desktop-native
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/desktop-native.yml"
+      - "apps/api/**"
+      - "apps/desktop/**"
+      - "apps/web/**"
+      - "infrastructure/scripts/build-desktop-runtime-macos.sh"
+      - "pnpm-lock.yaml"
+      - "Makefile"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-native-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos-native:
+    name: macOS ${{ matrix.arch }} native package
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+            machine_arch: arm64
+            target: macos-arm64
+          - runner: macos-15-intel
+            arch: x64
+            machine_arch: x86_64
+            target: macos-x64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+      - name: Assert native runner architecture
+        run: test "$(uname -m)" = "${{ matrix.machine_arch }}"
+      - uses: dtolnay/rust-toolchain@1.90.0
+        with:
+          components: clippy, rustfmt
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22.17.1"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: python -m pip install --upgrade "pip>=26.1.2"
+      - name: Install desktop Python dependencies
+        if: matrix.arch != 'x64'
+        run: python -m pip install -e "apps/api[desktop]"
+      - name: Install Intel dependencies with a single static OpenSSL
+        if: matrix.arch == 'x64'
+        run: |
+          OPENSSL_PREFIX="$(brew --prefix openssl@3)"
+          test -f "$OPENSSL_PREFIX/lib/libssl.a"
+          test -f "$OPENSSL_PREFIX/lib/libcrypto.a"
+          OPENSSL_DIR="$OPENSSL_PREFIX" OPENSSL_STATIC=1 \
+            python -m pip install --no-cache-dir --no-binary cryptography \
+            -e "apps/api[desktop]"
+      - name: Verify cryptography native dependency boundary
+        run: |
+          BINDING="$(python -c 'import cryptography.hazmat.bindings._rust as binding; print(binding.__file__)')"
+          test "$(lipo -archs "$BINDING")" = "${{ matrix.machine_arch }}"
+          if otool -L "$BINDING" | tail -n +2 | grep -E '/lib(ssl|crypto)\.[^/ ]*dylib'; then
+            echo "cryptography must not depend on a mutable runner OpenSSL dylib" >&2
+            exit 1
+          fi
+      - name: Build pinned native PostgreSQL, Valkey and Node
+        run: >-
+          infrastructure/scripts/build-desktop-runtime-macos.sh
+          "${{ matrix.machine_arch }}"
+          "${{ github.workspace }}/artifacts/native/${{ matrix.target }}"
+      - name: Build same-origin Next standalone runtime
+        run: |
+          pnpm --filter @cyberaudit/web build
+          node apps/desktop/scripts/assemble-web-runtime.mjs \
+            "artifacts/web/${{ matrix.target }}" \
+            "artifacts/native/${{ matrix.target }}/node"
+        env:
+          CYBERAUDIT_DESKTOP_BUILD: "1"
+          NEXT_PUBLIC_API_URL: /api/v1
+      - name: Build fixed native runtime hosts
+        run: |
+          cargo build --release --manifest-path apps/desktop/runtime-host/Cargo.toml
+          mkdir -p "artifacts/hosts/${{ matrix.target }}"
+          cp apps/desktop/runtime-host/target/release/cyberaudit-postgres "artifacts/hosts/${{ matrix.target }}/"
+          cp apps/desktop/runtime-host/target/release/cyberaudit-valkey "artifacts/hosts/${{ matrix.target }}/"
+          cp apps/desktop/runtime-host/target/release/cyberaudit-web "artifacts/hosts/${{ matrix.target }}/"
+      - name: Build packaged API and worker sidecars
+        run: >-
+          pyinstaller --noconfirm
+          --distpath "artifacts/python/${{ matrix.target }}"
+          --workpath "${RUNNER_TEMP}/cyberaudit-pyinstaller"
+          apps/api/desktop/cyberaudit-runtime.spec
+        env:
+          PYINSTALLER_CONFIG_DIR: ${{ runner.temp }}/pyinstaller-config
+      - name: Smoke-test packaged sidecars
+        run: |
+          "artifacts/python/${{ matrix.target }}/cyberaudit-api" --help
+          "artifacts/python/${{ matrix.target }}/cyberaudit-worker" --help
+          "artifacts/python/${{ matrix.target }}/cyberaudit-worker" --verify-package
+      - name: Assemble and verify the complete native runtime
+        run: >-
+          node apps/desktop/scripts/assemble-runtime.mjs
+          "artifacts/runtime/${{ matrix.target }}"
+          "artifacts/web/${{ matrix.target }}"
+          "artifacts/hosts/${{ matrix.target }}"
+          "artifacts/python/${{ matrix.target }}"
+          "artifacts/native/${{ matrix.target }}/postgresql"
+          "artifacts/native/${{ matrix.target }}/provenance/postgresql.json"
+          "artifacts/native/${{ matrix.target }}/valkey"
+          "artifacts/native/${{ matrix.target }}/provenance/valkey.json"
+          "${{ matrix.target }}"
+          --smoke
+      - name: Build the native application and DMG
+        run: pnpm --filter @cyberaudit/desktop build
+        env:
+          APPLE_SIGNING_IDENTITY: "-"
+          CYBERAUDIT_DESKTOP_RUNTIME_DIR: artifacts/runtime/${{ matrix.target }}
+          CARGO_PROFILE_RELEASE_STRIP: none
+      - name: Verify package architecture, integrity and signing state
+        run: |
+          BUNDLE="apps/desktop/src-tauri/target/release/bundle"
+          APP="$BUNDLE/macos/CyberAudit OS.app"
+          test -d "$APP"
+          test -n "$(find "$BUNDLE/dmg" -name '*.dmg' -type f -print -quit)"
+          test "$(lipo -archs "$APP/Contents/MacOS/cyberaudit-desktop")" = "${{ matrix.machine_arch }}"
+          codesign --verify --deep --strict "$APP"
+          hdiutil verify "$(find "$BUNDLE/dmg" -name '*.dmg' -type f -print -quit)"
+          node apps/desktop/scripts/write-native-build-report.mjs \
+            "$BUNDLE/native-build-report.json" \
+            "macos" "${{ matrix.arch }}" "ad-hoc" "not-notarized" "$BUNDLE"
+          (
+            cd "$BUNDLE"
+            CHECKSUM_FILE="$RUNNER_TEMP/cyberaudit-${{ matrix.target }}-SHA256SUMS"
+            find . -type f ! -name SHA256SUMS -print0 \
+              | sort -z \
+              | xargs -0 shasum -a 256 > "$CHECKSUM_FILE"
+            shasum -a 256 -c "$CHECKSUM_FILE"
+            mv "$CHECKSUM_FILE" SHA256SUMS
+          )
+      - uses: actions/upload-artifact@v6
+        with:
+          name: cyberaudit-desktop-${{ matrix.target }}-unsigned
+          path: apps/desktop/src-tauri/target/release/bundle/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+
+  windows-x64:
+    name: Windows x64 broker compatibility gate
+    runs-on: windows-2025
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - name: Assert x64 runner architecture
+        shell: pwsh
+        run: |
+          if ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -ne "X64") {
+            throw "The Windows desktop package requires a native x64 runner."
+          }
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "10.0.403"
+      - name: Assert pinned .NET SDK
+        shell: pwsh
+        run: |
+          $sdkVersion = dotnet --version
+          if ($sdkVersion -ne "10.0.403") {
+            throw "Expected .NET SDK 10.0.403, got $sdkVersion."
+          }
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install the pinned Dramatiq compatibility client
+        run: python -m pip install "dramatiq[redis]==1.17.1"
+      - name: Publish the fixed-purpose self-contained broker
+        run: >-
+          dotnet publish
+          apps/desktop/windows-broker-host/CyberAudit.WindowsBroker.csproj
+          --configuration Release
+          --runtime win-x64
+          --self-contained true
+          --property:RestoreLockedMode=true
+          --output artifacts/windows-x64/broker
+          --nologo
+      - name: Exercise authentication, Dramatiq Lua protocol and AOF recovery
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $broker = Resolve-Path "artifacts/windows-x64/broker/cyberaudit-valkey.exe"
+          & $broker --verify-package
+
+          $listener = [System.Net.Sockets.TcpListener]::new(
+            [System.Net.IPAddress]::Loopback,
+            0
+          )
+          $listener.Start()
+          $port = ([System.Net.IPEndPoint]$listener.LocalEndpoint).Port
+          $listener.Stop()
+
+          $secretBytes = [byte[]]::new(32)
+          [System.Security.Cryptography.RandomNumberGenerator]::Fill($secretBytes)
+          $password = [Convert]::ToHexString($secretBytes).ToLowerInvariant()
+          $dataDirectory = Join-Path $env:RUNNER_TEMP "cyberaudit-garnet"
+          New-Item -ItemType Directory -Path $dataDirectory | Out-Null
+          $env:CYBERAUDIT_BROKER_DIRECTORY = $dataDirectory
+          $env:CYBERAUDIT_BROKER_PORT = $port.ToString()
+          $env:CYBERAUDIT_BROKER_PASSWORD = $password
+
+          function Start-CyberAuditBroker {
+            $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+            $startInfo.FileName = $broker
+            $startInfo.UseShellExecute = $false
+            $startInfo.CreateNoWindow = $true
+            $startInfo.RedirectStandardInput = $true
+            [void]$startInfo.Environment.Remove("CYBERAUDIT_BROKER_PASSWORD")
+            $child = [System.Diagnostics.Process]::new()
+            $child.StartInfo = $startInfo
+            [void]$child.Start()
+            $child.StandardInput.WriteLine($password)
+            $child.StandardInput.Close()
+            return $child
+          }
+
+          function Wait-CyberAuditBroker([System.Diagnostics.Process]$process) {
+            $deadline = [DateTime]::UtcNow.AddSeconds(30)
+            do {
+              if ($process.HasExited) {
+                throw "The broker exited before becoming ready."
+              }
+              try {
+                $client = [System.Net.Sockets.TcpClient]::new()
+                $client.Connect("127.0.0.1", $port)
+                $client.Dispose()
+                return
+              } catch {
+                Start-Sleep -Milliseconds 100
+              }
+            } while ([DateTime]::UtcNow -lt $deadline)
+            throw "The broker did not become ready before its deadline."
+          }
+
+          $process = Start-CyberAuditBroker
+          try {
+            Wait-CyberAuditBroker $process
+            $listeners = Get-NetTCPConnection -State Listen -OwningProcess $process.Id
+            if ($listeners.Count -ne 1 -or $listeners[0].LocalAddress -ne "127.0.0.1") {
+              throw "The broker is not restricted to a single IPv4 loopback listener."
+            }
+            $env:CYBERAUDIT_D13_BROKER_STAGE = "core"
+            python apps/desktop/windows-broker-host/verify_dramatiq.py
+            $env:CYBERAUDIT_D13_BROKER_STAGE = "persist"
+            python apps/desktop/windows-broker-host/verify_dramatiq.py
+          } finally {
+            if (!$process.HasExited) {
+              $process.Kill()
+              $process.WaitForExit()
+            }
+          }
+
+          $process = Start-CyberAuditBroker
+          try {
+            Wait-CyberAuditBroker $process
+            $env:CYBERAUDIT_D13_BROKER_STAGE = "recover"
+            python apps/desktop/windows-broker-host/verify_dramatiq.py
+          } finally {
+            if (!$process.HasExited) {
+              $process.Kill()
+              $process.WaitForExit()
+            }
+            Remove-Item Env:CYBERAUDIT_BROKER_PASSWORD
+          }
+
+          $hash = (Get-FileHash $broker -Algorithm SHA256).Hash.ToLowerInvariant()
+          @{
+            platform = "windows"
+            architecture = "x64"
+            broker_build_result = "PASS"
+            dramatiq_compatibility = "PASS"
+            authenticated_loopback = "PASS"
+            abrupt_restart_recovery = "PASS"
+            broker_sha256 = $hash
+            signing_status = "not-signed"
+            installer = $null
+            package_result = "BLOCKED"
+            blocker = "The complete PostgreSQL, Python, Node, Tauri and NSIS runtime has not yet been assembled and exercised on Windows. This gate proves only the broker boundary."
+          } | ConvertTo-Json | Set-Content -Encoding utf8 artifacts/windows-x64/native-build-report.json
+      - uses: actions/upload-artifact@v6
+        with:
+          name: cyberaudit-desktop-windows-x64-broker-evidence
+          path: |
+            artifacts/windows-x64/broker/cyberaudit-valkey.exe
+            artifacts/windows-x64/native-build-report.json
+          if-no-files-found: error
+          retention-days: 7

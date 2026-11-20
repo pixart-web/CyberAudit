@@ -15,11 +15,16 @@ node_modules/
 coverage/
 uploads/
 dist/
+target/
+apps/desktop/src-tauri/gen/
+apps/desktop/src-tauri/resources/runtime/*
+!apps/desktop/src-tauri/resources/runtime/.gitkeep
 *.log
 dump.rdb
 *.tsbuildinfo
 .DS_Store
 .local/
+.artifacts/
 
 # Phase 10.2 readiness runtime material. Manifests and sanitized reports are
 # selectively re-included below; private keys, tokens and service data never are.

@@ -9,7 +9,7 @@ import { api } from "@/lib/api";
 
 export default function SetupPage() {
   const [created, setCreated] = useState(false);
-  const status = useQuery({ queryKey: ["setup-status"], queryFn: () => api<{ initialized: boolean; bootstrap_enabled: boolean }>("/setup/status"), retry: false });
+  const status = useQuery({ queryKey: ["setup-status"], queryFn: () => api<{ initialized: boolean; bootstrap_enabled: boolean; bootstrap_token_required: boolean }>("/setup/status"), retry: false });
 
   return (
     <main className="mx-auto max-w-2xl p-6">
@@ -34,7 +34,9 @@ export default function SetupPage() {
           submitLabel="Concluir configuração"
           onCreated={() => setCreated(true)}
           fields={[
-            { name: "bootstrap_token", label: "Token de configuração", type: "password", required: true, minLength: 16, help: "Fornecido pelo operador (variável BOOTSTRAP_TOKEN)" },
+            ...(status.data.bootstrap_token_required
+              ? [{ name: "bootstrap_token", label: "Token de configuração", type: "password" as const, required: true, minLength: 16, help: "Fornecido pelo operador (variável BOOTSTRAP_TOKEN)" }]
+              : []),
             { name: "name", label: "Nome da organização", required: true },
             { name: "slug", label: "Identificador", required: true, help: "Minúsculas, números e hífens" },
             { name: "admin_name", label: "Nome do administrador", required: true },

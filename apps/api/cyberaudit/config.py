@@ -14,7 +14,14 @@ class Settings(BaseSettings):
         extra="ignore",
     )
     environment: Literal[
-        "development", "test", "demo", "staging", "production", "on_premises", "ha"
+        "development",
+        "test",
+        "demo",
+        "desktop",
+        "staging",
+        "production",
+        "on_premises",
+        "ha",
     ] = "development"
     database_url: str = "sqlite+aiosqlite:///./cyberaudit.db"
     redis_url: str = "redis://localhost:6379/0"
@@ -102,6 +109,8 @@ class Settings(BaseSettings):
     # A bundle's signature must verify against one of these; it is never
     # trusted merely because it was uploaded (see cyberaudit.update_bundle).
     update_trusted_public_keys_pem: list[str] = []
+    desktop_mode: bool = False
+    desktop_session_secret_file: Path | None = None
 
     @property
     def production_like(self) -> bool:
@@ -109,6 +118,58 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def reject_insecure_production(self) -> "Settings":
+        if self.desktop_mode:
+            desktop_errors: list[str] = []
+            if self.environment != "desktop":
+                desktop_errors.append("ENVIRONMENT must be desktop")
+            if self.desktop_session_secret_file is None:
+                desktop_errors.append("DESKTOP_SESSION_SECRET_FILE is required")
+            parsed_origin = urlparse(self.app_origin)
+            if (
+                parsed_origin.scheme != "http"
+                or parsed_origin.hostname not in {"127.0.0.1", "localhost"}
+                or parsed_origin.username is not None
+                or parsed_origin.password is not None
+            ):
+                desktop_errors.append("a plain HTTP loopback APP_ORIGIN is required")
+            database = urlparse(self.database_url)
+            if (
+                database.scheme != "postgresql+asyncpg"
+                or database.hostname not in {"127.0.0.1", "localhost"}
+                or not database.username
+                or not database.password
+                or not database.path.strip("/")
+            ):
+                desktop_errors.append("DATABASE_URL must use authenticated PostgreSQL on loopback")
+            broker = urlparse(self.redis_url)
+            if (
+                broker.scheme not in {"redis", "rediss"}
+                or broker.hostname not in {"127.0.0.1", "localhost"}
+                or not broker.password
+            ):
+                desktop_errors.append("REDIS_URL must use an authenticated loopback broker")
+            if (
+                self.jwt_secret.startswith(("development-", "replace-", "change-", "example-"))
+                or len(self.jwt_secret) < 32
+            ):
+                desktop_errors.append("JWT_SECRET must be installation-specific")
+            if (
+                self.encryption_key.startswith(("development-", "replace-", "change-", "example-"))
+                or len(self.encryption_key) < 32
+            ):
+                desktop_errors.append("ENCRYPTION_KEY must be installation-specific")
+            if self.debug or self.trusted_proxy:
+                desktop_errors.append("debug and proxy trust must be disabled")
+            if self.api_docs_enabled:
+                desktop_errors.append("API documentation must be disabled")
+            if "*" in self.allowed_hosts or any(
+                host not in {"127.0.0.1", "localhost"} for host in self.allowed_hosts
+            ):
+                desktop_errors.append("ALLOWED_HOSTS must contain only loopback hosts")
+            if not self.rls_required or self.database_runtime_role != "cyberaudit_runtime":
+                desktop_errors.append("PostgreSQL RLS runtime role is required")
+            if desktop_errors:
+                raise ValueError("Unsafe desktop configuration: " + "; ".join(desktop_errors))
         if not self.production_like:
             return self
         errors: list[str] = []
