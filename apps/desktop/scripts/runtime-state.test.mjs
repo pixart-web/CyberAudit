@@ -3,7 +3,19 @@ import test from "node:test";
 import {
   runtimeFailurePresentation,
   runtimePresentation,
+  shouldPollRuntime,
 } from "../ui/runtime-state.mjs";
+
+test("polls only while native startup can still advance", () => {
+  assert.equal(shouldPollRuntime({ state: "verifying_resources" }), true);
+  assert.equal(shouldPollRuntime({ state: "resources_verified" }), true);
+  assert.equal(shouldPollRuntime({ state: "ready", ready: true }), false);
+  assert.equal(
+    shouldPollRuntime({ state: "credential_migration_required" }),
+    false,
+  );
+  assert.equal(shouldPollRuntime({ state: "failed" }), false);
+});
 
 test("shows verified resources as progress without claiming service readiness", () => {
   const result = runtimePresentation({

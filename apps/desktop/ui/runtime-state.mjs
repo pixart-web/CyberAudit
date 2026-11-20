@@ -7,6 +7,13 @@ const RESOURCE_LABELS = Object.freeze({
   "manifest.json": "Manifesto do runtime",
 });
 
+export function shouldPollRuntime(status) {
+  return (
+    status?.state === "verifying_resources" ||
+    status?.state === "resources_verified"
+  );
+}
+
 export function runtimePresentation(status) {
   if (status?.state === "verifying_resources") {
     return {

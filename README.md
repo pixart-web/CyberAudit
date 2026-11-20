@@ -142,7 +142,10 @@ um job Dramatiq concluído, isolamento entre duas organizações, shutdown e
 restart sobre os mesmos dados. O mesmo fluxo passou com rede externa bloqueada
 e apenas loopback permitido. Bundles Tauri `.app` e `.dmg` ARM64 foram
 construídos localmente; o `.app` debug abriu o frontend real. Os builds nativos
-macOS ARM64 e x64 passam em CI, mas continuam ad-hoc e não notarizados. O D13
+macOS ARM64 e x64 passam em CI, mas continuam ad-hoc e não notarizados. O D14
+verificou checksums portáteis, DMGs ARM64/x64 e a cópia do ARM64 para
+`/Applications` num Mac de desenvolvimento; uma instalação limpa, o percurso
+GUI completo, Developer ID e notarização continuam pendentes. O D13
 acrescenta uma gate Windows para um broker Garnet self-contained: a password
 proveniente do Credential Manager é entregue ao processo apenas por stdin e a
 gate exerce o protocolo Lua real do Dramatiq e recuperação AOF. Isto ainda não
@@ -173,6 +176,7 @@ Ver `docs/architecture/desktop-reality-audit.md`,
 `docs/architecture/adr-035-desktop-first-runtime.md`,
 `docs/architecture/desktop-native-readiness-d8-d12.md`,
 `docs/architecture/desktop-native-readiness-d13.md`,
+`docs/architecture/desktop-macos-readiness-d14.md`,
 `docs/development/desktop-development.md` e
 `docs/security/desktop-threat-model.md`.
 

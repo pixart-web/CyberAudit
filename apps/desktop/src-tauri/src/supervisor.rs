@@ -1055,6 +1055,10 @@ fn runtime_environment(
                 environment.insert("CYBERAUDIT_DESKTOP_API_PORT", ports.api.to_string());
             }
             if process == RuntimeProcess::Worker {
+                // Dramatiq's Prometheus middleware defaults to 0.0.0.0:9191.
+                // The desktop runtime is local-only, so its metrics endpoint
+                // must never be reachable from another host on the network.
+                environment.insert("dramatiq_prom_host", "127.0.0.1".to_owned());
                 environment.insert(
                     "CYBERAUDIT_DESKTOP_READY_FILE",
                     layout
@@ -1359,6 +1363,10 @@ mod tests {
             .environment
             .get("DATABASE_URL")
             .is_some_and(|url| url.contains("cyberaudit_app:")));
+        assert_eq!(
+            plan.steps()[4].environment.get("dramatiq_prom_host"),
+            Some(&"127.0.0.1".to_owned())
+        );
         fs::remove_dir_all(root).expect("fixture should be removed");
     }
 
@@ -1470,9 +1478,7 @@ mod tests {
         let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).expect("listener should bind");
         let port = listener.local_addr().expect("listener address").port();
         let password = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-        let expected = format!(
-            "*2\r\n$4\r\nAUTH\r\n$64\r\n{password}\r\n*1\r\n$4\r\nPING\r\n"
-        );
+        let expected = format!("*2\r\n$4\r\nAUTH\r\n$64\r\n{password}\r\n*1\r\n$4\r\nPING\r\n");
         let server = thread::spawn(move || {
             let (mut stream, _) = listener.accept().expect("probe should connect");
             let mut request = vec![0_u8; expected.len()];

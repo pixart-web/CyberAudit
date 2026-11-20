@@ -43,6 +43,8 @@ impl RuntimeLayout {
     }
 
     pub fn initialize(root: &Path) -> Result<Self, RuntimeError> {
+        fs::create_dir_all(root)?;
+        restrict_directory(root)?;
         let layout = Self::for_root(root);
         for directory in layout.directories() {
             fs::create_dir_all(directory)?;
@@ -411,6 +413,18 @@ mod tests {
         for directory in layout.directories() {
             assert!(directory.is_dir());
             assert!(directory.starts_with(&root));
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(
+                fs::metadata(&root)
+                    .expect("runtime root metadata should be readable")
+                    .permissions()
+                    .mode()
+                    & 0o077,
+                0
+            );
         }
         fs::remove_dir_all(root).expect("temporary layout should be removable");
     }

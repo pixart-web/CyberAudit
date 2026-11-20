@@ -1,7 +1,11 @@
 import {
   runtimeFailurePresentation,
   runtimePresentation,
+  shouldPollRuntime,
 } from "./runtime-state.mjs";
+
+const RUNTIME_POLL_INTERVAL_MS = 250;
+let verificationTimer = null;
 
 const elements = {
   title: document.querySelector("#title"),
@@ -33,10 +37,19 @@ function render(presentation) {
 }
 
 async function verifyRuntime() {
+  if (verificationTimer !== null) {
+    window.clearTimeout(verificationTimer);
+    verificationTimer = null;
+  }
   elements.retry.disabled = true;
   try {
     const status = await window.__TAURI__.core.invoke("desktop_runtime_status");
     render(runtimePresentation(status));
+    if (shouldPollRuntime(status)) {
+      verificationTimer = window.setTimeout(() => {
+        void verifyRuntime();
+      }, RUNTIME_POLL_INTERVAL_MS);
+    }
   } catch {
     render(runtimeFailurePresentation());
   } finally {

@@ -93,6 +93,8 @@ struct SupervisorControl {
     sender: Mutex<mpsc::Sender<SupervisorCommand>>,
 }
 
+const SUPERVISOR_SHUTDOWN_WAIT: Duration = Duration::from_secs(90);
+
 enum SupervisorCommand {
     Stop(Option<mpsc::SyncSender<()>>),
 }
@@ -100,7 +102,17 @@ enum SupervisorCommand {
 impl SupervisorControl {
     fn stop(&self) {
         if let Ok(sender) = self.sender.lock() {
-            let _ = sender.send(SupervisorCommand::Stop(None));
+            let (completion_sender, completion_receiver) = mpsc::sync_channel(1);
+            if sender
+                .send(SupervisorCommand::Stop(Some(completion_sender)))
+                .is_ok()
+            {
+                // ExitRequested is delivered before Tauri tears the process
+                // down. Keep the native supervisor alive until its owned
+                // process groups have been reaped so sidecars cannot be
+                // orphaned when the user quits the application.
+                let _ = completion_receiver.recv_timeout(SUPERVISOR_SHUTDOWN_WAIT);
+            }
         }
     }
 }
@@ -125,6 +137,19 @@ fn install_termination_handlers() -> Result<(), std::io::Error> {
 }
 
 #[cfg(unix)]
+fn configure_private_process_umask() {
+    // This runs before any worker threads or child services are created. It
+    // keeps files created later by PostgreSQL, Valkey, and the sidecars private
+    // even when the graphical login session has a permissive default umask.
+    unsafe {
+        libc::umask(0o077);
+    }
+}
+
+#[cfg(not(unix))]
+fn configure_private_process_umask() {}
+
+#[cfg(unix)]
 fn spawn_termination_watcher(
     app: tauri::AppHandle,
     sender: mpsc::Sender<SupervisorCommand>,
@@ -138,7 +163,7 @@ fn spawn_termination_watcher(
                     .send(SupervisorCommand::Stop(Some(completion_sender)))
                     .is_ok()
                 {
-                    let _ = completion_receiver.recv_timeout(Duration::from_secs(30));
+                    let _ = completion_receiver.recv_timeout(SUPERVISOR_SHUTDOWN_WAIT);
                 }
                 app.exit(0);
                 break;
@@ -299,6 +324,7 @@ fn launch_runtime(
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    configure_private_process_umask();
     #[cfg(unix)]
     install_termination_handlers().expect("CyberAudit termination handlers failed to initialize");
     let status = Arc::new(Mutex::new(DesktopRuntimeStatus::starting()));
@@ -347,4 +373,33 @@ pub fn run() {
             app.state::<SupervisorControl>().stop();
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{SupervisorCommand, SupervisorControl};
+    use std::sync::{mpsc, Mutex};
+    use std::thread;
+    use std::time::{Duration, Instant};
+
+    #[test]
+    fn exit_waits_for_supervisor_cleanup_acknowledgement() {
+        let (sender, receiver) = mpsc::channel();
+        let control = SupervisorControl {
+            sender: Mutex::new(sender),
+        };
+        let worker = thread::spawn(move || match receiver.recv().expect("stop command") {
+            SupervisorCommand::Stop(Some(completion)) => {
+                thread::sleep(Duration::from_millis(25));
+                completion.send(()).expect("cleanup acknowledgement");
+            }
+            _ => panic!("exit must request an acknowledged stop"),
+        });
+
+        let started = Instant::now();
+        control.stop();
+
+        assert!(started.elapsed() >= Duration::from_millis(20));
+        worker.join().expect("cleanup worker should finish");
+    }
 }
